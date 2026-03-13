@@ -146,6 +146,14 @@ async def get_asset_file(asset_id: str, filename: str):
     return FileResponse(path, media_type=media_type)
 
 
+@router.delete("/{asset_id}", status_code=204)
+async def delete_asset(asset_id: str):
+    """Löscht Asset-Ordner und alle zugehörigen Dateien unwiderruflich."""
+    deleted = asset_service.delete_asset(asset_id)
+    if not deleted:
+        raise HTTPException(404, detail="Asset nicht gefunden")
+
+
 @router.post("", response_model=CreateAssetResponse)
 async def create_asset():
     """Neues Asset anlegen, gibt asset_id zurück."""
