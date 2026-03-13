@@ -21,6 +21,14 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
+    # Optional: GPU für UniRig (Lokal) aktivieren — auskommentiert, Stack läuft ohne GPU
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
     volumes:
       - ./api:/app
       - ./storage/meshes:/app/storage/meshes
@@ -34,6 +42,8 @@ services:
       - PICSART_API_KEY=${PICSART_API_KEY:-}
       - HF_TOKEN=${HF_TOKEN:-}
       - U2NET_HOME=/app/storage/rembg_cache
+      - UNIRIG_MODEL_PATH=${UNIRIG_MODEL_PATH:-./models/unirig/}
+      - UNIRIG_REPO_PATH=${UNIRIG_REPO_PATH:-./unirig/}
     depends_on:
       db:
         condition: service_healthy
