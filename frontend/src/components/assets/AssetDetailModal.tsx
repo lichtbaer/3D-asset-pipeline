@@ -40,7 +40,7 @@ export function AssetDetailModal({ assetId, onClose }: AssetDetailModalProps) {
   });
 
   const handleAction = (
-    tab: "bgremoval" | "mesh",
+    tab: "bgremoval" | "mesh" | "rigging",
     sourceUrl: string,
     assetIdForJob: string
   ) => {
@@ -87,6 +87,8 @@ export function AssetDetailModal({ assetId, onClose }: AssetDetailModalProps) {
   const hasBgremoval =
     "bgremoval" in steps && steps.bgremoval && "file" in steps.bgremoval;
   const hasMesh = "mesh" in steps && steps.mesh && "file" in steps.mesh;
+  const hasRigging =
+    "rigging" in steps && steps.rigging && "file" in steps.rigging;
 
   const imageFile =
     hasImage && steps.image && "file" in steps.image
@@ -105,6 +107,13 @@ export function AssetDetailModal({ assetId, onClose }: AssetDetailModalProps) {
     hasMesh && steps.mesh && "file" in steps.mesh
       ? getAssetFileUrl(data.asset_id, String(steps.mesh.file))
       : null;
+  const riggingFile =
+    hasRigging && steps.rigging && "file" in steps.rigging
+      ? String(steps.rigging.file)
+      : null;
+  const riggingUrl = riggingFile
+    ? getAssetFileUrl(data.asset_id, riggingFile)
+    : null;
 
   return (
     <div className="asset-modal" role="dialog" aria-modal="true">
@@ -179,6 +188,19 @@ export function AssetDetailModal({ assetId, onClose }: AssetDetailModalProps) {
                 </a>
               </div>
             )}
+            {hasRigging && riggingUrl && (
+              <div className="asset-modal__preview-item">
+                <MeshViewer glbUrl={riggingUrl} height={450} />
+                <p className="asset-modal__preview-label">rigging.glb</p>
+                <a
+                  href={riggingUrl}
+                  download
+                  className="asset-modal__download"
+                >
+                  Download GLB
+                </a>
+              </div>
+            )}
           </div>
         </section>
 
@@ -229,7 +251,18 @@ export function AssetDetailModal({ assetId, onClose }: AssetDetailModalProps) {
                   → Als Mesh-Input
                 </button>
               )}
-            {hasImage && hasBgremoval && hasMesh && (
+            {hasMesh && !hasRigging && meshUrl && (
+              <button
+                type="button"
+                className="asset-modal__action-btn"
+                onClick={() =>
+                  handleAction("rigging", meshUrl, data.asset_id)
+                }
+              >
+                → Riggen
+              </button>
+            )}
+            {hasImage && hasBgremoval && hasMesh && hasRigging && (
               <p className="asset-modal__all-done">
                 Alle Schritte vorhanden. Nutze die Download-Links oben.
               </p>
