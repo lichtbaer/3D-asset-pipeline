@@ -25,6 +25,7 @@ services:
       - ./api:/app
     environment:
       - DATABASE_URL=postgresql+asyncpg://user:password@db:5432/purzel
+      - PICSART_API_KEY=${PICSART_API_KEY:-}
     depends_on:
       db:
         condition: service_healthy
