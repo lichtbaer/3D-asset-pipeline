@@ -3,7 +3,7 @@ export interface AnimationJobHistoryEntry {
   motion_prompt: string;
   provider_key: string;
   status: string;
-  glb_url: string | null;
+  animated_glb_url: string | null;
   created_at?: string;
   asset_id?: string | null;
 }
@@ -55,13 +55,13 @@ export function AnimationJobHistory({ jobs }: AnimationJobHistoryProps) {
                   {formatDate(job.created_at)}
                 </span>
               )}
-              {job.status === "done" && job.glb_url && (
+              {job.status === "done" && job.animated_glb_url && (
                 <a
-                  href={job.glb_url}
+                  href={job.animated_glb_url}
                   download
                   className="job-history__download"
                 >
-                  GLB herunterladen
+                  Animation herunterladen
                 </a>
               )}
               {job.status === "done" && job.asset_id && (

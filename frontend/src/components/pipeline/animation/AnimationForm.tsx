@@ -4,15 +4,15 @@ import { MeshViewer } from "../../viewer/MeshViewer.js";
 import {
   getAnimationPresets,
   type AnimationProvider,
-  type AnimationPreset,
+  type MotionPreset,
 } from "../../../api/animation.js";
 
-const DEFAULT_PRESETS: AnimationPreset[] = [
-  { key: "walk", label: "Gehen", motion_prompt: "Gehen" },
-  { key: "run", label: "Laufen", motion_prompt: "Laufen" },
-  { key: "idle", label: "Idle", motion_prompt: "Idle" },
-  { key: "jump", label: "Springen", motion_prompt: "Springen" },
-  { key: "wave", label: "Winken", motion_prompt: "Winken" },
+const DEFAULT_PRESETS: MotionPreset[] = [
+  { key: "walk", display_name: "Gehen", prompt: "Gehen" },
+  { key: "run", display_name: "Laufen", prompt: "Laufen" },
+  { key: "idle", display_name: "Idle", prompt: "Idle" },
+  { key: "jump", display_name: "Springen", prompt: "Springen" },
+  { key: "wave", display_name: "Winken", prompt: "Winken" },
 ];
 
 export interface AnimationFormProps {
@@ -59,8 +59,8 @@ export function AnimationForm({
     }
   }, [effectiveProviderKey, providerKey]);
 
-  const handlePresetClick = (preset: AnimationPreset) => {
-    setMotionPrompt(preset.motion_prompt);
+  const handlePresetClick = (preset: MotionPreset) => {
+    setMotionPrompt(preset.prompt);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -98,7 +98,7 @@ export function AnimationForm({
           <MeshViewer
             glbUrl={sourceGlbUrl}
             height={200}
-            autoRotate
+            autoRotateDefault
             className="animation-form__preview-viewer"
           />
         </div>
@@ -115,7 +115,7 @@ export function AnimationForm({
               onClick={() => handlePresetClick(preset)}
               disabled={presetsLoading}
             >
-              {preset.label}
+              {preset.display_name}
             </button>
           ))}
         </div>

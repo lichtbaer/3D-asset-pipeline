@@ -1,5 +1,7 @@
+import os
 import re
 from datetime import datetime, timezone
+from pathlib import Path
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
@@ -12,10 +14,9 @@ from app.schemas.generation import (
     AnimationGenerateRequest,
     AnimationGenerateResponse,
     AnimationJobStatusResponse,
-    AnimationPresetInfo,
-    AnimationPresetsResponse,
     AnimationProviderInfo,
     AnimationProvidersResponse,
+    AnimationPresetsResponse,
     BgRemovalGenerateRequest,
     BgRemovalGenerateResponse,
     BgRemovalJobStatusResponse,
@@ -32,6 +33,12 @@ from app.schemas.generation import (
     MeshProviderInfo,
     MeshProvidersResponse,
     ModelsResponse,
+    MotionPresetSchema,
+    RiggingGenerateRequest,
+    RiggingGenerateResponse,
+    RiggingJobStatusResponse,
+    RiggingProviderInfo,
+    RiggingProvidersResponse,
 )
 from app.services.bgremoval import run_bgremoval
 from app.services.bgremoval_providers import (
@@ -46,6 +53,13 @@ from app.services.mesh_generation import (
 from app.services.mesh_providers import MESH_PROVIDERS, get_provider as get_mesh_provider
 from app.services.picsart import run_image_generation
 from app.services import asset_service
+from app.services.animation_generation import run_animation
+from app.services.rigging_generation import run_rigging
+from app.providers.animation import (
+    get_animation_provider,
+    list_animation_providers,
+)
+from app.providers.rigging import get_rigging_provider, list_rigging_providers
 
 router = APIRouter(prefix="/generate", tags=["generation"])
 
@@ -130,6 +144,35 @@ async def _persist_job_completion(job_id: str) -> None:
                 source_file,
                 job.glb_file_path,
             )
+        elif job.job_type == "rigging" and job.glb_file_path:
+            await asset_service.persist_rigging_job(
+                str(job.id),
+                asset_id,
+                job.provider_key or "",
+                "mesh.glb",
+                job.glb_file_path,
+            )
+        elif job.job_type == "animation" and job.glb_file_path:
+            source_file = "mesh.glb"
+            if job.source_image_url and "/files/" in (job.source_image_url or ""):
+                parts = (job.source_image_url or "").rstrip("/").split("/")
+                if parts:
+                    source_file = parts[-1] or "mesh.glb"
+            anim_path = Path(job.glb_file_path)
+            if not anim_path.exists():
+                return
+            animated_bytes = anim_path.read_bytes()
+            ext = anim_path.suffix.lstrip(".") or "glb"
+            filename = f"mesh_animated.{ext}"
+            await asset_service.persist_animation_job(
+                str(job.id),
+                asset_id,
+                job.provider_key or "",
+                job.prompt or "",
+                source_file,
+                animated_bytes,
+                filename=filename,
+            )
 
 
 async def _update_job(
@@ -203,6 +246,35 @@ async def _update_mesh_job_bgremoval(
             job.bgremoval_result_url = bgremoval_result_url
             job.updated_at = datetime.now(timezone.utc)
             await session.commit()
+
+
+async def _update_rigging_job(
+    job_id: str,
+    status: str,
+    glb_file_path: str | None,
+    error_msg: str | None = None,
+    error_type: str | None = None,
+    error_detail: str | None = None,
+) -> None:
+    async with async_session_factory() as session:
+        result = await session.execute(
+            select(GenerationJob).where(GenerationJob.id == UUID(job_id))
+        )
+        job = result.scalar_one_or_none()
+        if job:
+            job.status = status
+            job.updated_at = datetime.now(timezone.utc)
+            if glb_file_path is not None:
+                job.glb_file_path = glb_file_path
+            if error_msg is not None:
+                job.error_msg = error_msg
+            if error_type is not None:
+                job.error_type = error_type
+            if error_detail is not None:
+                job.error_detail = error_detail
+            await session.commit()
+    if status == "done":
+        await _persist_job_completion(job_id)
 
 
 async def _update_bgremoval_job(
@@ -713,6 +785,235 @@ async def retry_mesh_job(
     )
 
     return MeshGenerateResponse(job_id=new_job.id, status="pending")
+
+
+@router.get("/rigging/providers", response_model=RiggingProvidersResponse)
+async def list_rigging_providers_endpoint():
+    """Listet alle verfügbaren Rigging-Provider."""
+    providers = list_rigging_providers()
+    return RiggingProvidersResponse(
+        providers=[
+            RiggingProviderInfo(
+                key=p.key,
+                display_name=p.display_name,
+            )
+            for p in providers
+        ]
+    )
+
+
+@router.post("/rigging", response_model=RiggingGenerateResponse, status_code=202)
+async def create_rigging(
+    body: RiggingGenerateRequest,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),
+):
+    try:
+        get_rigging_provider(body.provider_key)
+    except ValueError:
+        raise HTTPException(
+            422, detail=f"Unbekannter provider_key: {body.provider_key}"
+        )
+
+    asset_id: UUID | None = None
+    if body.asset_id:
+        try:
+            asset_id = UUID(body.asset_id)
+        except ValueError:
+            pass
+    if asset_id is None:
+        aid = _extract_asset_id_from_url(body.source_glb_url)
+        if aid:
+            asset_id = aid
+
+    job = GenerationJob(
+        job_type="rigging",
+        status="pending",
+        prompt="[rigging]",
+        provider_key=body.provider_key,
+        source_image_url=body.source_glb_url,
+        asset_id=asset_id,
+    )
+    session.add(job)
+    await session.commit()
+    await session.refresh(job)
+
+    background_tasks.add_task(
+        run_rigging,
+        str(job.id),
+        body.source_glb_url,
+        body.provider_key,
+        str(asset_id) if asset_id else None,
+        _update_rigging_job,
+    )
+
+    return RiggingGenerateResponse(job_id=job.id, status="pending")
+
+
+@router.get("/rigging/{job_id}", response_model=RiggingJobStatusResponse)
+async def get_rigging_job_status(
+    job_id: UUID,
+    session: AsyncSession = Depends(get_session),
+):
+    result = await session.execute(
+        select(GenerationJob).where(
+            GenerationJob.id == job_id,
+            GenerationJob.job_type == "rigging",
+        )
+    )
+    job = result.scalar_one_or_none()
+    if not job:
+        raise HTTPException(404, detail="Job nicht gefunden")
+
+    glb_url = None
+    if job.status == "done" and job.glb_file_path:
+        glb_url = f"/static/meshes/{job.id}_rigged.glb"
+
+    return RiggingJobStatusResponse(
+        job_id=job.id,
+        status=job.status,
+        glb_url=glb_url,
+        error_msg=job.error_msg,
+        error_type=job.error_type,
+        error_detail=job.error_detail,
+        source_glb_url=job.source_image_url or "",
+        provider_key=job.provider_key or "unirig",
+        created_at=job.created_at,
+        updated_at=job.updated_at,
+        asset_id=job.asset_id,
+        failed_at=job.updated_at if job.status == "failed" else None,
+    )
+
+
+@router.get("/animation/providers", response_model=AnimationProvidersResponse)
+async def list_animation_providers_endpoint():
+    """Listet alle verfügbaren Animation-Provider."""
+    providers = list_animation_providers()
+    return AnimationProvidersResponse(
+        providers=[
+            AnimationProviderInfo(key=p.key, display_name=p.display_name)
+            for p in providers
+        ]
+    )
+
+
+@router.get(
+    "/animation/presets/{provider_key}",
+    response_model=AnimationPresetsResponse,
+)
+async def get_animation_presets(provider_key: str):
+    """Liefert die Motion-Presets für einen Provider."""
+    try:
+        provider = get_animation_provider(provider_key)
+    except ValueError:
+        raise HTTPException(422, detail=f"Unbekannter provider_key: {provider_key}")
+    presets = provider.get_preset_motions()
+    return AnimationPresetsResponse(
+        presets=[
+            MotionPresetSchema(
+                key=p.key,
+                display_name=p.display_name,
+                prompt=p.prompt,
+            )
+            for p in presets
+        ]
+    )
+
+
+@router.post("/animation", response_model=AnimationGenerateResponse, status_code=202)
+async def create_animation(
+    body: AnimationGenerateRequest,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),
+):
+    if not os.getenv("HF_TOKEN"):
+        raise HTTPException(
+            503,
+            detail=(
+                "HF_TOKEN nicht konfiguriert. Animation-Provider (HY-Motion) "
+                "benötigt einen Hugging Face Token. Bitte HF_TOKEN in der Umgebung setzen."
+            ),
+        )
+    try:
+        get_animation_provider(body.provider_key)
+    except ValueError:
+        raise HTTPException(
+            422, detail=f"Unbekannter provider_key: {body.provider_key}"
+        )
+
+    asset_id: UUID | None = None
+    if body.asset_id:
+        try:
+            asset_id = UUID(body.asset_id)
+        except ValueError:
+            pass
+    if asset_id is None:
+        aid = _extract_asset_id_from_url(body.source_glb_url)
+        if aid:
+            asset_id = aid
+
+    job = GenerationJob(
+        job_type="animation",
+        status="pending",
+        prompt=body.motion_prompt,
+        provider_key=body.provider_key,
+        source_image_url=body.source_glb_url,
+        asset_id=asset_id,
+    )
+    session.add(job)
+    await session.commit()
+    await session.refresh(job)
+
+    background_tasks.add_task(
+        run_animation,
+        str(job.id),
+        body.source_glb_url,
+        body.motion_prompt,
+        body.provider_key,
+        asset_id,
+        _update_mesh_job,
+    )
+
+    return AnimationGenerateResponse(job_id=job.id, status="pending")
+
+
+@router.get("/animation/{job_id}", response_model=AnimationJobStatusResponse)
+async def get_animation_job_status(
+    job_id: UUID,
+    session: AsyncSession = Depends(get_session),
+):
+    result = await session.execute(
+        select(GenerationJob).where(
+            GenerationJob.id == job_id,
+            GenerationJob.job_type == "animation",
+        )
+    )
+    job = result.scalar_one_or_none()
+    if not job:
+        raise HTTPException(404, detail="Job nicht gefunden")
+
+    animated_url = None
+    if job.status == "done" and job.glb_file_path:
+        anim_path = Path(job.glb_file_path)
+        if anim_path.exists():
+            filename = anim_path.name
+            animated_url = f"/static/animations/{filename}"
+
+    return AnimationJobStatusResponse(
+        job_id=job.id,
+        status=job.status,
+        animated_glb_url=animated_url,
+        error_msg=job.error_msg,
+        error_type=job.error_type,
+        error_detail=job.error_detail,
+        source_glb_url=job.source_image_url or "",
+        provider_key=job.provider_key or "hy-motion",
+        motion_prompt=job.prompt or "",
+        created_at=job.created_at,
+        updated_at=job.updated_at,
+        asset_id=job.asset_id,
+        failed_at=job.updated_at if job.status == "failed" else None,
+    )
 
 
 @router.get("/models", response_model=ModelsResponse)

@@ -1,31 +1,33 @@
 import { useEffect } from "react";
-import { Link } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  getAnimationJobStatus,
-  retryAnimationJob,
-  type AnimationJob,
-} from "../../../api/animation.js";
+  getRiggingJobStatus,
+  retryRiggingJob,
+  type RiggingJob,
+} from "../../../api/rigging.js";
 import { JobErrorBlock } from "../../generation/JobErrorBlock.js";
-import { AnimationMeshViewer } from "../../viewer/AnimationMeshViewer.js";
+import { MeshViewer } from "../../viewer/MeshViewer.js";
+import { usePipelineStore } from "../../../store/PipelineStore.js";
 
-export interface AnimationJobStatusProps {
+export interface RiggingJobStatusProps {
   jobId: string | null;
-  onJobUpdate?: (job: AnimationJob) => void;
+  onJobUpdate?: (job: RiggingJob) => void;
   onRetrySuccess?: (newJobId: string) => void;
-  onTryDifferentPreset?: () => void;
 }
 
-export function AnimationJobStatus({
+export function RiggingJobStatus({
   jobId,
   onJobUpdate,
   onRetrySuccess,
-  onTryDifferentPreset,
-}: AnimationJobStatusProps) {
+}: RiggingJobStatusProps) {
   const queryClient = useQueryClient();
+  const [, setSearchParams] = useSearchParams();
+  const { setPendingAnimationGlbUrl } = usePipelineStore();
+
   const { data, isLoading, error } = useQuery({
-    queryKey: ["animation-job", jobId],
-    queryFn: () => getAnimationJobStatus(jobId!),
+    queryKey: ["rigging-job", jobId],
+    queryFn: () => getRiggingJobStatus(jobId!),
     refetchInterval: (query) => {
       const status = query.state.data?.status;
       return status === "done" || status === "failed" ? false : 2000;
@@ -34,9 +36,9 @@ export function AnimationJobStatus({
   });
 
   const retryMutation = useMutation({
-    mutationFn: () => retryAnimationJob(jobId!),
+    mutationFn: () => retryRiggingJob(jobId!),
     onSuccess: (res) => {
-      queryClient.invalidateQueries({ queryKey: ["animation-job", jobId] });
+      queryClient.invalidateQueries({ queryKey: ["rigging-job", jobId] });
       onRetrySuccess?.(res.job_id);
     },
   });
@@ -46,6 +48,13 @@ export function AnimationJobStatus({
       onJobUpdate?.(data);
     }
   }, [data, onJobUpdate]);
+
+  const handleUseForAnimation = () => {
+    if (data?.glb_url) {
+      setPendingAnimationGlbUrl(data.glb_url);
+      setSearchParams({ tab: "animation" });
+    }
+  };
 
   if (!jobId) {
     return null;
@@ -75,45 +84,28 @@ export function AnimationJobStatus({
     return null;
   }
 
-  const { status, animated_glb_url } = data;
+  const { status, glb_url } = data;
 
-  if (status === "done" && animated_glb_url) {
-    const isGlb = animated_glb_url.toLowerCase().endsWith(".glb");
+  if (status === "done" && glb_url) {
     return (
       <div className="job-status job-status--done">
         <p className="job-status__label">Fertig!</p>
-        <div className="animation-job-status__preview">
-          {isGlb ? (
-            <AnimationMeshViewer glbUrl={animated_glb_url} height={400} />
-          ) : (
-            <p>
-              <a href={animated_glb_url} download className="job-status__download">
-                Animation herunterladen (FBX)
-              </a>
-            </p>
-          )}
-        </div>
+        <MeshViewer glbUrl={glb_url} height={400} />
         <div className="compare-results__actions">
-          <a href={animated_glb_url} download className="job-status__download">
-            Download
+          <button
+            type="button"
+            className="job-history__use-mesh"
+            onClick={handleUseForAnimation}
+          >
+            → Animieren
+          </button>
+          <a
+            href={glb_url}
+            download
+            className="job-status__download"
+          >
+            Download GLB
           </a>
-          {onTryDifferentPreset && (
-            <button
-              type="button"
-              className="job-history__use-mesh"
-              onClick={onTryDifferentPreset}
-            >
-              → Nochmal mit anderem Preset
-            </button>
-          )}
-          {data.asset_id && (
-            <Link
-              to={`/assets/${data.asset_id}`}
-              className="job-history__library-link"
-            >
-              → In Bibliothek ansehen
-            </Link>
-          )}
         </div>
       </div>
     );
@@ -140,10 +132,7 @@ export function AnimationJobStatus({
       <p>
         {status === "pending"
           ? "Wartet auf Verarbeitung..."
-          : "HY-Motion generiert Animation..."}
-      </p>
-      <p className="animation-job-status__hint">
-        Animation kann 60–120 Sekunden dauern
+          : "UniRig analysiert Mesh..."}
       </p>
     </div>
   );
