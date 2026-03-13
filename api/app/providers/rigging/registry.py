@@ -72,6 +72,22 @@ def _build_registry() -> dict[str, BaseRiggingProvider]:
             e,
         )
 
+    # Blender Rigify (lokal, headless) — nur wenn Blender verfügbar
+    try:
+        from app.exceptions import BlenderNotAvailableError
+        from app.providers.rigging.blender_rigify import BlenderRigifyProvider
+
+        registry["blender-rigify"] = BlenderRigifyProvider()
+    except BlenderNotAvailableError:
+        logger.warning(
+            "Blender nicht gefunden — blender-rigify Provider aus Registry ausgeschlossen"
+        )
+    except Exception as e:
+        logger.warning(
+            "blender-rigify nicht geladen: %s — Provider aus Registry ausgeschlossen",
+            e,
+        )
+
     return registry
 
 

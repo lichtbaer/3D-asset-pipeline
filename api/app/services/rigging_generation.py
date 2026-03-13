@@ -7,7 +7,12 @@ from pathlib import Path
 from typing import Awaitable, Callable
 
 from app.config.storage import MESH_STORAGE_PATH
-from app.exceptions import UniRigInvalidMeshError, UniRigTimeoutError
+from app.exceptions import (
+    BlenderRigifyError,
+    BlenderRigifyTimeoutError,
+    UniRigInvalidMeshError,
+    UniRigTimeoutError,
+)
 from app.logging_utils import log_job_error
 from app.providers.rigging import get_rigging_provider
 from app.providers.rigging.base import RiggingParams
@@ -59,14 +64,15 @@ async def run_rigging(
             error_detail=err,
         )
         return
-    except UniRigTimeoutError as e:
+    except (UniRigTimeoutError, BlenderRigifyTimeoutError) as e:
         err = str(e)
+        error_type = type(e).__name__
         log_job_error(
             logger,
             "Rigging Timeout",
             job_id=job_id,
             provider_key=provider_key,
-            error_type="UniRigTimeoutError",
+            error_type=error_type,
             error_detail=err,
         )
         await update_job_callback(
@@ -74,18 +80,19 @@ async def run_rigging(
             "failed",
             None,
             err,
-            error_type="UniRigTimeoutError",
+            error_type=error_type,
             error_detail=err,
         )
         return
-    except UniRigInvalidMeshError as e:
+    except (UniRigInvalidMeshError, BlenderRigifyError) as e:
         err = str(e)
+        error_type = type(e).__name__
         log_job_error(
             logger,
-            "Rigging: Mesh nicht riggbar",
+            "Rigging: Mesh nicht riggbar" if isinstance(e, UniRigInvalidMeshError) else "Blender Rigify Fehler",
             job_id=job_id,
             provider_key=provider_key,
-            error_type="UniRigInvalidMeshError",
+            error_type=error_type,
             error_detail=err,
         )
         await update_job_callback(
@@ -93,7 +100,7 @@ async def run_rigging(
             "failed",
             None,
             err,
-            error_type="UniRigInvalidMeshError",
+            error_type=error_type,
             error_detail=err,
         )
         return

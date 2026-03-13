@@ -81,3 +81,21 @@ class ReplicateModelError(ProviderAPIError):
     """Das angeforderte Replicate-Modell ist nicht verfügbar oder existiert nicht."""
 
     pass
+
+
+class BlenderRigifyError(Exception):
+    """Blender Rigify-Provider hat einen Fehler zurückgegeben."""
+
+    pass
+
+
+class BlenderRigifyTimeoutError(ProviderTimeoutError):
+    """Blender Rigify Subprocess hat das Timeout überschritten."""
+
+    pass
+
+
+class BlenderNotAvailableError(ProviderConfigError):
+    """Blender ist nicht installiert oder nicht ausführbar."""
+
+    pass
