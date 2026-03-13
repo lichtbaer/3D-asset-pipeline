@@ -21,7 +21,9 @@ class GenerationJob(Base):
     provider_key: Mapped[str] = mapped_column(String(100), nullable=False)
     model_key: Mapped[str | None] = mapped_column(String(100), nullable=True)  # Alias, deprecated
     result_url: Mapped[str | None] = mapped_column(Text, nullable=True)
-    error_msg: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error_msg: Mapped[str | None] = mapped_column(Text, nullable=True)  # Deprecated, use error_detail
+    error_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    error_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Mesh job columns
     source_image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     source_job_id: Mapped[uuid.UUID | None] = mapped_column(

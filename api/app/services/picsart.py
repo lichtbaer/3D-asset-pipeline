@@ -1,14 +1,15 @@
 """PicsArt Bildgenerierung — nutzt Image-Provider-Abstraktion."""
 
 import logging
-from typing import Callable, Awaitable
+from typing import Awaitable, Callable
 
+from app.logging_utils import log_job_error
 from app.services.image_providers import get_provider
 
 logger = logging.getLogger(__name__)
 
-# (job_id, status, result_url, error_msg)
-UpdateJobCallback = Callable[[str, str, str | None, str | None], Awaitable[None]]
+# (job_id, status, result_url, error_msg, *, error_type, error_detail)
+UpdateJobCallback = Callable[..., Awaitable[None]]
 
 
 async def run_image_generation(
@@ -20,17 +21,20 @@ async def run_image_generation(
 ) -> None:
     """
     Führt die Bildgenerierung via Image-Provider aus.
-    update_job_callback(job_id, status, result_url=None, error_msg=None)
+    update_job_callback(job_id, status, result_url=None, error_msg=None, error_type=..., error_detail=...)
     """
     try:
         provider = get_provider(provider_key)
     except ValueError as e:
-        await update_job_callback(
-            job_id,
-            "failed",
-            None,
-            str(e),
+        log_job_error(
+            logger,
+            "Unbekannter Image-Provider",
+            job_id=job_id,
+            provider_key=provider_key,
+            error_type="ValueError",
+            error_detail=str(e),
         )
+        await update_job_callback(job_id, "failed", None, str(e), error_type="ValueError", error_detail=str(e))
         return
 
     await update_job_callback(job_id, "processing", None, None)
@@ -39,8 +43,22 @@ async def run_image_generation(
         result_url = await provider.generate(prompt, params)
         await update_job_callback(job_id, "done", result_url, None)
     except RuntimeError as e:
-        logger.exception("Bildgenerierung fehlgeschlagen")
-        await update_job_callback(job_id, "failed", None, str(e))
+        log_job_error(
+            logger,
+            "Bildgenerierung fehlgeschlagen",
+            job_id=job_id,
+            provider_key=provider_key,
+            error_type="RuntimeError",
+            error_detail=str(e),
+        )
+        await update_job_callback(job_id, "failed", None, str(e), error_type="RuntimeError", error_detail=str(e))
     except Exception as e:
-        logger.exception("Unerwarteter Fehler bei Bildgenerierung")
-        await update_job_callback(job_id, "failed", None, str(e))
+        log_job_error(
+            logger,
+            "Unerwarteter Fehler bei Bildgenerierung",
+            job_id=job_id,
+            provider_key=provider_key,
+            error_type=type(e).__name__,
+            error_detail=str(e),
+        )
+        await update_job_callback(job_id, "failed", None, str(e), error_type=type(e).__name__, error_detail=str(e))

@@ -117,6 +117,75 @@
   border-radius: 4px;
 }
 
+/* JobErrorBlock */
+.job-error-block {
+  padding: 1rem;
+  background: rgba(220, 38, 38, 0.08);
+  border: 1px solid rgba(220, 38, 38, 0.3);
+  border-radius: 6px;
+  color: #dc2626;
+}
+
+.job-error-block__label {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.job-error-block__type {
+  margin: 0.25rem 0;
+}
+
+.job-error-block__detail {
+  margin: 0.5rem 0;
+}
+
+.job-error-block__detail code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.9em;
+  word-break: break-all;
+}
+
+.job-error-block__toggle {
+  margin-left: 0.5rem;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.8em;
+  background: transparent;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  cursor: pointer;
+  color: inherit;
+}
+
+.job-error-block__toggle:hover {
+  background: rgba(220, 38, 38, 0.15);
+}
+
+.job-error-block__meta {
+  font-size: 0.85em;
+  opacity: 0.9;
+  margin: 0.5rem 0;
+}
+
+.job-error-block__retry {
+  margin-top: 0.75rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.95rem;
+  background: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.job-error-block__retry:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.job-error-block__retry:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
 .spinner {
   width: 24px;
   height: 24px;

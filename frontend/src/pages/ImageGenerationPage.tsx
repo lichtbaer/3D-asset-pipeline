@@ -62,6 +62,21 @@ export function ImageGenerationPage() {
     );
   }, []);
 
+  const handleRetrySuccess = useCallback((newJobId: string) => {
+    setCurrentJobId(newJobId);
+    setJobHistory((prev) => {
+      const failedJob = prev.find((j) => j.job_id === currentJobId);
+      const newEntry: JobHistoryEntry = {
+        job_id: newJobId,
+        prompt: failedJob?.prompt ?? "",
+        model_key: failedJob?.model_key ?? "",
+        status: "pending",
+        result_url: null,
+      };
+      return [newEntry, ...prev];
+    });
+  }, [currentJobId]);
+
   const currentJob = jobHistory.find((j) => j.job_id === currentJobId);
   const isJobRunning =
     !!currentJobId &&
@@ -86,7 +101,11 @@ export function ImageGenerationPage() {
       </section>
 
       <section className="image-generation-page__status">
-        <JobStatus jobId={currentJobId} onJobUpdate={handleJobUpdate} />
+        <JobStatus
+          jobId={currentJobId}
+          onJobUpdate={handleJobUpdate}
+          onRetrySuccess={handleRetrySuccess}
+        />
       </section>
 
       <section className="image-generation-page__history">

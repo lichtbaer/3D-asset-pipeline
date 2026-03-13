@@ -209,6 +209,21 @@ export function PipelinePage() {
     );
   }, []);
 
+  const handleImageRetrySuccess = useCallback((newJobId: string) => {
+    setCurrentImageJobId(newJobId);
+    const failedJob = imageJobHistory.find((j) => j.job_id === currentImageJobId);
+    setImageJobHistory((prev) => [
+      {
+        job_id: newJobId,
+        prompt: failedJob?.prompt ?? "",
+        model_key: failedJob?.model_key ?? "",
+        status: "pending",
+        result_url: null,
+      },
+      ...prev,
+    ]);
+  }, [currentImageJobId, imageJobHistory]);
+
   const currentImageJob = imageJobHistory.find(
     (j) => j.job_id === currentImageJobId
   );
@@ -256,6 +271,21 @@ export function PipelinePage() {
       )
     );
   }, []);
+
+  const handleMeshRetrySuccess = useCallback((newJobId: string) => {
+    setCurrentMeshJobId(newJobId);
+    const failedJob = meshJobHistory.find((j) => j.job_id === currentMeshJobId);
+    setMeshJobHistory((prev) => [
+      {
+        job_id: newJobId,
+        source_image_url: failedJob?.source_image_url ?? "",
+        provider_key: failedJob?.provider_key ?? "",
+        status: "pending",
+        glb_url: null,
+      },
+      ...prev,
+    ]);
+  }, [currentMeshJobId, meshJobHistory]);
 
   const currentMeshJob = meshJobHistory.find(
     (j) => j.job_id === currentMeshJobId
@@ -310,6 +340,21 @@ export function PipelinePage() {
       )
     );
   }, []);
+
+  const handleBgRemovalRetrySuccess = useCallback((newJobId: string) => {
+    setCurrentBgRemovalJobId(newJobId);
+    const failedJob = bgRemovalJobHistory.find((j) => j.job_id === currentBgRemovalJobId);
+    setBgRemovalJobHistory((prev) => [
+      {
+        job_id: newJobId,
+        source_image_url: failedJob?.source_image_url ?? "",
+        provider_key: failedJob?.provider_key ?? "",
+        status: "pending",
+        result_url: null,
+      },
+      ...prev,
+    ]);
+  }, [currentBgRemovalJobId, bgRemovalJobHistory]);
 
   const currentBgRemovalJob = bgRemovalJobHistory.find(
     (j) => j.job_id === currentBgRemovalJobId
@@ -535,6 +580,7 @@ export function PipelinePage() {
               <JobStatus
                 jobId={currentImageJobId}
                 onJobUpdate={handleImageJobUpdate}
+                onRetrySuccess={handleImageRetrySuccess}
               />
             ) : (
               <CompareResults
@@ -545,6 +591,8 @@ export function PipelinePage() {
                 step="image"
                 onUseForMesh={handleCompareUseForMesh}
                 onUseForBgRemoval={handleCompareUseForBgRemoval}
+                onRetrySuccessA={(id) => setImageCompareJobIdA(id)}
+                onRetrySuccessB={(id) => setImageCompareJobIdB(id)}
               />
             )}
           </section>
@@ -580,6 +628,7 @@ export function PipelinePage() {
               jobId={currentBgRemovalJobId}
               onJobUpdate={handleBgRemovalJobUpdate}
               onUseForMesh={handleUseForMesh}
+              onRetrySuccess={handleBgRemovalRetrySuccess}
             />
           </section>
           <section className="pipeline-page__history">
@@ -638,6 +687,7 @@ export function PipelinePage() {
               <MeshJobStatus
                 jobId={currentMeshJobId}
                 onJobUpdate={handleMeshJobUpdate}
+                onRetrySuccess={handleMeshRetrySuccess}
               />
             ) : (
               <CompareResults
@@ -646,6 +696,8 @@ export function PipelinePage() {
                 providerLabelA={meshCompareProviderLabelA}
                 providerLabelB={meshCompareProviderLabelB}
                 step="mesh"
+                onRetrySuccessA={(id) => setMeshCompareJobIdA(id)}
+                onRetrySuccessB={(id) => setMeshCompareJobIdB(id)}
               />
             )}
           </section>

@@ -66,9 +66,15 @@ class ImageJobStatusResponse(BaseModel):
     status: str
     result_url: str | None = None
     error_msg: str | None = None
-    model_key: str
+    error_type: str | None = None
+    error_detail: str | None = None
+    provider_key: str
+    model_key: str  # Deprecated alias for provider_key
     created_at: datetime
+    updated_at: datetime | None = None
     asset_id: UUID | None = None
+    prompt: str | None = None  # Für Retry
+    failed_at: datetime | None = None
 
 
 class ModelsResponse(BaseModel):
@@ -124,10 +130,14 @@ class MeshJobStatusResponse(BaseModel):
     status: str
     glb_url: str | None = None
     error_msg: str | None = None
+    error_type: str | None = None
+    error_detail: str | None = None
     source_image_url: str
     provider_key: str  # NULL in DB → "hunyuan3d-2" (Rückwärtskompatibilität)
     created_at: datetime
+    updated_at: datetime | None = None
     asset_id: UUID | None = None
+    failed_at: datetime | None = None
 
 
 # --- Background Removal ---
@@ -150,10 +160,14 @@ class BgRemovalJobStatusResponse(BaseModel):
     status: str
     result_url: str | None = None
     error_msg: str | None = None
+    error_type: str | None = None
+    error_detail: str | None = None
     source_image_url: str
     provider_key: str
     created_at: datetime
+    updated_at: datetime | None = None
     asset_id: UUID | None = None
+    failed_at: datetime | None = None
 
 
 class BgRemovalProviderInfo(BaseModel):

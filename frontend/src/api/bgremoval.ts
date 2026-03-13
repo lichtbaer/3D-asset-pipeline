@@ -18,10 +18,14 @@ export interface BgRemovalJob {
   status: BgRemovalJobStatus;
   result_url: string | null;
   error_msg: string | null;
+  error_type: string | null;
+  error_detail: string | null;
   source_image_url: string;
   provider_key: string;
   created_at: string;
+  updated_at?: string;
   asset_id: string | null;
+  failed_at?: string | null;
 }
 
 export interface BgRemovalProvider {
@@ -62,10 +66,14 @@ export async function getBgRemovalJobStatus(
     status: string;
     result_url: string | null;
     error_msg: string | null;
+    error_type: string | null;
+    error_detail: string | null;
     source_image_url: string;
     provider_key: string;
     created_at: string;
+    updated_at?: string;
     asset_id: string | null;
+    failed_at?: string | null;
   }>(`/generate/bgremoval/${jobId}`);
   const result_url = data.result_url
     ? data.result_url.startsWith("http")
@@ -77,10 +85,26 @@ export async function getBgRemovalJobStatus(
     status: data.status as BgRemovalJobStatus,
     result_url,
     error_msg: data.error_msg,
+    error_type: data.error_type,
+    error_detail: data.error_detail,
     source_image_url: data.source_image_url,
     provider_key: data.provider_key,
     created_at: data.created_at,
+    updated_at: data.updated_at,
     asset_id: data.asset_id ? String(data.asset_id) : null,
+    failed_at: data.failed_at,
+  };
+}
+
+export async function retryBgRemovalJob(
+  jobId: string
+): Promise<{ job_id: string; status: string }> {
+  const { data } = await apiClient.post<{ job_id: string; status: string }>(
+    `/generate/bgremoval/retry/${jobId}`
+  );
+  return {
+    job_id: String(data.job_id),
+    status: data.status,
   };
 }
 

@@ -16,9 +16,15 @@ export interface GenerationJob {
   status: GenerationJobStatus;
   result_url: string | null;
   error_msg: string | null;
+  error_type: string | null;
+  error_detail: string | null;
+  provider_key: string;
   model_key: string;
   created_at: string;
+  updated_at?: string;
   asset_id: string | null;
+  prompt?: string | null;
+  failed_at?: string | null;
 }
 
 interface PostGenerateImageResponse {
@@ -49,18 +55,40 @@ export async function getJobStatus(jobId: string): Promise<GenerationJob> {
     status: string;
     result_url: string | null;
     error_msg: string | null;
+    error_type: string | null;
+    error_detail: string | null;
+    provider_key: string;
     model_key: string;
     created_at: string;
+    updated_at?: string;
     asset_id: string | null;
+    prompt?: string | null;
+    failed_at?: string | null;
   }>(`/generate/image/${jobId}`);
   return {
     job_id: String(data.job_id),
     status: data.status as GenerationJobStatus,
     result_url: data.result_url,
     error_msg: data.error_msg,
-    model_key: data.model_key,
+    error_type: data.error_type,
+    error_detail: data.error_detail,
+    provider_key: data.provider_key ?? data.model_key,
+    model_key: data.model_key ?? data.provider_key ?? "",
     created_at: data.created_at,
+    updated_at: data.updated_at,
     asset_id: data.asset_id ? String(data.asset_id) : null,
+    prompt: data.prompt,
+    failed_at: data.failed_at,
+  };
+}
+
+export async function retryImageJob(jobId: string): Promise<{ job_id: string; status: string }> {
+  const { data } = await apiClient.post<{ job_id: string; status: string }>(
+    `/generate/image/retry/${jobId}`
+  );
+  return {
+    job_id: String(data.job_id),
+    status: data.status,
   };
 }
 

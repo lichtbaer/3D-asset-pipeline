@@ -2,16 +2,15 @@
 Orchestrierung der Background-Removal: Provider-Aufruf, DB-Update.
 """
 import logging
-from typing import Callable, Awaitable
+from typing import Awaitable, Callable
 
+from app.logging_utils import log_job_error
 from app.services.bgremoval_providers import get_provider
 
 logger = logging.getLogger(__name__)
 
-# (job_id, status, result_url, error_msg)
-UpdateBgRemovalJobCallback = Callable[
-    [str, str, str | None, str | None], Awaitable[None]
-]
+# (job_id, status, result_url, error_msg, *, error_type, error_detail)
+UpdateBgRemovalJobCallback = Callable[..., Awaitable[None]]
 
 
 async def run_bgremoval(
@@ -26,7 +25,15 @@ async def run_bgremoval(
     try:
         provider = get_provider(provider_key)
     except ValueError as e:
-        await update_job_callback(job_id, "failed", None, str(e))
+        log_job_error(
+            logger,
+            "Unbekannter BgRemoval-Provider",
+            job_id=job_id,
+            provider_key=provider_key,
+            error_type="ValueError",
+            error_detail=str(e),
+        )
+        await update_job_callback(job_id, "failed", None, str(e), error_type="ValueError", error_detail=str(e))
         return
 
     await update_job_callback(job_id, "processing", None, None)
@@ -37,8 +44,22 @@ async def run_bgremoval(
         )
         await update_job_callback(job_id, "done", result_url, None)
     except RuntimeError as e:
-        logger.warning("Background-Removal fehlgeschlagen: %s", e)
-        await update_job_callback(job_id, "failed", None, str(e))
+        log_job_error(
+            logger,
+            "Background-Removal fehlgeschlagen",
+            job_id=job_id,
+            provider_key=provider_key,
+            error_type="RuntimeError",
+            error_detail=str(e),
+        )
+        await update_job_callback(job_id, "failed", None, str(e), error_type="RuntimeError", error_detail=str(e))
     except Exception as e:
-        logger.exception("Unerwarteter Fehler bei Background-Removal")
-        await update_job_callback(job_id, "failed", None, str(e))
+        log_job_error(
+            logger,
+            "Unerwarteter Fehler bei Background-Removal",
+            job_id=job_id,
+            provider_key=provider_key,
+            error_type=type(e).__name__,
+            error_detail=str(e),
+        )
+        await update_job_callback(job_id, "failed", None, str(e), error_type=type(e).__name__, error_detail=str(e))
