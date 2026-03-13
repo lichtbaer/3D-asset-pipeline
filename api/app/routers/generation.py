@@ -204,7 +204,7 @@ async def _update_job(
         await _persist_job_completion(job_id)
 
 
-async def _update_mesh_job(
+async def _update_glb_job(
     job_id: str,
     status: str,
     glb_file_path: str | None,
@@ -212,6 +212,7 @@ async def _update_mesh_job(
     error_type: str | None = None,
     error_detail: str | None = None,
 ) -> None:
+    """Generischer Update-Handler für Jobs mit glb_file_path (Mesh, Rigging, Animation)."""
     async with async_session_factory() as session:
         result = await session.execute(
             select(GenerationJob).where(GenerationJob.id == UUID(job_id))
@@ -231,6 +232,11 @@ async def _update_mesh_job(
             await session.commit()
     if status == "done":
         await _persist_job_completion(job_id)
+
+
+# Aliase für bestehende Aufrufstellen, delegieren an _update_glb_job
+_update_mesh_job = _update_glb_job
+_update_rigging_job = _update_glb_job
 
 
 async def _update_mesh_job_bgremoval(
@@ -246,35 +252,6 @@ async def _update_mesh_job_bgremoval(
             job.bgremoval_result_url = bgremoval_result_url
             job.updated_at = datetime.now(timezone.utc)
             await session.commit()
-
-
-async def _update_rigging_job(
-    job_id: str,
-    status: str,
-    glb_file_path: str | None,
-    error_msg: str | None = None,
-    error_type: str | None = None,
-    error_detail: str | None = None,
-) -> None:
-    async with async_session_factory() as session:
-        result = await session.execute(
-            select(GenerationJob).where(GenerationJob.id == UUID(job_id))
-        )
-        job = result.scalar_one_or_none()
-        if job:
-            job.status = status
-            job.updated_at = datetime.now(timezone.utc)
-            if glb_file_path is not None:
-                job.glb_file_path = glb_file_path
-            if error_msg is not None:
-                job.error_msg = error_msg
-            if error_type is not None:
-                job.error_type = error_type
-            if error_detail is not None:
-                job.error_detail = error_detail
-            await session.commit()
-    if status == "done":
-        await _persist_job_completion(job_id)
 
 
 async def _update_bgremoval_job(
@@ -1020,78 +997,6 @@ async def get_animation_job_status(
 async def list_models():
     """Listet alle Provider-Keys (Rückwärtskompatibel mit /generate/image/providers)."""
     return ModelsResponse(models=[p.provider_key for p in list_providers()])
-
-
-
-@router.post(
-    "/animation",
-    response_model=AnimationGenerateResponse,
-    status_code=202,
-)
-async def create_animation_generation(
-    body: AnimationGenerateRequest,
-    session: AsyncSession = Depends(get_session),
-):
-    """Erstellt einen Animation-Job. Stub: Job bleibt pending bis SMA-165 Backend."""
-    asset_id: UUID | None = None
-    if body.asset_id:
-        try:
-            asset_id = UUID(body.asset_id)
-        except ValueError:
-            pass
-
-    job = GenerationJob(
-        job_type="animation",
-        status="pending",
-        prompt=body.motion_prompt,
-        provider_key=body.provider_key,
-        source_image_url=body.source_glb_url,
-        asset_id=asset_id,
-    )
-    session.add(job)
-    await session.commit()
-    await session.refresh(job)
-
-    return AnimationGenerateResponse(job_id=job.id, status="pending")
-
-
-@router.get(
-    "/animation/{job_id}",
-    response_model=AnimationJobStatusResponse,
-)
-async def get_animation_job_status(
-    job_id: UUID,
-    session: AsyncSession = Depends(get_session),
-):
-    result = await session.execute(
-        select(GenerationJob).where(
-            GenerationJob.id == job_id,
-            GenerationJob.job_type == "animation",
-        )
-    )
-    job = result.scalar_one_or_none()
-    if not job:
-        raise HTTPException(404, detail="Job nicht gefunden")
-
-    glb_url = None
-    if job.status == "done" and job.glb_file_path:
-        glb_url = f"/static/meshes/{job.id}.glb"
-
-    return AnimationJobStatusResponse(
-        job_id=job.id,
-        status=job.status,
-        glb_url=glb_url,
-        error_msg=job.error_msg,
-        error_type=job.error_type,
-        error_detail=job.error_detail,
-        source_glb_url=job.source_image_url or "",
-        motion_prompt=job.prompt or "",
-        provider_key=job.provider_key or "hy-motion",
-        created_at=job.created_at,
-        updated_at=job.updated_at,
-        asset_id=job.asset_id,
-        failed_at=job.updated_at if job.status == "failed" else None,
-    )
 
 
 @router.post(

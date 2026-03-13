@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 class ImageGenerateRequest(BaseModel):
     """Neues Format: provider_key + params."""
 
-    prompt: str = Field(..., min_length=1)
+    prompt: str = Field(..., min_length=1, max_length=2000)
     provider_key: str = Field(default="picsart-default", alias="provider_key")
     params: dict = Field(
         default_factory=lambda: {"width": 1024, "height": 1024},
@@ -225,7 +225,7 @@ class RiggingJobStatusResponse(BaseModel):
 class AnimationGenerateRequest(BaseModel):
     source_glb_url: str = Field(..., min_length=1)
     provider_key: str = "hy-motion"
-    motion_prompt: str = Field(..., min_length=1)
+    motion_prompt: str = Field(..., min_length=1, max_length=2000)
     asset_id: str | None = None
 
 

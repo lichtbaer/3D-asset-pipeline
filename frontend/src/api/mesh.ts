@@ -73,7 +73,7 @@ export async function getMeshJobStatus(jobId: string): Promise<MeshJob> {
   }>(`/generate/mesh/${jobId}`);
   const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
   const glb_url = data.glb_url
-    ? `${baseUrl}${data.glb_url}`
+    ? (data.glb_url.startsWith("http") ? data.glb_url : `${baseUrl}${data.glb_url}`)
     : null;
   return {
     job_id: String(data.job_id),

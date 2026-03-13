@@ -3,8 +3,10 @@ Asset-Persistenz: Ordnerstruktur mit Metadaten für alle Pipeline-Outputs.
 Jeder generierte Output wird auf dem Filesystem abgelegt.
 """
 
+import asyncio
 import json
 import logging
+import re
 import shutil
 import uuid
 from datetime import datetime, timezone
@@ -81,7 +83,7 @@ def create_asset() -> str:
     return asset_id
 
 
-def update_step(
+async def update_step(
     asset_id: str,
     step: StepType,
     data: dict[str, Any],
@@ -91,6 +93,7 @@ def update_step(
     """
     Schreibt Datei (falls file_bytes) und aktualisiert metadata.json.
     data enthält: job_id, provider_key, prompt/negative_prompt/source_file, etc.
+    Verwendet asyncio.to_thread, um blockierendes File-I/O aus dem Event-Loop auszulagern.
     """
     asset_path = _asset_dir(asset_id)
     if not asset_path.exists():
@@ -98,14 +101,18 @@ def update_step(
 
     if file_bytes is not None and filename:
         target = asset_path / filename
-        target.write_bytes(file_bytes)
+        await asyncio.to_thread(target.write_bytes, file_bytes)
         data["file"] = filename
 
     meta_path = _metadata_path(asset_id)
-    meta = json.loads(meta_path.read_text(encoding="utf-8"))
-    meta["steps"][step] = data
-    meta["updated_at"] = datetime.now(timezone.utc).isoformat()
-    meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+
+    def _update_meta() -> None:
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        meta["steps"][step] = data
+        meta["updated_at"] = datetime.now(timezone.utc).isoformat()
+        meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+
+    await asyncio.to_thread(_update_meta)
 
 
 def get_asset(asset_id: str) -> AssetMetadata | None:
@@ -137,11 +144,17 @@ def list_assets() -> list[AssetMetadata]:
 
 
 def get_file_path(asset_id: str, filename: str) -> Path | None:
-    """Pfad zur Datei, None wenn nicht vorhanden."""
-    target = _asset_dir(asset_id) / filename
-    if target.exists() and target.is_file():
-        return target
-    return None
+    """Pfad zur Datei, None wenn nicht vorhanden oder Pfad ungültig.
+
+    Validiert asset_id als UUID und verhindert Path-Traversal-Angriffe.
+    """
+    if not re.fullmatch(r"[0-9a-f-]{36}", asset_id):
+        return None
+    base = _asset_dir(asset_id).resolve()
+    target = (base / filename).resolve()
+    if not target.is_relative_to(base):
+        return None
+    return target if target.is_file() else None
 
 
 def get_asset_dir(asset_id: str) -> Path:
@@ -239,7 +252,7 @@ async def persist_image_job(
     if height is not None:
         step_data["height"] = height
 
-    update_step(
+    await update_step(
         asset_id,
         "image",
         step_data,
@@ -277,7 +290,7 @@ async def persist_bgremoval_job(
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
 
-    update_step(
+    await update_step(
         asset_id,
         "bgremoval",
         step_data,
@@ -311,7 +324,7 @@ async def persist_mesh_job(
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
 
-    update_step(
+    await update_step(
         asset_id,
         "mesh",
         step_data,
@@ -345,7 +358,7 @@ async def persist_rigging_job(
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
 
-    update_step(
+    await update_step(
         asset_id,
         "rigging",
         step_data,
@@ -376,7 +389,7 @@ async def persist_animation_job(
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
 
-    update_step(
+    await update_step(
         asset_id,
         "animation",
         step_data,
