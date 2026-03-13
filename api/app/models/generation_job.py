@@ -29,6 +29,11 @@ class GenerationJob(Base):
         nullable=True,
     )
     glb_file_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Background-Removal-Spalten (für job_type=bgremoval oder mesh mit auto_bgremoval)
+    bgremoval_provider_key: Mapped[str | None] = mapped_column(
+        String(100), nullable=True
+    )
+    bgremoval_result_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

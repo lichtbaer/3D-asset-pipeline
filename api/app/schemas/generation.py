@@ -95,6 +95,9 @@ class MeshGenerateRequest(BaseModel):
     params: dict = Field(default_factory=dict)
     # Legacy: steps wird für hunyuan3d-2 in params übernommen
     steps: int | None = Field(default=None, ge=1, le=50)
+    # Optional: Background-Removal vor Mesh-Generierung
+    auto_bgremoval: bool = False
+    bgremoval_provider_key: str = "picsart"
 
 
 class MeshProviderInfo(BaseModel):
@@ -121,3 +124,38 @@ class MeshJobStatusResponse(BaseModel):
     source_image_url: str
     provider_key: str  # NULL in DB → "hunyuan3d-2" (Rückwärtskompatibilität)
     created_at: datetime
+
+
+# --- Background Removal ---
+
+
+class BgRemovalGenerateRequest(BaseModel):
+    source_image_url: str = Field(..., min_length=1)
+    source_job_id: UUID | None = None
+    provider_key: str = "picsart"
+
+
+class BgRemovalGenerateResponse(BaseModel):
+    job_id: UUID
+    status: str
+
+
+class BgRemovalJobStatusResponse(BaseModel):
+    job_id: UUID
+    status: str
+    result_url: str | None = None
+    error_msg: str | None = None
+    source_image_url: str
+    provider_key: str
+    created_at: datetime
+
+
+class BgRemovalProviderInfo(BaseModel):
+    key: str
+    display_name: str
+    default_params: dict = Field(default_factory=dict)
+    param_schema: dict
+
+
+class BgRemovalProvidersResponse(BaseModel):
+    providers: list[BgRemovalProviderInfo]

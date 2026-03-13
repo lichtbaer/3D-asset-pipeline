@@ -1,5 +1,6 @@
 """
 Orchestrierung der Mesh-Generierung: Download, Provider-Aufruf, Speicherung.
+Optional: Background-Removal vor Mesh-Generierung (auto_bgremoval).
 """
 import asyncio
 import logging
@@ -18,6 +19,11 @@ logger = logging.getLogger(__name__)
 
 # (job_id, status, glb_file_path, error_msg)
 UpdateMeshJobCallback = Callable[[str, str, str | None, str | None], Awaitable[None]]
+
+# (job_id, bgremoval_provider_key, bgremoval_result_url)
+UpdateMeshJobBgRemovalCallback = Callable[
+    [str, str, str], Awaitable[None]
+]
 
 
 async def run_mesh_generation(
@@ -127,3 +133,40 @@ async def run_mesh_generation(
                 os.unlink(temp_image_path)
             except OSError:
                 pass
+
+
+async def run_mesh_generation_with_auto_bgremoval(
+    job_id: str,
+    source_image_url: str,
+    provider_key: str,
+    params: dict,
+    auto_bgremoval: bool,
+    bgremoval_provider_key: str,
+    update_job_callback: UpdateMeshJobCallback,
+    update_bgremoval_callback: UpdateMeshJobBgRemovalCallback | None,
+) -> None:
+    """
+    Führt optional Background-Removal durch, dann Mesh-Generierung.
+    Wenn auto_bgremoval=True: zuerst BG-Removal, freigestelltes Bild für Mesh nutzen.
+    """
+    image_url_for_mesh = source_image_url
+
+    if auto_bgremoval and update_bgremoval_callback:
+        try:
+            from app.services.bgremoval_providers import get_provider as get_bgremoval_provider
+
+            provider = get_bgremoval_provider(bgremoval_provider_key)
+            result_url = await provider.remove_background(source_image_url)
+            await update_bgremoval_callback(job_id, bgremoval_provider_key, result_url)
+            image_url_for_mesh = result_url
+        except (ValueError, RuntimeError) as e:
+            await update_job_callback(job_id, "failed", None, str(e))
+            return
+        except Exception as e:
+            logger.exception("Background-Removal vor Mesh fehlgeschlagen")
+            await update_job_callback(job_id, "failed", None, str(e))
+            return
+
+    await run_mesh_generation(
+        job_id, image_url_for_mesh, provider_key, params, update_job_callback
+    )

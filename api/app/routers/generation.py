@@ -8,6 +8,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import async_session_factory, get_session
 from app.models import GenerationJob
 from app.schemas.generation import (
+    BgRemovalGenerateRequest,
+    BgRemovalGenerateResponse,
+    BgRemovalJobStatusResponse,
+    BgRemovalProviderInfo,
+    BgRemovalProvidersResponse,
     ImageGenerateRequest,
     ImageGenerateResponse,
     ImageJobStatusResponse,
@@ -20,8 +25,16 @@ from app.schemas.generation import (
     MeshProvidersResponse,
     ModelsResponse,
 )
+from app.services.bgremoval import run_bgremoval
+from app.services.bgremoval_providers import (
+    get_provider as get_bgremoval_provider,
+    list_providers as list_bgremoval_providers,
+)
 from app.services.image_providers import get_provider as get_image_provider, list_providers
-from app.services.mesh_generation import run_mesh_generation
+from app.services.mesh_generation import (
+    run_mesh_generation,
+    run_mesh_generation_with_auto_bgremoval,
+)
 from app.services.mesh_providers import MESH_PROVIDERS, get_provider as get_mesh_provider
 from app.services.picsart import run_image_generation
 
@@ -57,6 +70,40 @@ async def _update_mesh_job(
             job.updated_at = datetime.now(timezone.utc)
             if glb_file_path is not None:
                 job.glb_file_path = glb_file_path
+            if error_msg is not None:
+                job.error_msg = error_msg
+            await session.commit()
+
+
+async def _update_mesh_job_bgremoval(
+    job_id: str, bgremoval_provider_key: str, bgremoval_result_url: str
+) -> None:
+    async with async_session_factory() as session:
+        result = await session.execute(
+            select(GenerationJob).where(GenerationJob.id == UUID(job_id))
+        )
+        job = result.scalar_one_or_none()
+        if job:
+            job.bgremoval_provider_key = bgremoval_provider_key
+            job.bgremoval_result_url = bgremoval_result_url
+            job.updated_at = datetime.now(timezone.utc)
+            await session.commit()
+
+
+async def _update_bgremoval_job(
+    job_id: str, status: str, result_url: str | None, error_msg: str | None
+) -> None:
+    async with async_session_factory() as session:
+        result = await session.execute(
+            select(GenerationJob).where(GenerationJob.id == UUID(job_id))
+        )
+        job = result.scalar_one_or_none()
+        if job:
+            job.status = status
+            job.updated_at = datetime.now(timezone.utc)
+            if result_url is not None:
+                job.result_url = result_url
+                job.bgremoval_result_url = result_url
             if error_msg is not None:
                 job.error_msg = error_msg
             await session.commit()
@@ -142,6 +189,86 @@ async def get_image_job_status(
     )
 
 
+@router.get("/bgremoval/providers", response_model=BgRemovalProvidersResponse)
+async def list_bgremoval_providers_endpoint():
+    """Listet alle verfügbaren Background-Removal-Provider."""
+    providers = list_bgremoval_providers()
+    return BgRemovalProvidersResponse(
+        providers=[
+            BgRemovalProviderInfo(
+                key=p.provider_key,
+                display_name=p.display_name,
+                default_params=p.default_params(),
+                param_schema=p.param_schema(),
+            )
+            for p in providers
+        ]
+    )
+
+
+@router.post("/bgremoval", response_model=BgRemovalGenerateResponse, status_code=202)
+async def create_bgremoval(
+    body: BgRemovalGenerateRequest,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),
+):
+    try:
+        get_bgremoval_provider(body.provider_key)
+    except ValueError:
+        raise HTTPException(
+            422, detail=f"Unbekannter provider_key: {body.provider_key}"
+        )
+
+    job = GenerationJob(
+        job_type="bgremoval",
+        status="pending",
+        prompt="[bgremoval]",
+        provider_key=body.provider_key,
+        source_image_url=body.source_image_url,
+        source_job_id=body.source_job_id,
+        bgremoval_provider_key=body.provider_key,
+    )
+    session.add(job)
+    await session.commit()
+    await session.refresh(job)
+
+    background_tasks.add_task(
+        run_bgremoval,
+        str(job.id),
+        body.source_image_url,
+        body.provider_key,
+        _update_bgremoval_job,
+    )
+
+    return BgRemovalGenerateResponse(job_id=job.id, status="pending")
+
+
+@router.get("/bgremoval/{job_id}", response_model=BgRemovalJobStatusResponse)
+async def get_bgremoval_job_status(
+    job_id: UUID,
+    session: AsyncSession = Depends(get_session),
+):
+    result = await session.execute(
+        select(GenerationJob).where(
+            GenerationJob.id == job_id,
+            GenerationJob.job_type == "bgremoval",
+        )
+    )
+    job = result.scalar_one_or_none()
+    if not job:
+        raise HTTPException(404, detail="Job nicht gefunden")
+
+    return BgRemovalJobStatusResponse(
+        job_id=job.id,
+        status=job.status,
+        result_url=job.bgremoval_result_url or job.result_url,
+        error_msg=job.error_msg,
+        source_image_url=job.source_image_url or "",
+        provider_key=job.bgremoval_provider_key or job.provider_key or "",
+        created_at=job.created_at,
+    )
+
+
 @router.get("/mesh/providers", response_model=MeshProvidersResponse)
 async def list_mesh_providers():
     """Listet alle verfügbaren Mesh-Provider mit Parametern und Schema."""
@@ -185,14 +312,34 @@ async def create_mesh_generation(
     await session.commit()
     await session.refresh(job)
 
-    background_tasks.add_task(
-        run_mesh_generation,
-        str(job.id),
-        body.source_image_url,
-        body.provider_key,
-        params,
-        _update_mesh_job,
-    )
+    if body.auto_bgremoval:
+        try:
+            get_bgremoval_provider(body.bgremoval_provider_key)
+        except ValueError:
+            raise HTTPException(
+                422,
+                detail=f"Unbekannter bgremoval provider_key: {body.bgremoval_provider_key}",
+            )
+        background_tasks.add_task(
+            run_mesh_generation_with_auto_bgremoval,
+            str(job.id),
+            body.source_image_url,
+            body.provider_key,
+            params,
+            body.auto_bgremoval,
+            body.bgremoval_provider_key,
+            _update_mesh_job,
+            _update_mesh_job_bgremoval,
+        )
+    else:
+        background_tasks.add_task(
+            run_mesh_generation,
+            str(job.id),
+            body.source_image_url,
+            body.provider_key,
+            params,
+            _update_mesh_job,
+        )
 
     return MeshGenerateResponse(job_id=job.id, status="pending")
 
