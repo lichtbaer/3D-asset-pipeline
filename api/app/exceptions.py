@@ -51,3 +51,33 @@ class UniRigInvalidMeshError(ProviderAPIError):
 
     def __init__(self, message: str) -> None:
         super().__init__(status_code=400, body=message)
+
+
+class ProviderConfigError(Exception):
+    """Provider-Konfiguration fehlt oder ist ungültig (z.B. fehlender API-Token)."""
+
+    pass
+
+
+class HFInferenceError(ProviderAPIError):
+    """Fehler beim Aufruf der Hugging Face Inference API."""
+
+    pass
+
+
+class HFModelNotAvailableError(ProviderAPIError):
+    """Das angeforderte HF-Modell ist nicht verfügbar oder existiert nicht."""
+
+    pass
+
+
+class ReplicateAPIError(ProviderAPIError):
+    """Fehler beim Aufruf der Replicate API."""
+
+    pass
+
+
+class ReplicateModelError(ProviderAPIError):
+    """Das angeforderte Replicate-Modell ist nicht verfügbar oder existiert nicht."""
+
+    pass

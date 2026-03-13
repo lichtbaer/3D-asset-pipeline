@@ -11,3 +11,5 @@ pillow>=10.0.0
 python-json-logger>=2.0.0
 open3d>=0.18.0
 trimesh>=4.0.0
+huggingface_hub>=0.22.0
+replicate>=0.25.0

@@ -23,5 +23,10 @@ ANIMATION_STORAGE_PATH = Path(
     os.getenv("ANIMATION_STORAGE_PATH", "/app/storage/animations")
 )
 
+# Image-Output (HF Inference, lokal gespeicherte Bilder)
+IMAGE_STORAGE_PATH = Path(
+    os.getenv("IMAGE_STORAGE_PATH", "/app/storage/images")
+)
+
 # Logs: /app/storage/logs (rolling app.log)
 LOGS_PATH = Path(os.getenv("LOG_PATH", "/app/storage/logs"))

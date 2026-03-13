@@ -1,13 +1,33 @@
 """Provider-Registry für Image-Provider."""
 
+import logging
+
+from app.exceptions import ProviderConfigError
 from app.services.image_providers.base import ImageProvider
 from app.services.image_providers.picsart import create_picsart_providers
 
+logger = logging.getLogger(__name__)
+
 _REGISTRY: dict[str, ImageProvider] = {}
 
-# PicsArt-Provider beim Import registrieren
-for provider in create_picsart_providers():
-    _REGISTRY[provider.provider_key] = provider
+for _provider in create_picsart_providers():
+    _REGISTRY[_provider.provider_key] = _provider
+
+try:
+    from app.services.image_providers.hf_inference import HFInferenceImageProvider
+
+    _REGISTRY["hf-inference"] = HFInferenceImageProvider()
+    logger.info("hf-inference Provider erfolgreich registriert")
+except ProviderConfigError as _e:
+    logger.warning("hf-inference Provider nicht verfügbar: %s", _e)
+
+try:
+    from app.services.image_providers.replicate_provider import ReplicateImageProvider
+
+    _REGISTRY["replicate"] = ReplicateImageProvider()
+    logger.info("replicate Provider erfolgreich registriert")
+except ProviderConfigError as _e:
+    logger.warning("replicate Provider nicht verfügbar: %s", _e)
 
 
 def get_provider(key: str) -> ImageProvider:
