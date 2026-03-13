@@ -2,8 +2,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import check_db_connection
+from app.routers import generation
 
 app = FastAPI(title="Purzel ML Asset Pipeline API")
+app.include_router(generation.router)
 
 app.add_middleware(
     CORSMiddleware,
