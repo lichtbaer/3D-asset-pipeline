@@ -1,11 +1,14 @@
+import { Routes, Route } from "react-router-dom";
 import { HomePage } from "./pages/HomePage";
+import { ImageGenerationPage } from "./pages/ImageGenerationPage";
 import "./App.css";
 
 function App() {
   return (
-    <>
-      <HomePage />
-    </>
+    <Routes>
+      <Route path="/" element={<HomePage />} />
+      <Route path="/generate/image" element={<ImageGenerationPage />} />
+    </Routes>
   );
 }
 
