@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { getJobStatus } from "../../api/generation.js";
 import { getMeshJobStatus } from "../../api/mesh.js";
-import type { CompareStep } from "./CompareForm.js";
+import type { CompareStep } from "./CompareResults.js";
 
 export interface CompareHistoryEntry {
   id: string;

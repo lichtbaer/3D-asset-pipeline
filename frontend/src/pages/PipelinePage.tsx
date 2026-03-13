@@ -45,10 +45,8 @@ import {
   BgRemovalJobHistory,
   type BgRemovalJobHistoryEntry,
 } from "../components/pipeline/BgRemovalJobHistory.js";
-import {
-  CompareForm,
-  type CompareStep,
-} from "../components/pipeline/CompareForm.js";
+import { ImageCompareForm } from "../components/pipeline/ImageCompareForm.js";
+import { MeshCompareForm } from "../components/pipeline/MeshCompareForm.js";
 import { CompareResults } from "../components/pipeline/CompareResults.js";
 import {
   CompareHistory,
@@ -58,7 +56,7 @@ import { usePipelineStore } from "../store/PipelineStore.js";
 import "./ImageGenerationPage.css";
 import "./PipelinePage.css";
 
-type TabId = "image" | "bgremoval" | "mesh" | "compare";
+type TabId = "image" | "bgremoval" | "mesh";
 
 function jobToHistoryEntry(job: GenerationJob, prompt: string): JobHistoryEntry {
   return {
@@ -87,13 +85,11 @@ export function PipelinePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
   const activeTab: TabId =
-    tabParam === "compare"
-      ? "compare"
-      : tabParam === "mesh"
-        ? "mesh"
-        : tabParam === "bgremoval"
-          ? "bgremoval"
-          : "image";
+    tabParam === "mesh"
+      ? "mesh"
+      : tabParam === "bgremoval"
+        ? "bgremoval"
+        : "image";
 
   const [pendingMeshImageUrl, setPendingMeshImageUrl] = useState<string | null>(
     null
@@ -124,6 +120,13 @@ export function PipelinePage() {
       setPendingBgRemovalImageUrl(null);
     }
   }, [pendingBgRemovalImageUrl, activeTab]);
+
+  // Redirect ?tab=compare → ?tab=image (Vergleichsmodus ist jetzt in den Tabs integriert)
+  useEffect(() => {
+    if (searchParams.get("tab") === "compare") {
+      setSearchParams({ tab: "image" });
+    }
+  }, [searchParams, setSearchParams]);
 
   // URL-Parameter: ?tab=mesh&source=URL oder ?tab=bgremoval&source=URL (z.B. aus Asset-Bibliothek)
   useEffect(() => {
@@ -368,14 +371,36 @@ export function PipelinePage() {
     [imageProvidersData?.providers]
   );
 
-  const [compareStep, setCompareStep] = useState<CompareStep>("image");
-  const [compareJobIdA, setCompareJobIdA] = useState<string | null>(null);
-  const [compareJobIdB, setCompareJobIdB] = useState<string | null>(null);
-  const [compareProviderLabelA, setCompareProviderLabelA] = useState("");
-  const [compareProviderLabelB, setCompareProviderLabelB] = useState("");
-  const [compareHistory, setCompareHistory] = useState<CompareHistoryEntry[]>(
-    []
+  const [imageMode, setImageMode] = useState<"single" | "compare">("single");
+  const [meshMode, setMeshMode] = useState<"single" | "compare">("single");
+
+  const [imageCompareJobIdA, setImageCompareJobIdA] = useState<string | null>(
+    null
   );
+  const [imageCompareJobIdB, setImageCompareJobIdB] = useState<string | null>(
+    null
+  );
+  const [imageCompareProviderLabelA, setImageCompareProviderLabelA] =
+    useState("");
+  const [imageCompareProviderLabelB, setImageCompareProviderLabelB] =
+    useState("");
+  const [imageCompareHistory, setImageCompareHistory] = useState<
+    CompareHistoryEntry[]
+  >([]);
+
+  const [meshCompareJobIdA, setMeshCompareJobIdA] = useState<string | null>(
+    null
+  );
+  const [meshCompareJobIdB, setMeshCompareJobIdB] = useState<string | null>(
+    null
+  );
+  const [meshCompareProviderLabelA, setMeshCompareProviderLabelA] =
+    useState("");
+  const [meshCompareProviderLabelB, setMeshCompareProviderLabelB] =
+    useState("");
+  const [meshCompareHistory, setMeshCompareHistory] = useState<
+    CompareHistoryEntry[]
+  >([]);
 
   const handleCompareImageSubmit = useCallback(
     (req: CompareImageRequest) => {
@@ -386,11 +411,11 @@ export function PipelinePage() {
         const labelB =
           imageProviders.find((p) => p.key === req.provider_key_b)
             ?.display_name ?? req.provider_key_b;
-        setCompareJobIdA(jobIdA);
-        setCompareJobIdB(jobIdB);
-        setCompareProviderLabelA(labelA);
-        setCompareProviderLabelB(labelB);
-        setCompareHistory((prev) => [
+        setImageCompareJobIdA(jobIdA);
+        setImageCompareJobIdB(jobIdB);
+        setImageCompareProviderLabelA(labelA);
+        setImageCompareProviderLabelB(labelB);
+        setImageCompareHistory((prev) => [
           {
             id: `${jobIdA}-${jobIdB}`,
             step: "image",
@@ -416,11 +441,11 @@ export function PipelinePage() {
         const labelB =
           meshProviders.find((p) => p.key === req.provider_key_b)
             ?.display_name ?? req.provider_key_b;
-        setCompareJobIdA(jobIdA);
-        setCompareJobIdB(jobIdB);
-        setCompareProviderLabelA(labelA);
-        setCompareProviderLabelB(labelB);
-        setCompareHistory((prev) => [
+        setMeshCompareJobIdA(jobIdA);
+        setMeshCompareJobIdB(jobIdB);
+        setMeshCompareProviderLabelA(labelA);
+        setMeshCompareProviderLabelB(labelB);
+        setMeshCompareHistory((prev) => [
           {
             id: `${jobIdA}-${jobIdB}`,
             step: "mesh",
@@ -467,40 +492,72 @@ export function PipelinePage() {
         >
           Mesh-Generierung
         </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeTab === "compare"}
-          className={`pipeline-tabs__tab ${activeTab === "compare" ? "pipeline-tabs__tab--active" : ""}`}
-          onClick={() => setActiveTab("compare")}
-        >
-          Vergleich
-        </button>
       </nav>
 
       {activeTab === "image" && (
         <div className="pipeline-tab-content" role="tabpanel">
           <h1>Bildgenerierung</h1>
+          <div className="pipeline-mode-toggle" role="group" aria-label="Modus">
+            <button
+              type="button"
+              className={`pipeline-mode-toggle__btn ${imageMode === "single" ? "pipeline-mode-toggle__btn--active" : ""}`}
+              onClick={() => setImageMode("single")}
+            >
+              Einzelgenerierung
+            </button>
+            <button
+              type="button"
+              className={`pipeline-mode-toggle__btn ${imageMode === "compare" ? "pipeline-mode-toggle__btn--active" : ""}`}
+              onClick={() => setImageMode("compare")}
+            >
+              Vergleich
+            </button>
+          </div>
           <section className="pipeline-page__form">
-            <PromptForm
-              models={models}
-              modelsLoading={modelsLoading}
-              onSubmit={handleImageSubmit}
-              disabled={isImageJobRunning}
-            />
+            {imageMode === "single" ? (
+              <PromptForm
+                models={models}
+                modelsLoading={modelsLoading}
+                onSubmit={handleImageSubmit}
+                disabled={isImageJobRunning}
+              />
+            ) : (
+              <ImageCompareForm
+                imageProviders={imageProviders}
+                imageProvidersLoading={imageProvidersLoading}
+                onSubmit={handleCompareImageSubmit}
+                disabled={false}
+              />
+            )}
           </section>
           <section className="pipeline-page__status">
-            <JobStatus
-              jobId={currentImageJobId}
-              onJobUpdate={handleImageJobUpdate}
-            />
+            {imageMode === "single" ? (
+              <JobStatus
+                jobId={currentImageJobId}
+                onJobUpdate={handleImageJobUpdate}
+              />
+            ) : (
+              <CompareResults
+                jobIdA={imageCompareJobIdA}
+                jobIdB={imageCompareJobIdB}
+                providerLabelA={imageCompareProviderLabelA}
+                providerLabelB={imageCompareProviderLabelB}
+                step="image"
+                onUseForMesh={handleCompareUseForMesh}
+                onUseForBgRemoval={handleCompareUseForBgRemoval}
+              />
+            )}
           </section>
           <section className="pipeline-page__history">
-            <JobHistory
-              jobs={imageJobHistory}
-              onUseForMesh={handleUseForMesh}
-              onUseForBgRemoval={handleUseForBgRemoval}
-            />
+            {imageMode === "single" ? (
+              <JobHistory
+                jobs={imageJobHistory}
+                onUseForMesh={handleUseForMesh}
+                onUseForBgRemoval={handleUseForBgRemoval}
+              />
+            ) : (
+              <CompareHistory entries={imageCompareHistory} />
+            )}
           </section>
         </div>
       )}
@@ -537,59 +594,67 @@ export function PipelinePage() {
       {activeTab === "mesh" && (
         <div className="pipeline-tab-content" role="tabpanel">
           <h1>Mesh-Generierung</h1>
+          <div className="pipeline-mode-toggle" role="group" aria-label="Modus">
+            <button
+              type="button"
+              className={`pipeline-mode-toggle__btn ${meshMode === "single" ? "pipeline-mode-toggle__btn--active" : ""}`}
+              onClick={() => setMeshMode("single")}
+            >
+              Einzelgenerierung
+            </button>
+            <button
+              type="button"
+              className={`pipeline-mode-toggle__btn ${meshMode === "compare" ? "pipeline-mode-toggle__btn--active" : ""}`}
+              onClick={() => setMeshMode("compare")}
+            >
+              Vergleich
+            </button>
+          </div>
           <section className="pipeline-page__form">
-            <MeshForm
-              sourceImageUrl={meshSourceImageUrl}
-              onSourceImageUrlChange={setMeshSourceImageUrl}
-              providers={meshProviders}
-              providersLoading={meshProvidersLoading}
-              bgRemovalProviders={bgRemovalProviders}
-              bgRemovalProvidersLoading={bgRemovalProvidersLoading}
-              onSubmit={handleMeshSubmit}
-              disabled={isMeshJobRunning}
-            />
+            {meshMode === "single" ? (
+              <MeshForm
+                sourceImageUrl={meshSourceImageUrl}
+                onSourceImageUrlChange={setMeshSourceImageUrl}
+                providers={meshProviders}
+                providersLoading={meshProvidersLoading}
+                bgRemovalProviders={bgRemovalProviders}
+                bgRemovalProvidersLoading={bgRemovalProvidersLoading}
+                onSubmit={handleMeshSubmit}
+                disabled={isMeshJobRunning}
+              />
+            ) : (
+              <MeshCompareForm
+                sourceImageUrl={meshSourceImageUrl}
+                onSourceImageUrlChange={setMeshSourceImageUrl}
+                meshProviders={meshProviders}
+                meshProvidersLoading={meshProvidersLoading}
+                onSubmit={handleCompareMeshSubmit}
+                disabled={false}
+              />
+            )}
           </section>
           <section className="pipeline-page__status">
-            <MeshJobStatus
-              jobId={currentMeshJobId}
-              onJobUpdate={handleMeshJobUpdate}
-            />
+            {meshMode === "single" ? (
+              <MeshJobStatus
+                jobId={currentMeshJobId}
+                onJobUpdate={handleMeshJobUpdate}
+              />
+            ) : (
+              <CompareResults
+                jobIdA={meshCompareJobIdA}
+                jobIdB={meshCompareJobIdB}
+                providerLabelA={meshCompareProviderLabelA}
+                providerLabelB={meshCompareProviderLabelB}
+                step="mesh"
+              />
+            )}
           </section>
           <section className="pipeline-page__history">
-            <MeshJobHistory jobs={meshJobHistory} />
-          </section>
-        </div>
-      )}
-
-      {activeTab === "compare" && (
-        <div className="pipeline-tab-content" role="tabpanel">
-          <h1>Vergleich</h1>
-          <section className="pipeline-page__form">
-            <CompareForm
-              step={compareStep}
-              onStepChange={setCompareStep}
-              imageProviders={imageProviders}
-              imageProvidersLoading={imageProvidersLoading}
-              meshProviders={meshProviders}
-              meshProvidersLoading={meshProvidersLoading}
-              onImageSubmit={handleCompareImageSubmit}
-              onMeshSubmit={handleCompareMeshSubmit}
-              disabled={false}
-            />
-          </section>
-          <section className="pipeline-page__status">
-            <CompareResults
-              jobIdA={compareJobIdA}
-              jobIdB={compareJobIdB}
-              providerLabelA={compareProviderLabelA}
-              providerLabelB={compareProviderLabelB}
-              step={compareStep}
-              onUseForMesh={handleCompareUseForMesh}
-              onUseForBgRemoval={handleCompareUseForBgRemoval}
-            />
-          </section>
-          <section className="pipeline-page__history">
-            <CompareHistory entries={compareHistory} />
+            {meshMode === "single" ? (
+              <MeshJobHistory jobs={meshJobHistory} />
+            ) : (
+              <CompareHistory entries={meshCompareHistory} />
+            )}
           </section>
         </div>
       )}

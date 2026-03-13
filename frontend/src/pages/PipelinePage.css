@@ -38,6 +38,35 @@
   margin-bottom: 1.5rem;
 }
 
+.pipeline-mode-toggle {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.pipeline-mode-toggle__btn {
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.pipeline-mode-toggle__btn:hover {
+  color: var(--text-h);
+  border-color: var(--text);
+}
+
+.pipeline-mode-toggle__btn--active {
+  color: white;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
 .pipeline-page__form,
 .pipeline-page__status,
 .pipeline-page__history {
@@ -164,18 +193,7 @@
   margin-right: 0.5rem;
 }
 
-/* Compare tab */
-.compare-form__step-select {
-  margin-bottom: 1.5rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.compare-form__step-select label {
-  font-weight: 500;
-}
-
+/* Compare form (in Image/Mesh tabs) */
 .compare-form__providers {
   display: grid;
   grid-template-columns: 1fr 1fr;
