@@ -1034,11 +1034,11 @@ ANIMATION_PROVIDERS = [
 ]
 
 ANIMATION_PRESETS = [
-    AnimationPresetInfo(key="walk", label="Gehen", motion_prompt="Gehen"),
-    AnimationPresetInfo(key="run", label="Laufen", motion_prompt="Laufen"),
-    AnimationPresetInfo(key="idle", label="Idle", motion_prompt="Idle"),
-    AnimationPresetInfo(key="jump", label="Springen", motion_prompt="Springen"),
-    AnimationPresetInfo(key="wave", label="Winken", motion_prompt="Winken"),
+    MotionPresetSchema(key="walk", display_name="Gehen", prompt="Gehen"),
+    MotionPresetSchema(key="run", display_name="Laufen", prompt="Laufen"),
+    MotionPresetSchema(key="idle", display_name="Idle", prompt="Idle"),
+    MotionPresetSchema(key="jump", display_name="Springen", prompt="Springen"),
+    MotionPresetSchema(key="wave", display_name="Winken", prompt="Winken"),
 ]
 
 
