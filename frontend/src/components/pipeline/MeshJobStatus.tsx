@@ -9,9 +9,10 @@ export interface MeshJobStatusProps {
   jobId: string | null;
   onJobUpdate?: (job: MeshJob) => void;
   onRetrySuccess?: (newJobId: string) => void;
+  onUseForAnimation?: (glbUrl: string) => void;
 }
 
-export function MeshJobStatus({ jobId, onJobUpdate, onRetrySuccess }: MeshJobStatusProps) {
+export function MeshJobStatus({ jobId, onJobUpdate, onRetrySuccess, onUseForAnimation }: MeshJobStatusProps) {
   const queryClient = useQueryClient();
   const { data, isLoading, error } = useQuery({
     queryKey: ["mesh-job", jobId],
@@ -73,6 +74,15 @@ export function MeshJobStatus({ jobId, onJobUpdate, onRetrySuccess }: MeshJobSta
         <p className="job-status__label">Fertig!</p>
         <MeshViewer glbUrl={glb_url} height={400} />
         <div className="compare-results__actions">
+          {onUseForAnimation && (
+            <button
+              type="button"
+              className="job-history__use-mesh"
+              onClick={() => onUseForAnimation(glb_url)}
+            >
+              → Animieren
+            </button>
+          )}
           {data.asset_id && (
             <Link
               to={`/assets/${data.asset_id}`}

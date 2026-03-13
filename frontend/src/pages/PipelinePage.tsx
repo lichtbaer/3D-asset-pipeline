@@ -52,11 +52,22 @@ import {
   CompareHistory,
   type CompareHistoryEntry,
 } from "../components/pipeline/CompareHistory.js";
+import { AnimationForm } from "../components/pipeline/animation/AnimationForm.js";
+import { AnimationJobStatus } from "../components/pipeline/animation/AnimationJobStatus.js";
+import {
+  AnimationJobHistory,
+  type AnimationJobHistoryEntry,
+} from "../components/pipeline/animation/AnimationJobHistory.js";
+import {
+  getAnimationProviders,
+  postGenerateAnimation,
+  type AnimationJob,
+} from "../api/animation.js";
 import { usePipelineStore } from "../store/PipelineStore.js";
 import "./ImageGenerationPage.css";
 import "./PipelinePage.css";
 
-type TabId = "image" | "bgremoval" | "mesh";
+type TabId = "image" | "bgremoval" | "mesh" | "animation";
 
 function jobToHistoryEntry(job: GenerationJob, prompt: string): JobHistoryEntry {
   return {
@@ -80,8 +91,23 @@ function meshJobToHistoryEntry(job: MeshJob): MeshJobHistoryEntry {
   };
 }
 
+function animationJobToHistoryEntry(
+  job: AnimationJob
+): AnimationJobHistoryEntry {
+  return {
+    job_id: job.job_id,
+    motion_prompt: job.motion_prompt,
+    provider_key: job.provider_key,
+    status: job.status,
+    glb_url: job.glb_url,
+    created_at: job.created_at,
+    asset_id: job.asset_id,
+  };
+}
+
 export function PipelinePage() {
-  const { activeAssetId, setActiveAssetId } = usePipelineStore();
+  const { activeAssetId, setActiveAssetId, pendingAnimationGlbUrl, setPendingAnimationGlbUrl } =
+    usePipelineStore();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
   const activeTab: TabId =
@@ -89,7 +115,9 @@ export function PipelinePage() {
       ? "mesh"
       : tabParam === "bgremoval"
         ? "bgremoval"
-        : "image";
+        : tabParam === "animation"
+          ? "animation"
+          : "image";
 
   const [pendingMeshImageUrl, setPendingMeshImageUrl] = useState<string | null>(
     null
@@ -99,6 +127,7 @@ export function PipelinePage() {
   >(null);
   const [meshSourceImageUrl, setMeshSourceImageUrl] = useState("");
   const [bgRemovalSourceImageUrl, setBgRemovalSourceImageUrl] = useState("");
+  const [animationSourceGlbUrl, setAnimationSourceGlbUrl] = useState("");
 
   const setActiveTab = useCallback(
     (tab: TabId) => {
@@ -121,6 +150,13 @@ export function PipelinePage() {
     }
   }, [pendingBgRemovalImageUrl, activeTab]);
 
+  useEffect(() => {
+    if (pendingAnimationGlbUrl && activeTab === "animation") {
+      setAnimationSourceGlbUrl(pendingAnimationGlbUrl);
+      setPendingAnimationGlbUrl(null);
+    }
+  }, [pendingAnimationGlbUrl, activeTab, setPendingAnimationGlbUrl]);
+
   // Redirect ?tab=compare → ?tab=image (Vergleichsmodus ist jetzt in den Tabs integriert)
   useEffect(() => {
     if (searchParams.get("tab") === "compare") {
@@ -128,7 +164,7 @@ export function PipelinePage() {
     }
   }, [searchParams, setSearchParams]);
 
-  // URL-Parameter: ?tab=mesh&source=URL oder ?tab=bgremoval&source=URL (z.B. aus Asset-Bibliothek)
+  // URL-Parameter: ?tab=mesh&source=URL oder ?tab=bgremoval&source=URL oder ?tab=animation&source=URL
   useEffect(() => {
     const source = searchParams.get("source");
     const tab = searchParams.get("tab");
@@ -138,6 +174,9 @@ export function PipelinePage() {
     } else if (source && tab === "bgremoval") {
       setBgRemovalSourceImageUrl(source);
       setActiveTab("bgremoval");
+    } else if (source && tab === "animation") {
+      setAnimationSourceGlbUrl(source);
+      setActiveTab("animation");
     }
   }, [searchParams]);
 
@@ -364,6 +403,110 @@ export function PipelinePage() {
     currentBgRemovalJob?.status !== "done" &&
     currentBgRemovalJob?.status !== "failed";
 
+  const [currentAnimationJobId, setCurrentAnimationJobId] = useState<
+    string | null
+  >(null);
+  const [animationJobHistory, setAnimationJobHistory] = useState<
+    AnimationJobHistoryEntry[]
+  >([]);
+
+  const { data: animationProvidersData, isLoading: animationProvidersLoading } =
+    useQuery({
+      queryKey: ["animation-providers"],
+      queryFn: getAnimationProviders,
+    });
+  const animationProviders = useMemo(
+    () => animationProvidersData?.providers ?? [],
+    [animationProvidersData?.providers]
+  );
+
+  const animationCreateMutation = useMutation({
+    mutationFn: postGenerateAnimation,
+    onSuccess: (res, variables) => {
+      setCurrentAnimationJobId(res.job_id);
+      setAnimationJobHistory((prev) => [
+        {
+          job_id: res.job_id,
+          motion_prompt: variables.motion_prompt,
+          provider_key: variables.provider_key,
+          status: "pending",
+          glb_url: null,
+          created_at: new Date().toISOString(),
+        },
+        ...prev,
+      ]);
+    },
+  });
+
+  const handleAnimationJobUpdate = useCallback((job: AnimationJob) => {
+    setAnimationJobHistory((prev) =>
+      prev.map((entry) =>
+        entry.job_id === job.job_id
+          ? animationJobToHistoryEntry(job)
+          : entry
+      )
+    );
+  }, []);
+
+  const handleAnimationRetrySuccess = useCallback((newJobId: string) => {
+    setCurrentAnimationJobId(newJobId);
+    const failedJob = animationJobHistory.find(
+      (j) => j.job_id === currentAnimationJobId
+    );
+    setAnimationJobHistory((prev) => [
+      {
+        job_id: newJobId,
+        motion_prompt: failedJob?.motion_prompt ?? "",
+        provider_key: failedJob?.provider_key ?? "",
+        status: "pending",
+        glb_url: null,
+        created_at: new Date().toISOString(),
+      },
+      ...prev,
+    ]);
+  }, [currentAnimationJobId, animationJobHistory]);
+
+  const currentAnimationJob = animationJobHistory.find(
+    (j) => j.job_id === currentAnimationJobId
+  );
+  const isAnimationJobRunning =
+    !!currentAnimationJobId &&
+    currentAnimationJob?.status !== "done" &&
+    currentAnimationJob?.status !== "failed";
+
+  const handleAnimationSubmit = (req: {
+    source_glb_url: string;
+    motion_prompt: string;
+    provider_key: string;
+    params?: Record<string, unknown>;
+    asset_id?: string;
+  }) => {
+    const payload: {
+      source_glb_url: string;
+      motion_prompt: string;
+      provider_key: string;
+      params?: Record<string, unknown>;
+      asset_id?: string;
+    } = { ...req };
+    if (activeAssetId) {
+      payload.asset_id = activeAssetId;
+      setActiveAssetId(null);
+    }
+    animationCreateMutation.mutate(payload);
+  };
+
+  const handleUseForAnimation = useCallback(
+    (glbUrl: string) => {
+      setPendingAnimationGlbUrl(glbUrl);
+      setActiveTab("animation");
+    },
+    [setPendingAnimationGlbUrl, setActiveTab]
+  );
+
+  const handleTryDifferentPreset = useCallback(() => {
+    setCurrentAnimationJobId(null);
+  }, []);
+
   const handleImageSubmit = (req: GenerateImageRequest) => {
     imageCreateMutation.mutate(req);
   };
@@ -537,6 +680,15 @@ export function PipelinePage() {
         >
           Mesh-Generierung
         </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "animation"}
+          className={`pipeline-tabs__tab ${activeTab === "animation" ? "pipeline-tabs__tab--active" : ""}`}
+          onClick={() => setActiveTab("animation")}
+        >
+          Animation
+        </button>
       </nav>
 
       {activeTab === "image" && (
@@ -688,6 +840,7 @@ export function PipelinePage() {
                 jobId={currentMeshJobId}
                 onJobUpdate={handleMeshJobUpdate}
                 onRetrySuccess={handleMeshRetrySuccess}
+                onUseForAnimation={handleUseForAnimation}
               />
             ) : (
               <CompareResults
@@ -707,6 +860,33 @@ export function PipelinePage() {
             ) : (
               <CompareHistory entries={meshCompareHistory} />
             )}
+          </section>
+        </div>
+      )}
+
+      {activeTab === "animation" && (
+        <div className="pipeline-tab-content" role="tabpanel">
+          <h1>Animation</h1>
+          <section className="pipeline-page__form">
+            <AnimationForm
+              sourceGlbUrl={animationSourceGlbUrl}
+              onSourceGlbUrlChange={setAnimationSourceGlbUrl}
+              providers={animationProviders}
+              providersLoading={animationProvidersLoading}
+              onSubmit={handleAnimationSubmit}
+              disabled={isAnimationJobRunning}
+            />
+          </section>
+          <section className="pipeline-page__status">
+            <AnimationJobStatus
+              jobId={currentAnimationJobId}
+              onJobUpdate={handleAnimationJobUpdate}
+              onRetrySuccess={handleAnimationRetrySuccess}
+              onTryDifferentPreset={handleTryDifferentPreset}
+            />
+          </section>
+          <section className="pipeline-page__history">
+            <AnimationJobHistory jobs={animationJobHistory} />
           </section>
         </div>
       )}
