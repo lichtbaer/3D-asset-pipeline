@@ -69,7 +69,9 @@ export async function getRiggingJobStatus(
   }>(`/generate/rigging/${jobId}`);
   const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
   const glb_url = data.glb_url
-    ? `${baseUrl}${data.glb_url}`
+    ? data.glb_url.startsWith("http")
+      ? data.glb_url
+      : `${baseUrl}${data.glb_url}`
     : null;
   return {
     job_id: String(data.job_id),
@@ -84,6 +86,18 @@ export async function getRiggingJobStatus(
     updated_at: data.updated_at,
     asset_id: data.asset_id ? String(data.asset_id) : null,
     failed_at: data.failed_at,
+  };
+}
+
+export async function retryRiggingJob(
+  jobId: string
+): Promise<{ job_id: string; status: string }> {
+  const { data } = await apiClient.post<{ job_id: string; status: string }>(
+    `/generate/rigging/retry/${jobId}`
+  );
+  return {
+    job_id: String(data.job_id),
+    status: data.status,
   };
 }
 

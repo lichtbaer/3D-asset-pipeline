@@ -1,36 +1,44 @@
 import { useEffect } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getMeshJobStatus, retryMeshJob, type MeshJob } from "../../api/mesh.js";
-import { JobErrorBlock } from "../generation/JobErrorBlock.js";
-import { MeshViewer } from "../viewer/MeshViewer.js";
-import { usePipelineStore } from "../../store/PipelineStore.js";
+import {
+  getRiggingJobStatus,
+  retryRiggingJob,
+  type RiggingJob,
+} from "../../../api/rigging.js";
+import { JobErrorBlock } from "../../generation/JobErrorBlock.js";
+import { MeshViewer } from "../../viewer/MeshViewer.js";
+import { usePipelineStore } from "../../../store/PipelineStore.js";
 
-export interface MeshJobStatusProps {
+export interface RiggingJobStatusProps {
   jobId: string | null;
-  onJobUpdate?: (job: MeshJob) => void;
+  onJobUpdate?: (job: RiggingJob) => void;
   onRetrySuccess?: (newJobId: string) => void;
 }
 
-export function MeshJobStatus({ jobId, onJobUpdate, onRetrySuccess }: MeshJobStatusProps) {
+export function RiggingJobStatus({
+  jobId,
+  onJobUpdate,
+  onRetrySuccess,
+}: RiggingJobStatusProps) {
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
   const [, setSearchParams] = useSearchParams();
-  const { setPendingRiggingGlbUrl } = usePipelineStore();
+  const { setPendingAnimationGlbUrl } = usePipelineStore();
+
   const { data, isLoading, error } = useQuery({
-    queryKey: ["mesh-job", jobId],
-    queryFn: () => getMeshJobStatus(jobId!),
+    queryKey: ["rigging-job", jobId],
+    queryFn: () => getRiggingJobStatus(jobId!),
     refetchInterval: (query) => {
       const status = query.state.data?.status;
-      return status === "done" || status === "failed" ? false : 3000;
+      return status === "done" || status === "failed" ? false : 2000;
     },
     enabled: !!jobId,
   });
 
   const retryMutation = useMutation({
-    mutationFn: () => retryMeshJob(jobId!),
+    mutationFn: () => retryRiggingJob(jobId!),
     onSuccess: (res) => {
-      queryClient.invalidateQueries({ queryKey: ["mesh-job", jobId] });
+      queryClient.invalidateQueries({ queryKey: ["rigging-job", jobId] });
       onRetrySuccess?.(res.job_id);
     },
   });
@@ -40,6 +48,13 @@ export function MeshJobStatus({ jobId, onJobUpdate, onRetrySuccess }: MeshJobSta
       onJobUpdate?.(data);
     }
   }, [data, onJobUpdate]);
+
+  const handleUseForAnimation = () => {
+    if (data?.glb_url) {
+      setPendingAnimationGlbUrl(data.glb_url);
+      setSearchParams({ tab: "animation" });
+    }
+  };
 
   if (!jobId) {
     return null;
@@ -71,14 +86,6 @@ export function MeshJobStatus({ jobId, onJobUpdate, onRetrySuccess }: MeshJobSta
 
   const { status, glb_url } = data;
 
-  const handleUseForRigging = () => {
-    if (glb_url) {
-      setPendingRiggingGlbUrl(glb_url);
-      navigate("/pipeline");
-      setSearchParams({ tab: "rigging" });
-    }
-  };
-
   if (status === "done" && glb_url) {
     return (
       <div className="job-status job-status--done">
@@ -88,18 +95,10 @@ export function MeshJobStatus({ jobId, onJobUpdate, onRetrySuccess }: MeshJobSta
           <button
             type="button"
             className="job-history__use-mesh"
-            onClick={handleUseForRigging}
+            onClick={handleUseForAnimation}
           >
-            → Riggen
+            → Animieren
           </button>
-          {data.asset_id && (
-            <Link
-              to={`/assets/${data.asset_id}`}
-              className="job-history__use-mesh"
-            >
-              → Als nächsten Schritt verwenden
-            </Link>
-          )}
           <a
             href={glb_url}
             download
@@ -108,9 +107,6 @@ export function MeshJobStatus({ jobId, onJobUpdate, onRetrySuccess }: MeshJobSta
             Download GLB
           </a>
         </div>
-        <p className="mesh-job-status__hint">
-          Mesh-Generierung kann bis zu 5 Minuten dauern
-        </p>
       </div>
     );
   }
@@ -136,10 +132,7 @@ export function MeshJobStatus({ jobId, onJobUpdate, onRetrySuccess }: MeshJobSta
       <p>
         {status === "pending"
           ? "Wartet auf Verarbeitung..."
-          : "Wird generiert..."}
-      </p>
-      <p className="mesh-job-status__hint">
-        Mesh-Generierung kann bis zu 5 Minuten dauern
+          : "UniRig analysiert Mesh..."}
       </p>
     </div>
   );
