@@ -399,6 +399,22 @@ async def persist_animation_job(
     logger.info("Asset %s: animation step persisted", asset_id)
 
 
+def delete_asset(asset_id: str) -> bool:
+    """
+    Löscht Asset-Ordner mit allen Dateien.
+    Gibt True zurück wenn gelöscht, False wenn nicht gefunden.
+    Validiert asset_id als UUID, um Path-Traversal zu verhindern.
+    """
+    if not re.fullmatch(r"[0-9a-f-]{36}", asset_id):
+        return False
+    asset_path = _asset_dir(asset_id)
+    if not asset_path.exists():
+        return False
+    shutil.rmtree(asset_path)
+    logger.info("Asset %s gelöscht", asset_id)
+    return True
+
+
 def get_or_create_asset_id(existing_asset_id: str | None) -> str:
     """Gibt existing_asset_id zurück oder erstellt neues Asset."""
     if existing_asset_id and get_asset(existing_asset_id):

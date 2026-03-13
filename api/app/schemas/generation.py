@@ -267,3 +267,47 @@ class MotionPresetSchema(BaseModel):
 
 class AnimationPresetsResponse(BaseModel):
     presets: list[MotionPresetSchema]
+
+
+# --- Job Listing & Statistiken ---
+
+
+class JobListItem(BaseModel):
+    """Einzelner Job in der Job-Liste."""
+
+    job_id: UUID
+    job_type: str
+    status: str
+    provider_key: str
+    prompt: str | None = None
+    asset_id: UUID | None = None
+    created_at: datetime
+    updated_at: datetime | None = None
+    error_type: str | None = None
+
+
+class JobListResponse(BaseModel):
+    """Paginierte Liste aller Jobs."""
+
+    jobs: list[JobListItem]
+    total: int
+    limit: int
+    offset: int
+
+
+class JobTypeStats(BaseModel):
+    """Statistiken für einen Job-Typ."""
+
+    job_type: str
+    total: int
+    pending: int
+    processing: int
+    done: int
+    failed: int
+
+
+class JobStatsResponse(BaseModel):
+    """Gesamtstatistiken über alle Jobs."""
+
+    total_jobs: int
+    by_type: list[JobTypeStats]
