@@ -169,7 +169,8 @@ async def _poll_for_result(
         except httpx.RequestError as e:
             raise RuntimeError(f"Poll Request-Fehler: {e}")
 
-        if response.status_code != 200:
+        # 202 = noch in Bearbeitung, weiter pollen; 200 = Ergebnis da
+        if response.status_code not in (200, 202):
             raise RuntimeError(
                 f"Poll-Fehler ({response.status_code}): {response.text}"
             )
@@ -189,6 +190,8 @@ async def _poll_for_result(
             raise RuntimeError(
                 data.get("message", data.get("error", "Unbekannter Fehler"))
             )
+
+        # 202 oder status "processing" → weiter warten
 
     return None
 
