@@ -18,6 +18,11 @@ import {
   type BgRemovalJob,
 } from "../api/bgremoval.js";
 import {
+  startRiggingJob,
+  getRiggingProviders,
+  type RiggingJob,
+} from "../api/rigging.js";
+import {
   getImageProviders,
   type ImageProvider,
 } from "../api/generation.js";
@@ -45,6 +50,12 @@ import {
   BgRemovalJobHistory,
   type BgRemovalJobHistoryEntry,
 } from "../components/pipeline/BgRemovalJobHistory.js";
+import { RiggingForm } from "../components/pipeline/rigging/RiggingForm.js";
+import { RiggingJobStatus } from "../components/pipeline/rigging/RiggingJobStatus.js";
+import {
+  RiggingJobHistory,
+  type RiggingJobHistoryEntry,
+} from "../components/pipeline/rigging/RiggingJobHistory.js";
 import { ImageCompareForm } from "../components/pipeline/ImageCompareForm.js";
 import { MeshCompareForm } from "../components/pipeline/MeshCompareForm.js";
 import { CompareResults } from "../components/pipeline/CompareResults.js";
@@ -56,7 +67,7 @@ import { usePipelineStore } from "../store/PipelineStore.js";
 import "./ImageGenerationPage.css";
 import "./PipelinePage.css";
 
-type TabId = "image" | "bgremoval" | "mesh";
+type TabId = "image" | "bgremoval" | "mesh" | "rigging" | "animation";
 
 function jobToHistoryEntry(job: GenerationJob, prompt: string): JobHistoryEntry {
   return {
@@ -81,7 +92,12 @@ function meshJobToHistoryEntry(job: MeshJob): MeshJobHistoryEntry {
 }
 
 export function PipelinePage() {
-  const { activeAssetId, setActiveAssetId } = usePipelineStore();
+  const {
+    activeAssetId,
+    setActiveAssetId,
+    pendingRiggingGlbUrl,
+    setPendingRiggingGlbUrl,
+  } = usePipelineStore();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
   const activeTab: TabId =
@@ -89,7 +105,11 @@ export function PipelinePage() {
       ? "mesh"
       : tabParam === "bgremoval"
         ? "bgremoval"
-        : "image";
+        : tabParam === "rigging"
+          ? "rigging"
+          : tabParam === "animation"
+            ? "animation"
+            : "image";
 
   const [pendingMeshImageUrl, setPendingMeshImageUrl] = useState<string | null>(
     null
@@ -99,6 +119,7 @@ export function PipelinePage() {
   >(null);
   const [meshSourceImageUrl, setMeshSourceImageUrl] = useState("");
   const [bgRemovalSourceImageUrl, setBgRemovalSourceImageUrl] = useState("");
+  const [riggingSourceGlbUrl, setRiggingSourceGlbUrl] = useState("");
 
   const setActiveTab = useCallback(
     (tab: TabId) => {
@@ -121,6 +142,13 @@ export function PipelinePage() {
     }
   }, [pendingBgRemovalImageUrl, activeTab]);
 
+  useEffect(() => {
+    if (pendingRiggingGlbUrl && activeTab === "rigging") {
+      setRiggingSourceGlbUrl(pendingRiggingGlbUrl);
+      setPendingRiggingGlbUrl(null);
+    }
+  }, [pendingRiggingGlbUrl, activeTab, setPendingRiggingGlbUrl]);
+
   // Redirect ?tab=compare → ?tab=image (Vergleichsmodus ist jetzt in den Tabs integriert)
   useEffect(() => {
     if (searchParams.get("tab") === "compare") {
@@ -128,7 +156,7 @@ export function PipelinePage() {
     }
   }, [searchParams, setSearchParams]);
 
-  // URL-Parameter: ?tab=mesh&source=URL oder ?tab=bgremoval&source=URL (z.B. aus Asset-Bibliothek)
+  // URL-Parameter: ?tab=mesh&source=URL oder ?tab=bgremoval&source=URL oder ?tab=rigging&source=URL (z.B. aus Asset-Bibliothek)
   useEffect(() => {
     const source = searchParams.get("source");
     const tab = searchParams.get("tab");
@@ -138,6 +166,9 @@ export function PipelinePage() {
     } else if (source && tab === "bgremoval") {
       setBgRemovalSourceImageUrl(source);
       setActiveTab("bgremoval");
+    } else if (source && tab === "rigging") {
+      setRiggingSourceGlbUrl(source);
+      setActiveTab("rigging");
     }
   }, [searchParams]);
 
@@ -364,6 +395,105 @@ export function PipelinePage() {
     currentBgRemovalJob?.status !== "done" &&
     currentBgRemovalJob?.status !== "failed";
 
+  const [currentRiggingJobId, setCurrentRiggingJobId] = useState<string | null>(
+    null
+  );
+  const [riggingJobHistory, setRiggingJobHistory] = useState<
+    RiggingJobHistoryEntry[]
+  >([]);
+
+  const { data: riggingProvidersData, isLoading: riggingProvidersLoading } =
+    useQuery({
+      queryKey: ["rigging-providers"],
+      queryFn: getRiggingProviders,
+    });
+  const riggingProviders = useMemo(
+    () => riggingProvidersData?.providers ?? [],
+    [riggingProvidersData?.providers]
+  );
+
+  const riggingCreateMutation = useMutation({
+    mutationFn: startRiggingJob,
+    onSuccess: (res, variables) => {
+      setCurrentRiggingJobId(res.job_id);
+      setRiggingJobHistory((prev) => [
+        {
+          job_id: res.job_id,
+          source_glb_url: variables.source_glb_url,
+          provider_key: variables.provider_key,
+          status: "pending",
+          result_url: null,
+          asset_id: variables.asset_id,
+          created_at: new Date().toISOString(),
+        },
+        ...prev,
+      ]);
+    },
+  });
+
+  const handleRiggingJobUpdate = useCallback((job: RiggingJob) => {
+    setRiggingJobHistory((prev) =>
+      prev.map((entry) =>
+        entry.job_id === job.job_id
+          ? {
+              ...entry,
+              status: job.status,
+              result_url: job.result_url,
+              created_at: job.created_at,
+            }
+          : entry
+      )
+    );
+  }, []);
+
+  const handleRiggingRetrySuccess = useCallback((newJobId: string) => {
+    setCurrentRiggingJobId(newJobId);
+    const failedJob = riggingJobHistory.find(
+      (j) => j.job_id === currentRiggingJobId
+    );
+    setRiggingJobHistory((prev) => [
+      {
+        job_id: newJobId,
+        source_glb_url: failedJob?.source_glb_url ?? "",
+        provider_key: failedJob?.provider_key ?? "",
+        status: "pending",
+        result_url: null,
+        asset_id: failedJob?.asset_id,
+        created_at: new Date().toISOString(),
+      },
+      ...prev,
+    ]);
+  }, [currentRiggingJobId, riggingJobHistory]);
+
+  const handleRiggingSubmit = (req: {
+    source_glb_url: string;
+    provider_key: string;
+    asset_id?: string;
+  }) => {
+    const payload: {
+      source_glb_url: string;
+      provider_key: string;
+      asset_id?: string;
+    } = { ...req };
+    if (activeAssetId) {
+      payload.asset_id = activeAssetId;
+      setActiveAssetId(null);
+    }
+    riggingCreateMutation.mutate(payload);
+  };
+
+  const handleRiggingJobSelect = useCallback((job: RiggingJobHistoryEntry) => {
+    setCurrentRiggingJobId(job.job_id);
+  }, []);
+
+  const currentRiggingJob = riggingJobHistory.find(
+    (j) => j.job_id === currentRiggingJobId
+  );
+  const isRiggingJobRunning =
+    !!currentRiggingJobId &&
+    currentRiggingJob?.status !== "done" &&
+    currentRiggingJob?.status !== "failed";
+
   const handleImageSubmit = (req: GenerateImageRequest) => {
     imageCreateMutation.mutate(req);
   };
@@ -537,6 +667,24 @@ export function PipelinePage() {
         >
           Mesh-Generierung
         </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "rigging"}
+          className={`pipeline-tabs__tab ${activeTab === "rigging" ? "pipeline-tabs__tab--active" : ""}`}
+          onClick={() => setActiveTab("rigging")}
+        >
+          Rigging
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "animation"}
+          className={`pipeline-tabs__tab ${activeTab === "animation" ? "pipeline-tabs__tab--active" : ""}`}
+          onClick={() => setActiveTab("animation")}
+        >
+          Animation
+        </button>
       </nav>
 
       {activeTab === "image" && (
@@ -708,6 +856,46 @@ export function PipelinePage() {
               <CompareHistory entries={meshCompareHistory} />
             )}
           </section>
+        </div>
+      )}
+
+      {activeTab === "rigging" && (
+        <div className="pipeline-tab-content" role="tabpanel">
+          <h1>Rigging</h1>
+          <section className="pipeline-page__form">
+            <RiggingForm
+              sourceGlbUrl={riggingSourceGlbUrl}
+              onSourceGlbUrlChange={setRiggingSourceGlbUrl}
+              providers={riggingProviders}
+              providersLoading={riggingProvidersLoading}
+              onSubmit={handleRiggingSubmit}
+              disabled={isRiggingJobRunning}
+              assetId={activeAssetId}
+            />
+          </section>
+          <section className="pipeline-page__status">
+            <RiggingJobStatus
+              jobId={currentRiggingJobId}
+              onJobUpdate={handleRiggingJobUpdate}
+              onRetrySuccess={handleRiggingRetrySuccess}
+            />
+          </section>
+          <section className="pipeline-page__history">
+            <RiggingJobHistory
+              jobs={riggingJobHistory}
+              onSelectJob={handleRiggingJobSelect}
+            />
+          </section>
+        </div>
+      )}
+
+      {activeTab === "animation" && (
+        <div className="pipeline-tab-content" role="tabpanel">
+          <h1>Animation</h1>
+          <p className="pipeline-tab-placeholder">
+            Animation-Tab kommt bald. Der gerüggte Mesh wurde für den nächsten
+            Schritt vorbereitet.
+          </p>
         </div>
       )}
     </main>
