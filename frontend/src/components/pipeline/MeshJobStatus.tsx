@@ -1,9 +1,10 @@
 import { useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getMeshJobStatus, retryMeshJob, type MeshJob } from "../../api/mesh.js";
 import { JobErrorBlock } from "../generation/JobErrorBlock.js";
 import { MeshViewer } from "../viewer/MeshViewer.js";
+import { usePipelineStore } from "../../store/PipelineStore.js";
 
 export interface MeshJobStatusProps {
   jobId: string | null;
@@ -13,6 +14,9 @@ export interface MeshJobStatusProps {
 
 export function MeshJobStatus({ jobId, onJobUpdate, onRetrySuccess }: MeshJobStatusProps) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const [, setSearchParams] = useSearchParams();
+  const { setPendingRiggingGlbUrl } = usePipelineStore();
   const { data, isLoading, error } = useQuery({
     queryKey: ["mesh-job", jobId],
     queryFn: () => getMeshJobStatus(jobId!),
@@ -67,12 +71,27 @@ export function MeshJobStatus({ jobId, onJobUpdate, onRetrySuccess }: MeshJobSta
 
   const { status, glb_url } = data;
 
+  const handleUseForRigging = () => {
+    if (glb_url) {
+      setPendingRiggingGlbUrl(glb_url);
+      navigate("/pipeline");
+      setSearchParams({ tab: "rigging" });
+    }
+  };
+
   if (status === "done" && glb_url) {
     return (
       <div className="job-status job-status--done">
         <p className="job-status__label">Fertig!</p>
         <MeshViewer glbUrl={glb_url} height={400} />
         <div className="compare-results__actions">
+          <button
+            type="button"
+            className="job-history__use-mesh"
+            onClick={handleUseForRigging}
+          >
+            → Riggen
+          </button>
           {data.asset_id && (
             <Link
               to={`/assets/${data.asset_id}`}
