@@ -26,6 +26,7 @@ services:
       - ./storage/meshes:/app/storage/meshes
       - ./storage/bgremoval:/app/storage/bgremoval
       - ./storage/assets:/app/storage/assets
+      - ./storage/animations:/app/storage/animations
       - ./storage/rembg_cache:/app/storage/rembg_cache
       - ./storage/logs:/app/storage/logs
     environment:

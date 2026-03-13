@@ -12,6 +12,7 @@ from app.database import check_db_connection
 from app.routers import generation
 
 from app.config.storage import (
+    ANIMATION_STORAGE_PATH,
     ASSETS_STORAGE_PATH,
     BGREMOVAL_STORAGE_PATH,
     MESH_STORAGE_PATH,
@@ -21,6 +22,7 @@ from app.routers import assets
 MESH_STORAGE_PATH.mkdir(parents=True, exist_ok=True)
 BGREMOVAL_STORAGE_PATH.mkdir(parents=True, exist_ok=True)
 ASSETS_STORAGE_PATH.mkdir(parents=True, exist_ok=True)
+ANIMATION_STORAGE_PATH.mkdir(parents=True, exist_ok=True)
 
 app = FastAPI(title="Purzel ML Asset Pipeline API")
 app.include_router(generation.router)
@@ -30,6 +32,11 @@ app.mount(
     "/static/bgremoval",
     StaticFiles(directory=str(BGREMOVAL_STORAGE_PATH)),
     name="bgremoval",
+)
+app.mount(
+    "/static/animations",
+    StaticFiles(directory=str(ANIMATION_STORAGE_PATH)),
+    name="animations",
 )
 
 app.add_middleware(

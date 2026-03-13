@@ -179,3 +179,91 @@ class BgRemovalProviderInfo(BaseModel):
 
 class BgRemovalProvidersResponse(BaseModel):
     providers: list[BgRemovalProviderInfo]
+
+
+# --- Rigging ---
+
+
+class RiggingGenerateRequest(BaseModel):
+    source_glb_url: str = Field(..., min_length=1)
+    provider_key: str = "unirig"
+    asset_id: str | None = None
+
+
+class RiggingGenerateResponse(BaseModel):
+    job_id: UUID
+    status: str
+
+
+class RiggingProviderInfo(BaseModel):
+    key: str
+    display_name: str
+
+
+class RiggingProvidersResponse(BaseModel):
+    providers: list[RiggingProviderInfo]
+
+
+class RiggingJobStatusResponse(BaseModel):
+    job_id: UUID
+    status: str
+    glb_url: str | None = None
+    error_msg: str | None = None
+    error_type: str | None = None
+    error_detail: str | None = None
+    source_glb_url: str
+    provider_key: str
+    created_at: datetime
+    updated_at: datetime | None = None
+    asset_id: UUID | None = None
+    failed_at: datetime | None = None
+
+
+# --- Animation ---
+
+
+class AnimationGenerateRequest(BaseModel):
+    source_glb_url: str = Field(..., min_length=1)
+    provider_key: str = "hy-motion"
+    motion_prompt: str = Field(..., min_length=1)
+    asset_id: str | None = None
+
+
+class AnimationGenerateResponse(BaseModel):
+    job_id: UUID
+    status: str
+
+
+class AnimationJobStatusResponse(BaseModel):
+    job_id: UUID
+    status: str
+    animated_glb_url: str | None = None
+    error_msg: str | None = None
+    error_type: str | None = None
+    error_detail: str | None = None
+    source_glb_url: str
+    provider_key: str
+    motion_prompt: str
+    created_at: datetime
+    updated_at: datetime | None = None
+    asset_id: UUID | None = None
+    failed_at: datetime | None = None
+
+
+class AnimationProviderInfo(BaseModel):
+    key: str
+    display_name: str
+
+
+class AnimationProvidersResponse(BaseModel):
+    providers: list[AnimationProviderInfo]
+
+
+class MotionPresetSchema(BaseModel):
+    key: str
+    display_name: str
+    prompt: str
+
+
+class AnimationPresetsResponse(BaseModel):
+    presets: list[MotionPresetSchema]
