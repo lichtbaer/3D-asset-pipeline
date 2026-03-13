@@ -66,3 +66,21 @@ export async function getAvailableModels(): Promise<GetAvailableModelsResponse> 
   );
   return data;
 }
+
+export interface ImageProvider {
+  key: string;
+  display_name: string;
+  default_params: Record<string, unknown>;
+  param_schema: Record<string, unknown>;
+}
+
+interface GetImageProvidersResponse {
+  providers: ImageProvider[];
+}
+
+export async function getImageProviders(): Promise<GetImageProvidersResponse> {
+  const { data } = await apiClient.get<GetImageProvidersResponse>(
+    "/generate/image/providers"
+  );
+  return data;
+}
