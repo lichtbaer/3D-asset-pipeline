@@ -4,6 +4,7 @@ export interface BgRemovalRequest {
   source_image_url: string;
   source_job_id?: string;
   provider_key: string;
+  asset_id?: string;
 }
 
 export type BgRemovalJobStatus =

@@ -6,6 +6,7 @@ export interface GenerateImageRequest {
   width: number;
   height: number;
   negative_prompt?: string;
+  asset_id?: string;
 }
 
 export type GenerationJobStatus = "pending" | "processing" | "done" | "failed";

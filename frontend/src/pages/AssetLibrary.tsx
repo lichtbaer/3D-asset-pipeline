@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { listAssets, getAssetFileUrl } from "../api/assets.js";
+import { listAssets } from "../api/assets.js";
+import { AssetDetailModal } from "../components/assets/AssetDetailModal.js";
 
 function formatDate(iso: string): string {
   try {
@@ -19,14 +21,31 @@ function StepBadges({ steps }: { steps: Record<string, { file: string }> }) {
   const hasMesh = "mesh" in steps;
   return (
     <span className="asset-card__badges">
-      {hasImage && <span title="Bild">🖼</span>}
-      {hasBgremoval && <span title="Freistellung">✂️</span>}
-      {hasMesh && <span title="Mesh">🧊</span>}
+      <span
+        title="Bild"
+        className={hasImage ? "" : "asset-card__badge--missing"}
+      >
+        🖼
+      </span>
+      <span
+        title="Freistellung"
+        className={hasBgremoval ? "" : "asset-card__badge--missing"}
+      >
+        ✂️
+      </span>
+      <span
+        title="Mesh"
+        className={hasMesh ? "" : "asset-card__badge--missing"}
+      >
+        🧊
+      </span>
     </span>
   );
 }
 
 export function AssetLibrary() {
+  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+
   const { data: assets, isLoading, error } = useQuery({
     queryKey: ["assets"],
     queryFn: listAssets,
@@ -65,12 +84,10 @@ export function AssetLibrary() {
 
       {assets && assets.length === 0 && (
         <div className="asset-library__empty">
-          <p>Noch keine Assets gespeichert.</p>
-          <p>
-            Generiere ein Bild, führe eine Freistellung durch oder erstelle ein
-            Mesh — abgeschlossene Jobs werden automatisch in der Bibliothek
-            gespeichert.
-          </p>
+          <p>Noch keine Assets generiert.</p>
+          <Link to="/pipeline" className="asset-library__empty-link">
+            Zur Pipeline →
+          </Link>
         </div>
       )}
 
@@ -81,10 +98,11 @@ export function AssetLibrary() {
               ? `${baseUrl}${asset.thumbnail_url}`
               : null;
             return (
-              <Link
+              <button
                 key={asset.asset_id}
-                to={`/assets/${asset.asset_id}`}
+                type="button"
                 className="asset-card"
+                onClick={() => setSelectedAssetId(asset.asset_id)}
               >
                 <div className="asset-card__thumb">
                   {thumbUrl ? (
@@ -105,10 +123,17 @@ export function AssetLibrary() {
                   </p>
                   <StepBadges steps={asset.steps} />
                 </div>
-              </Link>
+              </button>
             );
           })}
         </div>
+      )}
+
+      {selectedAssetId && (
+        <AssetDetailModal
+          assetId={selectedAssetId}
+          onClose={() => setSelectedAssetId(null)}
+        />
       )}
     </main>
   );

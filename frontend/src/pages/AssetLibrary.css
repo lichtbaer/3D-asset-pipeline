@@ -48,9 +48,13 @@
   border: 1px solid var(--border);
   border-radius: 8px;
   overflow: hidden;
-  text-decoration: none;
   color: inherit;
   transition: box-shadow 0.2s;
+  background: var(--bg);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  padding: 0;
 }
 
 .asset-card:hover {
@@ -90,6 +94,22 @@
   font-size: 1rem;
   display: flex;
   gap: 0.25rem;
+}
+
+.asset-card__badge--missing {
+  opacity: 0.35;
+}
+
+.asset-library__empty-link {
+  display: inline-block;
+  margin-top: 0.5rem;
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.asset-library__empty-link:hover {
+  text-decoration: underline;
 }
 
 /* AssetDetail */
@@ -219,4 +239,186 @@
 
 .asset-detail--error {
   color: var(--text);
+}
+
+/* Asset Detail Modal */
+.asset-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.asset-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+}
+
+.asset-modal__content {
+  position: relative;
+  max-width: 700px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: var(--bg);
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: var(--shadow);
+}
+
+.asset-modal__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.asset-modal__header h2 {
+  margin: 0;
+}
+
+.asset-modal__close {
+  font-size: 1.5rem;
+  line-height: 1;
+  padding: 0.25rem 0.5rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.asset-modal__close:hover {
+  color: var(--accent);
+}
+
+.asset-modal__dates {
+  font-size: 0.875rem;
+  color: var(--text);
+  margin-bottom: 1.5rem;
+}
+
+.asset-modal__files h3,
+.asset-modal__meta h3,
+.asset-modal__actions h3 {
+  font-size: 1rem;
+  margin: 0 0 0.75rem;
+}
+
+.asset-modal__previews {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.asset-modal__preview-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.asset-modal__checkerboard {
+  background-image: linear-gradient(45deg, #ccc 25%, transparent 25%),
+    linear-gradient(-45deg, #ccc 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #ccc 75%),
+    linear-gradient(-45deg, transparent 75%, #ccc 75%);
+  background-size: 20px 20px;
+  background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+  background-color: #fff;
+  border-radius: 6px;
+  padding: 4px;
+  display: inline-block;
+}
+
+.asset-modal__checkerboard .asset-modal__preview-img {
+  display: block;
+}
+
+.asset-modal__preview-img {
+  max-width: 200px;
+  max-height: 200px;
+  object-fit: contain;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.asset-modal__preview-label {
+  font-size: 0.875rem;
+  color: var(--text);
+  margin: 0;
+}
+
+.asset-modal__download {
+  font-size: 0.875rem;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.asset-modal__download:hover {
+  text-decoration: underline;
+}
+
+.asset-modal__mesh-placeholder {
+  width: 200px;
+  height: 120px;
+  background: var(--border);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.875rem;
+  color: var(--text);
+}
+
+.asset-modal__hint {
+  font-size: 0.75rem;
+  color: var(--text);
+  margin: 0;
+}
+
+.asset-modal__meta-step {
+  font-size: 0.875rem;
+  margin-bottom: 0.5rem;
+}
+
+.asset-modal__actions {
+  margin-top: 1.5rem;
+}
+
+.asset-modal__action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.asset-modal__action-btn {
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.asset-modal__action-btn:hover {
+  background: var(--accent);
+  color: white;
+}
+
+.asset-modal__all-done {
+  font-size: 0.875rem;
+  color: var(--text);
+  margin: 0;
+}
+
+.asset-modal__loading,
+.asset-modal__error {
+  text-align: center;
+  padding: 2rem;
 }
