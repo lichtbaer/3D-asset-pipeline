@@ -54,6 +54,7 @@ import {
   CompareHistory,
   type CompareHistoryEntry,
 } from "../components/pipeline/CompareHistory.js";
+import { usePipelineStore } from "../store/PipelineStore.js";
 import "./ImageGenerationPage.css";
 import "./PipelinePage.css";
 
@@ -82,6 +83,7 @@ function meshJobToHistoryEntry(job: MeshJob): MeshJobHistoryEntry {
 }
 
 export function PipelinePage() {
+  const { activeAssetId, setActiveAssetId } = usePipelineStore();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
   const activeTab: TabId =
@@ -325,14 +327,35 @@ export function PipelinePage() {
     auto_bgremoval?: boolean;
     bgremoval_provider_key?: string;
   }) => {
-    meshCreateMutation.mutate(req);
+    const payload: {
+      source_image_url: string;
+      provider_key: string;
+      params: Record<string, unknown>;
+      auto_bgremoval?: boolean;
+      bgremoval_provider_key?: string;
+      asset_id?: string;
+    } = { ...req };
+    if (activeAssetId) {
+      payload.asset_id = activeAssetId;
+      setActiveAssetId(null);
+    }
+    meshCreateMutation.mutate(payload);
   };
 
   const handleBgRemovalSubmit = (req: {
     source_image_url: string;
     provider_key: string;
   }) => {
-    bgRemovalCreateMutation.mutate(req);
+    const payload: {
+      source_image_url: string;
+      provider_key: string;
+      asset_id?: string;
+    } = { ...req };
+    if (activeAssetId) {
+      payload.asset_id = activeAssetId;
+      setActiveAssetId(null);
+    }
+    bgRemovalCreateMutation.mutate(payload);
   };
 
   const { data: imageProvidersData, isLoading: imageProvidersLoading } =

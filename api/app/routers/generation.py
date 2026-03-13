@@ -230,11 +230,19 @@ async def create_image_generation(
     except ValueError:
         raise HTTPException(422, detail=f"Unbekannter provider_key: {provider_key}")
 
+    asset_id: UUID | None = None
+    if body.asset_id:
+        try:
+            asset_id = UUID(body.asset_id)
+        except ValueError:
+            pass
+
     job = GenerationJob(
         job_type="image",
         status="pending",
         prompt=body.prompt,
         provider_key=provider_key,
+        asset_id=asset_id,
     )
     session.add(job)
     await session.commit()
@@ -311,7 +319,12 @@ async def create_bgremoval(
         )
 
     asset_id: UUID | None = None
-    if body.source_job_id:
+    if body.asset_id:
+        try:
+            asset_id = UUID(body.asset_id)
+        except ValueError:
+            pass
+    if asset_id is None and body.source_job_id:
         src = await session.execute(
             select(GenerationJob).where(GenerationJob.id == body.source_job_id)
         )
@@ -407,7 +420,12 @@ async def create_mesh_generation(
         params.setdefault("steps", body.steps)
 
     asset_id: UUID | None = None
-    if body.source_job_id:
+    if body.asset_id:
+        try:
+            asset_id = UUID(body.asset_id)
+        except ValueError:
+            pass
+    if asset_id is None and body.source_job_id:
         src = await session.execute(
             select(GenerationJob).where(GenerationJob.id == body.source_job_id)
         )

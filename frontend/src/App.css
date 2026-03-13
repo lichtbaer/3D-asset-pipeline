@@ -1,3 +1,28 @@
+.main-nav {
+  display: flex;
+  gap: 0.5rem;
+  padding: 1rem 2rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.main-nav__link {
+  padding: 0.5rem 1rem;
+  color: var(--text);
+  text-decoration: none;
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+.main-nav__link:hover {
+  color: var(--accent);
+}
+
+.main-nav__link--active {
+  color: var(--accent);
+  background: var(--accent-bg);
+}
+
 .counter {
   font-size: 16px;
   padding: 5px 10px;

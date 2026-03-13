@@ -16,6 +16,7 @@ class ImageGenerateRequest(BaseModel):
 
     # Rückwärtskompatibilität: model_key + Top-Level-Parameter
     model_key: str | None = Field(default=None, alias="model_key")
+    asset_id: str | None = None
     width: int | None = Field(default=None, alias="width")
     height: int | None = Field(default=None, alias="height")
     negative_prompt: str | None = Field(default=None, alias="negative_prompt")
@@ -99,6 +100,7 @@ class MeshGenerateRequest(BaseModel):
     # Optional: Background-Removal vor Mesh-Generierung
     auto_bgremoval: bool = False
     bgremoval_provider_key: str = "rembg-local"
+    asset_id: str | None = None
 
 
 class MeshProviderInfo(BaseModel):
@@ -135,6 +137,7 @@ class BgRemovalGenerateRequest(BaseModel):
     source_image_url: str = Field(..., min_length=1)
     source_job_id: UUID | None = None
     provider_key: str = "rembg-local"
+    asset_id: str | None = None
 
 
 class BgRemovalGenerateResponse(BaseModel):

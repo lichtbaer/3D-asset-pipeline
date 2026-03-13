@@ -7,6 +7,7 @@ export interface MeshGenerationRequest {
   params: Record<string, unknown>;
   auto_bgremoval?: boolean;
   bgremoval_provider_key?: string;
+  asset_id?: string;
 }
 
 export type MeshJobStatus = "pending" | "processing" | "done" | "failed";
