@@ -75,10 +75,20 @@ import {
   type AnimationJobHistoryEntry,
 } from "../components/pipeline/animation/AnimationJobHistory.js";
 import { usePipelineStore } from "../store/PipelineStore.js";
+import { useAssetFromUrl } from "../hooks/useAssetFromUrl.js";
+import { getAssetFileUrl } from "../api/assets.js";
+import { MeshProcessingPanel } from "../components/assets/MeshProcessingPanel.js";
+import { AssetPickerModal } from "../components/assets/AssetPickerModal.js";
 import "./ImageGenerationPage.css";
 import "./PipelinePage.css";
 
-type TabId = "image" | "bgremoval" | "mesh" | "rigging" | "animation";
+type TabId =
+  | "image"
+  | "bgremoval"
+  | "mesh"
+  | "rigging"
+  | "animation"
+  | "mesh-processing";
 
 function jobToHistoryEntry(job: GenerationJob, prompt: string): JobHistoryEntry {
   return {
@@ -136,7 +146,13 @@ export function PipelinePage() {
           ? "rigging"
           : tabParam === "animation"
             ? "animation"
-            : "image";
+            : tabParam === "mesh-processing"
+              ? "mesh-processing"
+              : "image";
+
+  const [assetPickerOpen, setAssetPickerOpen] = useState<{
+    tab: "rigging" | "animation" | "mesh-processing";
+  } | null>(null);
 
   const [pendingMeshImageUrl, setPendingMeshImageUrl] = useState<string | null>(
     null
@@ -151,7 +167,50 @@ export function PipelinePage() {
 
   const setActiveTab = useCallback(
     (tab: TabId) => {
-      setSearchParams({ tab });
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("tab", tab);
+        const aid = prev.get("assetId");
+        if (aid) next.set("assetId", aid);
+        return next;
+      });
+    },
+    [setSearchParams]
+  );
+
+  const { assetId: urlAssetId, asset: urlAsset } = useAssetFromUrl();
+
+  const clearAssetFromUrl = useCallback(() => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("assetId");
+      return next;
+    });
+    if (activeTab === "rigging") setRiggingSourceGlbUrl("");
+    if (activeTab === "animation") setAnimationSourceGlbUrl("");
+  }, [setSearchParams, activeTab]);
+
+  const handleAssetPickerSelect = useCallback(
+    (
+      asset: { asset_id: string; steps: Record<string, { file?: string }> },
+      tab: "rigging" | "animation" | "mesh-processing"
+    ) => {
+      const aid = asset.asset_id;
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("tab", tab);
+        next.set("assetId", aid);
+        return next;
+      });
+      setAssetPickerOpen(null);
+      if (tab === "rigging" && asset.steps.mesh?.file) {
+        setRiggingSourceGlbUrl(getAssetFileUrl(aid, asset.steps.mesh.file));
+      }
+      if (tab === "animation" && asset.steps.rigging?.file) {
+        setAnimationSourceGlbUrl(
+          getAssetFileUrl(aid, asset.steps.rigging.file)
+        );
+      }
     },
     [setSearchParams]
   );
@@ -191,10 +250,12 @@ export function PipelinePage() {
     }
   }, [searchParams, setSearchParams]);
 
-  // URL-Parameter: ?tab=mesh&source=URL oder ?tab=bgremoval&source=URL oder ?tab=rigging&source=URL oder ?tab=animation&source=URL
+  // URL-Parameter: ?tab=X&source=URL oder ?tab=X&assetId=ID
   useEffect(() => {
     const source = searchParams.get("source");
+    const assetId = searchParams.get("assetId");
     const tab = searchParams.get("tab");
+
     if (source && tab === "mesh") {
       setMeshSourceImageUrl(source);
       setActiveTab("mesh");
@@ -209,6 +270,44 @@ export function PipelinePage() {
       setActiveTab("animation");
     }
   }, [searchParams]);
+
+  // URL assetId: Asset laden und Source-URLs setzen
+  useEffect(() => {
+    if (!urlAsset || !urlAssetId) return;
+    const tab = searchParams.get("tab");
+    const steps = urlAsset.steps ?? {};
+
+    if (tab === "rigging") {
+      const mesh = steps.mesh;
+      if (mesh && typeof mesh === "object" && "file" in mesh) {
+        const file = String((mesh as { file: string }).file);
+        setRiggingSourceGlbUrl(getAssetFileUrl(urlAssetId, file));
+      }
+    } else if (tab === "animation") {
+      const rigging = steps.rigging;
+      if (rigging && typeof rigging === "object" && "file" in rigging) {
+        const file = String((rigging as { file: string }).file);
+        setAnimationSourceGlbUrl(getAssetFileUrl(urlAssetId, file));
+      }
+    } else if (tab === "bgremoval") {
+      const image = steps.image;
+      if (image && typeof image === "object" && "file" in image) {
+        const file = String((image as { file: string }).file);
+        setBgRemovalSourceImageUrl(getAssetFileUrl(urlAssetId, file));
+      }
+    } else if (tab === "mesh") {
+      const bgremoval = steps.bgremoval;
+      const image = steps.image;
+      const file = bgremoval && typeof bgremoval === "object" && "file" in bgremoval
+        ? String((bgremoval as { file: string }).file)
+        : image && typeof image === "object" && "file" in image
+          ? String((image as { file: string }).file)
+          : null;
+      if (file) {
+        setMeshSourceImageUrl(getAssetFileUrl(urlAssetId, file));
+      }
+    }
+  }, [urlAsset, urlAssetId, searchParams]);
 
   const handleUseForMesh = useCallback(
     (resultUrl: string) => {
@@ -820,6 +919,15 @@ export function PipelinePage() {
         >
           Animation
         </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "mesh-processing"}
+          className={`pipeline-tabs__tab ${activeTab === "mesh-processing" ? "pipeline-tabs__tab--active" : ""}`}
+          onClick={() => setActiveTab("mesh-processing")}
+        >
+          Mesh-Processing
+        </button>
       </nav>
 
       {activeTab === "image" && (
@@ -997,6 +1105,32 @@ export function PipelinePage() {
       {activeTab === "rigging" && (
         <div className="pipeline-tab-content" role="tabpanel">
           <h1>Rigging</h1>
+          <div className="pipeline-asset-context">
+            {urlAssetId && urlAsset ? (
+              <div className="pipeline-asset-context__loaded">
+                <span>
+                  Aktuell geladen: Asset {urlAssetId.slice(0, 8)}…
+                </span>
+                <button
+                  type="button"
+                  className="pipeline-asset-context__remove"
+                  onClick={clearAssetFromUrl}
+                >
+                  ✕ Entfernen
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="pipeline-asset-context__load"
+                onClick={() =>
+                  setAssetPickerOpen({ tab: "rigging" })
+                }
+              >
+                Aus Bibliothek laden
+              </button>
+            )}
+          </div>
           <section className="pipeline-page__form">
             <RiggingForm
               sourceGlbUrl={riggingSourceGlbUrl}
@@ -1027,6 +1161,32 @@ export function PipelinePage() {
       {activeTab === "animation" && (
         <div className="pipeline-tab-content" role="tabpanel">
           <h1>Animation</h1>
+          <div className="pipeline-asset-context">
+            {urlAssetId && urlAsset ? (
+              <div className="pipeline-asset-context__loaded">
+                <span>
+                  Aktuell geladen: Asset {urlAssetId.slice(0, 8)}…
+                </span>
+                <button
+                  type="button"
+                  className="pipeline-asset-context__remove"
+                  onClick={clearAssetFromUrl}
+                >
+                  ✕ Entfernen
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="pipeline-asset-context__load"
+                onClick={() =>
+                  setAssetPickerOpen({ tab: "animation" })
+                }
+              >
+                Aus Bibliothek laden
+              </button>
+            )}
+          </div>
           <section className="pipeline-page__form">
             <AnimationForm
               sourceGlbUrl={animationSourceGlbUrl}
@@ -1049,6 +1209,59 @@ export function PipelinePage() {
             <AnimationJobHistory jobs={animationJobHistory} />
           </section>
         </div>
+      )}
+
+      {activeTab === "mesh-processing" && (
+        <div className="pipeline-tab-content" role="tabpanel">
+          <h1>Mesh-Processing</h1>
+          <div className="pipeline-asset-context">
+            {urlAssetId && urlAsset ? (
+              <div className="pipeline-asset-context__loaded">
+                <span>
+                  Aktuell geladen: Asset {urlAssetId.slice(0, 8)}…
+                </span>
+                <button
+                  type="button"
+                  className="pipeline-asset-context__remove"
+                  onClick={clearAssetFromUrl}
+                >
+                  ✕ Entfernen
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="pipeline-asset-context__load"
+                onClick={() =>
+                  setAssetPickerOpen({ tab: "mesh-processing" })
+                }
+              >
+                Aus Bibliothek laden
+              </button>
+            )}
+          </div>
+          {urlAssetId ? (
+            <MeshProcessingPanel assetId={urlAssetId} />
+          ) : (
+            <p className="pipeline-asset-context__empty">
+              Wähle ein Asset aus der Bibliothek, um Mesh-Bearbeitung
+              (Vereinfachen, Reparieren) durchzuführen.
+            </p>
+          )}
+        </div>
+      )}
+
+      {assetPickerOpen && (
+        <AssetPickerModal
+          isOpen={true}
+          onClose={() => setAssetPickerOpen(null)}
+          onSelect={(asset) =>
+            handleAssetPickerSelect(asset, assetPickerOpen.tab)
+          }
+          filter={
+            assetPickerOpen.tab === "animation" ? "has_rigging" : "has_mesh"
+          }
+        />
       )}
     </main>
   );

@@ -45,13 +45,13 @@ export function AssetDetailModal({ assetId, onClose }: AssetDetailModalProps) {
   });
 
   const handleAction = (
-    tab: "bgremoval" | "mesh" | "rigging" | "animation",
+    tab: "bgremoval" | "mesh" | "rigging" | "animation" | "mesh-processing",
     sourceUrl: string,
     assetIdForJob: string
   ) => {
     setActiveAssetId(assetIdForJob);
     onClose();
-    navigate(`/pipeline?tab=${tab}&source=${encodeURIComponent(sourceUrl)}`);
+    navigate(`/pipeline?tab=${tab}&assetId=${encodeURIComponent(assetIdForJob)}`);
   };
 
   const handleUseForRigging = (url: string, assetIdForJob: string) => {
@@ -300,44 +300,58 @@ export function AssetDetailModal({ assetId, onClose }: AssetDetailModalProps) {
                   → Als Mesh-Input
                 </button>
               )}
-            {hasMesh && !hasRigging && meshUrl && (
-              <button
-                type="button"
-                className="asset-modal__action-btn"
-                onClick={() =>
-                  handleAction("rigging", meshUrl, data.asset_id)
-                }
-              >
-                → Riggen
-              </button>
-            )}
-            {(hasRigging || hasMesh) && !hasAnimation && (
-              <button
-                type="button"
-                className="asset-modal__action-btn"
-                onClick={() => {
-                  const glbUrl =
-                    hasRigging && steps.rigging && "file" in steps.rigging
-                      ? getAssetFileUrl(
-                          data.asset_id,
-                          String(steps.rigging.file)
-                        )
-                      : meshUrl ?? "";
-                  if (glbUrl) {
-                    handleAction("animation", glbUrl, data.asset_id);
+            {hasMesh && (
+              <>
+                <button
+                  type="button"
+                  className="asset-modal__action-btn"
+                  onClick={() =>
+                    handleAction("rigging", meshUrl ?? "", data.asset_id)
                   }
-                }}
-                disabled={
-                  !meshUrl &&
-                  !(
-                    hasRigging &&
-                    steps.rigging &&
-                    "file" in steps.rigging
-                  )
-                }
-              >
-                → Animieren
-              </button>
+                >
+                  → Riggen
+                </button>
+                <button
+                  type="button"
+                  className="asset-modal__action-btn"
+                  onClick={() =>
+                    handleAction("mesh-processing", meshUrl ?? "", data.asset_id)
+                  }
+                >
+                  → Mesh-Processing
+                </button>
+              </>
+            )}
+            {hasRigging && (
+              <>
+                <button
+                  type="button"
+                  className="asset-modal__action-btn"
+                  onClick={() => {
+                    const glbUrl =
+                      steps.rigging && "file" in steps.rigging
+                        ? getAssetFileUrl(
+                            data.asset_id,
+                            String(steps.rigging.file)
+                          )
+                        : meshUrl ?? "";
+                    if (glbUrl) {
+                      handleAction("animation", glbUrl, data.asset_id);
+                    }
+                  }}
+                >
+                  → Animieren
+                </button>
+                <button
+                  type="button"
+                  className="asset-modal__action-btn"
+                  onClick={() =>
+                    handleAction("rigging", meshUrl ?? "", data.asset_id)
+                  }
+                >
+                  → Riggen (erneut)
+                </button>
+              </>
             )}
             {hasImage &&
               hasBgremoval &&
