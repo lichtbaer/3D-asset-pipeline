@@ -204,6 +204,15 @@ def _extract_result_url(data: dict) -> str | None:
         return data["url"]
     if "image_url" in data and data["image_url"]:
         return data["image_url"]
+    # PicsArt GenAI: {"data": [{"id": "...", "url": "..."}], "status": "success"}
+    if "data" in data and isinstance(data["data"], list) and len(data["data"]) > 0:
+        item = data["data"][0]
+        if isinstance(item, dict):
+            u = item.get("url") or item.get("result_url") or item.get("image_url")
+            if u:
+                return u
+        if isinstance(item, str):
+            return item
     if "images" in data and isinstance(data["images"], list) and len(data["images"]) > 0:
         img = data["images"][0]
         if isinstance(img, str):
