@@ -20,7 +20,6 @@ from app.schemas.generation import (
     MeshProvidersResponse,
     ModelsResponse,
 )
-<<<<<<< HEAD
 from app.services.image_providers import get_provider as get_image_provider, list_providers
 from app.services.mesh_generation import run_mesh_generation
 from app.services.mesh_providers import MESH_PROVIDERS, get_provider as get_mesh_provider
