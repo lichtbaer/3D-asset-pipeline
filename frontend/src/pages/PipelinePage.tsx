@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect } from "react";
+import { useCallback, useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
@@ -17,6 +17,16 @@ import {
   getBgRemovalProviders,
   type BgRemovalJob,
 } from "../api/bgremoval.js";
+import {
+  getImageProviders,
+  type ImageProvider,
+} from "../api/generation.js";
+import {
+  startImageCompare,
+  startMeshCompare,
+  type CompareImageRequest,
+  type CompareMeshRequest,
+} from "../api/compare.js";
 import { PromptForm } from "../components/generation/PromptForm.js";
 import { JobStatus } from "../components/generation/JobStatus.js";
 import {
@@ -35,10 +45,19 @@ import {
   BgRemovalJobHistory,
   type BgRemovalJobHistoryEntry,
 } from "../components/pipeline/BgRemovalJobHistory.js";
+import {
+  CompareForm,
+  type CompareStep,
+} from "../components/pipeline/CompareForm.js";
+import { CompareResults } from "../components/pipeline/CompareResults.js";
+import {
+  CompareHistory,
+  type CompareHistoryEntry,
+} from "../components/pipeline/CompareHistory.js";
 import "./ImageGenerationPage.css";
 import "./PipelinePage.css";
 
-type TabId = "image" | "bgremoval" | "mesh";
+type TabId = "image" | "bgremoval" | "mesh" | "compare";
 
 function jobToHistoryEntry(job: GenerationJob, prompt: string): JobHistoryEntry {
   return {
@@ -64,11 +83,13 @@ export function PipelinePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
   const activeTab: TabId =
-    tabParam === "mesh"
-      ? "mesh"
-      : tabParam === "bgremoval"
-        ? "bgremoval"
-        : "image";
+    tabParam === "compare"
+      ? "compare"
+      : tabParam === "mesh"
+        ? "mesh"
+        : tabParam === "bgremoval"
+          ? "bgremoval"
+          : "image";
 
   const [pendingMeshImageUrl, setPendingMeshImageUrl] = useState<string | null>(
     null
@@ -109,6 +130,22 @@ export function PipelinePage() {
   );
 
   const handleUseForBgRemoval = useCallback(
+    (resultUrl: string) => {
+      setPendingBgRemovalImageUrl(resultUrl);
+      setActiveTab("bgremoval");
+    },
+    [setActiveTab]
+  );
+
+  const handleCompareUseForMesh = useCallback(
+    (resultUrl: string) => {
+      setMeshSourceImageUrl(resultUrl);
+      setActiveTab("mesh");
+    },
+    [setActiveTab]
+  );
+
+  const handleCompareUseForBgRemoval = useCallback(
     (resultUrl: string) => {
       setPendingBgRemovalImageUrl(resultUrl);
       setActiveTab("bgremoval");
@@ -170,7 +207,10 @@ export function PipelinePage() {
       queryKey: ["mesh-providers"],
       queryFn: getMeshProviders,
     });
-  const meshProviders = meshProvidersData?.providers ?? [];
+  const meshProviders = useMemo(
+    () => meshProvidersData?.providers ?? [],
+    [meshProvidersData?.providers]
+  );
 
   const meshCreateMutation = useMutation({
     mutationFn: postGenerateMesh,
@@ -279,6 +319,85 @@ export function PipelinePage() {
     bgRemovalCreateMutation.mutate(req);
   };
 
+  const { data: imageProvidersData, isLoading: imageProvidersLoading } =
+    useQuery({
+      queryKey: ["image-providers"],
+      queryFn: getImageProviders,
+    });
+  const imageProviders = useMemo<ImageProvider[]>(
+    () => imageProvidersData?.providers ?? [],
+    [imageProvidersData?.providers]
+  );
+
+  const [compareStep, setCompareStep] = useState<CompareStep>("image");
+  const [compareJobIdA, setCompareJobIdA] = useState<string | null>(null);
+  const [compareJobIdB, setCompareJobIdB] = useState<string | null>(null);
+  const [compareProviderLabelA, setCompareProviderLabelA] = useState("");
+  const [compareProviderLabelB, setCompareProviderLabelB] = useState("");
+  const [compareHistory, setCompareHistory] = useState<CompareHistoryEntry[]>(
+    []
+  );
+
+  const handleCompareImageSubmit = useCallback(
+    (req: CompareImageRequest) => {
+      startImageCompare(req).then(([jobIdA, jobIdB]) => {
+        const labelA =
+          imageProviders.find((p) => p.key === req.provider_key_a)
+            ?.display_name ?? req.provider_key_a;
+        const labelB =
+          imageProviders.find((p) => p.key === req.provider_key_b)
+            ?.display_name ?? req.provider_key_b;
+        setCompareJobIdA(jobIdA);
+        setCompareJobIdB(jobIdB);
+        setCompareProviderLabelA(labelA);
+        setCompareProviderLabelB(labelB);
+        setCompareHistory((prev) => [
+          {
+            id: `${jobIdA}-${jobIdB}`,
+            step: "image",
+            label: req.prompt,
+            provider_key_a: req.provider_key_a,
+            provider_key_b: req.provider_key_b,
+            job_id_a: jobIdA,
+            job_id_b: jobIdB,
+          },
+          ...prev,
+        ]);
+      });
+    },
+    [imageProviders]
+  );
+
+  const handleCompareMeshSubmit = useCallback(
+    (req: CompareMeshRequest) => {
+      startMeshCompare(req).then(([jobIdA, jobIdB]) => {
+        const labelA =
+          meshProviders.find((p) => p.key === req.provider_key_a)
+            ?.display_name ?? req.provider_key_a;
+        const labelB =
+          meshProviders.find((p) => p.key === req.provider_key_b)
+            ?.display_name ?? req.provider_key_b;
+        setCompareJobIdA(jobIdA);
+        setCompareJobIdB(jobIdB);
+        setCompareProviderLabelA(labelA);
+        setCompareProviderLabelB(labelB);
+        setCompareHistory((prev) => [
+          {
+            id: `${jobIdA}-${jobIdB}`,
+            step: "mesh",
+            label: req.source_image_url,
+            provider_key_a: req.provider_key_a,
+            provider_key_b: req.provider_key_b,
+            job_id_a: jobIdA,
+            job_id_b: jobIdB,
+          },
+          ...prev,
+        ]);
+      });
+    },
+    [meshProviders]
+  );
+
   return (
     <main className="pipeline-page">
       <nav className="pipeline-tabs" role="tablist">
@@ -308,6 +427,15 @@ export function PipelinePage() {
           onClick={() => setActiveTab("mesh")}
         >
           Mesh-Generierung
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "compare"}
+          className={`pipeline-tabs__tab ${activeTab === "compare" ? "pipeline-tabs__tab--active" : ""}`}
+          onClick={() => setActiveTab("compare")}
+        >
+          Vergleich
         </button>
       </nav>
 
@@ -390,6 +518,39 @@ export function PipelinePage() {
           </section>
           <section className="pipeline-page__history">
             <MeshJobHistory jobs={meshJobHistory} />
+          </section>
+        </div>
+      )}
+
+      {activeTab === "compare" && (
+        <div className="pipeline-tab-content" role="tabpanel">
+          <h1>Vergleich</h1>
+          <section className="pipeline-page__form">
+            <CompareForm
+              step={compareStep}
+              onStepChange={setCompareStep}
+              imageProviders={imageProviders}
+              imageProvidersLoading={imageProvidersLoading}
+              meshProviders={meshProviders}
+              meshProvidersLoading={meshProvidersLoading}
+              onImageSubmit={handleCompareImageSubmit}
+              onMeshSubmit={handleCompareMeshSubmit}
+              disabled={false}
+            />
+          </section>
+          <section className="pipeline-page__status">
+            <CompareResults
+              jobIdA={compareJobIdA}
+              jobIdB={compareJobIdB}
+              providerLabelA={compareProviderLabelA}
+              providerLabelB={compareProviderLabelB}
+              step={compareStep}
+              onUseForMesh={handleCompareUseForMesh}
+              onUseForBgRemoval={handleCompareUseForBgRemoval}
+            />
+          </section>
+          <section className="pipeline-page__history">
+            <CompareHistory entries={compareHistory} />
           </section>
         </div>
       )}
