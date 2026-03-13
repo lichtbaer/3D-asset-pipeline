@@ -77,6 +77,7 @@ import {
 import { usePipelineStore } from "../store/PipelineStore.js";
 import { useAssetFromUrl } from "../hooks/useAssetFromUrl.js";
 import { getAssetFileUrl } from "../api/assets.js";
+import { getMeshSources } from "../api/meshProcessing.js";
 import { MeshProcessingPanel } from "../components/assets/MeshProcessingPanel.js";
 import { AssetPickerModal } from "../components/assets/AssetPickerModal.js";
 import "./ImageGenerationPage.css";
@@ -547,6 +548,16 @@ export function PipelinePage() {
   const riggingProviders = useMemo(
     () => riggingProvidersData?.providers ?? [],
     [riggingProvidersData?.providers]
+  );
+
+  const { data: riggingMeshSourcesData } = useQuery({
+    queryKey: ["rigging-mesh-sources", activeAssetId],
+    queryFn: () => getMeshSources(activeAssetId!),
+    enabled: !!activeAssetId && activeTab === "rigging",
+  });
+  const riggingMeshFiles = useMemo(
+    () => riggingMeshSourcesData?.sources ?? [],
+    [riggingMeshSourcesData?.sources]
   );
 
   const riggingCreateMutation = useMutation({
@@ -1140,6 +1151,7 @@ export function PipelinePage() {
               onSubmit={handleRiggingSubmit}
               disabled={isRiggingJobRunning}
               assetId={activeAssetId}
+              availableMeshFiles={riggingMeshFiles}
             />
           </section>
           <section className="pipeline-page__status">

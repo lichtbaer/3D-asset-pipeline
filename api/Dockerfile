@@ -10,6 +10,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgomp1 \
     libxi6 \
     libxrender1 \
+    libxkbcommon0 \
+    libxxf86vm1 \
+    libegl1 \
+    libsm6 \
+    libice6 \
+    libxfixes3 \
+    libxrandr2 \
+    libdbus-1-3 \
+    libxcb1 \
     curl \
     xz-utils \
     && rm -rf /var/lib/apt/lists/*

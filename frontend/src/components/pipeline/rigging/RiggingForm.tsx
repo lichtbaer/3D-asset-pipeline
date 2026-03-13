@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { RiggingProvider } from "../../../api/rigging.js";
+import { getAssetFileUrl } from "../../../api/assets.js";
 import { MeshViewer } from "../../viewer/MeshViewer.js";
 
 export interface RiggingFormProps {
@@ -14,6 +15,7 @@ export interface RiggingFormProps {
   }) => void;
   disabled: boolean;
   assetId?: string | null;
+  availableMeshFiles?: string[];
 }
 
 export function RiggingForm({
@@ -24,6 +26,7 @@ export function RiggingForm({
   onSubmit,
   disabled,
   assetId,
+  availableMeshFiles = [],
 }: RiggingFormProps) {
   const [providerKey, setProviderKey] = useState("");
   const selectedProvider =
@@ -55,6 +58,32 @@ export function RiggingForm({
 
   return (
     <form onSubmit={handleSubmit} className="rigging-form prompt-form">
+      {assetId && availableMeshFiles.length > 0 && (
+        <div className="form-group">
+          <label htmlFor="rigging-mesh-variant">Mesh-Variante</label>
+          <select
+            id="rigging-mesh-variant"
+            value={
+              availableMeshFiles.find(
+                (f) => getAssetFileUrl(assetId, f) === sourceGlbUrl
+              ) ?? ""
+            }
+            onChange={(e) => {
+              if (e.target.value) {
+                onSourceGlbUrlChange(getAssetFileUrl(assetId, e.target.value));
+              }
+            }}
+          >
+            <option value="">— Variante wählen —</option>
+            {availableMeshFiles.map((f) => (
+              <option key={f} value={f}>
+                {f}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       <div className="form-group">
         <label htmlFor="rigging-source-glb">Quell-Mesh-GLB-URL</label>
         <input
