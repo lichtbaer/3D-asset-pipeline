@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getJobStatus, retryImageJob } from "../../api/generation.js";
 import { getMeshJobStatus, retryMeshJob } from "../../api/mesh.js";
 import { JobErrorBlock } from "../generation/JobErrorBlock.js";
+import { MeshViewer } from "../viewer/MeshViewer.js";
 
 export type CompareStep = "image" | "mesh";
 
@@ -233,6 +234,7 @@ function CompareResultColumnContent({
         <h4 className="compare-results__column-title">{providerLabel}</h4>
         <div className="job-status job-status--done">
           <p className="job-status__label">Fertig!</p>
+          <MeshViewer glbUrl={meshData.glb_url} height={350} />
           <a
             href={meshData.glb_url}
             download

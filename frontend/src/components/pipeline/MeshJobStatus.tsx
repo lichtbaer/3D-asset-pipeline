@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getMeshJobStatus, retryMeshJob, type MeshJob } from "../../api/mesh.js";
 import { JobErrorBlock } from "../generation/JobErrorBlock.js";
+import { MeshViewer } from "../viewer/MeshViewer.js";
 
 export interface MeshJobStatusProps {
   jobId: string | null;
@@ -70,24 +71,27 @@ export function MeshJobStatus({ jobId, onJobUpdate, onRetrySuccess }: MeshJobSta
     return (
       <div className="job-status job-status--done">
         <p className="job-status__label">Fertig!</p>
-        <a
-          href={glb_url}
-          download
-          className="job-status__download"
-        >
-          GLB herunterladen
-        </a>
+        <MeshViewer glbUrl={glb_url} height={400} />
+        <div className="compare-results__actions">
+          {data.asset_id && (
+            <Link
+              to={`/assets/${data.asset_id}`}
+              className="job-history__use-mesh"
+            >
+              → Als nächsten Schritt verwenden
+            </Link>
+          )}
+          <a
+            href={glb_url}
+            download
+            className="job-status__download"
+          >
+            Download GLB
+          </a>
+        </div>
         <p className="mesh-job-status__hint">
           Mesh-Generierung kann bis zu 5 Minuten dauern
         </p>
-        {data.asset_id && (
-          <Link
-            to={`/assets/${data.asset_id}`}
-            className="job-status__library-link"
-          >
-            → In Bibliothek ansehen
-          </Link>
-        )}
       </div>
     );
   }
