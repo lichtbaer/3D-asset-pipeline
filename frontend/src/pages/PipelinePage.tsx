@@ -24,6 +24,7 @@ import {
   MeshJobHistory,
   type MeshJobHistoryEntry,
 } from "../components/pipeline/MeshJobHistory.js";
+import "./ImageGenerationPage.css";
 import "./PipelinePage.css";
 
 type TabId = "image" | "mesh";
