@@ -5,6 +5,6 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   optimizeDeps: {
-    include: ['three', 'three/examples/jsm/loaders/GLTFLoader.js', 'three/examples/jsm/controls/OrbitControls.js'],
+    include: ['three', 'three/examples/jsm/loaders/GLTFLoader', 'three/examples/jsm/controls/OrbitControls'],
   },
 })
