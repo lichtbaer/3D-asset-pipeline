@@ -87,3 +87,65 @@
 .job-history__download:hover {
   text-decoration: underline;
 }
+
+.bgremoval-job-status__preview {
+  display: flex;
+  gap: 1.5rem;
+  margin: 1rem 0;
+  flex-wrap: wrap;
+}
+
+.bgremoval-job-status__preview-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.bgremoval-job-status__preview-label {
+  font-size: 0.875rem;
+  color: var(--text);
+}
+
+.job-history__use-mesh {
+  display: inline-block;
+  margin-top: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.job-history__use-mesh:hover {
+  background: var(--accent);
+  color: white;
+}
+
+.mesh-form__auto-bgremoval {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.mesh-form__checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.mesh-form__checkbox-label input {
+  width: auto;
+}
+
+.mesh-form__bgremoval-provider {
+  margin-top: 0.5rem;
+  margin-left: 1.5rem;
+}
+
+.mesh-form__bgremoval-provider label {
+  margin-right: 0.5rem;
+}
