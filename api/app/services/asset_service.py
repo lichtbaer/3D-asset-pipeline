@@ -280,6 +280,40 @@ async def persist_mesh_job(
     logger.info("Asset %s: mesh step persisted", asset_id)
 
 
+async def persist_rigging_job(
+    job_id: str,
+    asset_id: str,
+    provider_key: str,
+    source_file: str,
+    glb_file_path: str,
+) -> None:
+    """
+    Speichert Rigging-Job-Output im Asset-Ordner.
+    Kopiert rigged GLB nach mesh_rigged.glb.
+    """
+    src = Path(glb_file_path)
+    if not src.exists():
+        logger.warning("Rigged GLB nicht gefunden: %s", glb_file_path)
+        return
+
+    file_bytes = src.read_bytes()
+    step_data = {
+        "job_id": job_id,
+        "provider_key": provider_key,
+        "source_file": source_file,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    update_step(
+        asset_id,
+        "rigging",
+        step_data,
+        file_bytes=file_bytes,
+        filename="mesh_rigged.glb",
+    )
+    logger.info("Asset %s: rigging step persisted", asset_id)
+
+
 async def persist_animation_job(
     job_id: str,
     asset_id: str,
