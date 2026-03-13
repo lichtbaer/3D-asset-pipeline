@@ -1,0 +1,80 @@
+/* Shared button base */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: 0.5rem 1rem;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  font-family: inherit;
+  line-height: 1.4;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, opacity 0.15s;
+  box-sizing: border-box;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Primary: filled accent */
+.btn--primary {
+  color: white;
+  background: var(--accent);
+  border: none;
+}
+
+.btn--primary:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+/* Outline: transparent with accent border */
+.btn--outline {
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid var(--accent);
+}
+
+.btn--outline:hover:not(:disabled) {
+  background: var(--accent);
+  color: white;
+}
+
+/* Ghost: no border, subtle hover */
+.btn--ghost {
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--border);
+}
+
+.btn--ghost:hover:not(:disabled) {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Danger: error-colored */
+.btn--danger {
+  color: white;
+  background: var(--color-error);
+  border: none;
+}
+
+.btn--danger:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+/* Size: small */
+.btn--sm {
+  padding: 0.35rem 0.6rem;
+  font-size: var(--font-size-xs);
+}
+
+/* Size: large */
+.btn--lg {
+  padding: 0.75rem 1.5rem;
+  font-size: var(--font-size-base);
+}

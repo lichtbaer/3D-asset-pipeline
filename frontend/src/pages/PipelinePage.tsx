@@ -947,14 +947,14 @@ export function PipelinePage() {
           <div className="pipeline-mode-toggle" role="group" aria-label="Modus">
             <button
               type="button"
-              className={`pipeline-mode-toggle__btn ${imageMode === "single" ? "pipeline-mode-toggle__btn--active" : ""}`}
+              className={`btn btn--ghost ${imageMode === "single" ? "pipeline-mode-toggle__btn--active" : ""}`}
               onClick={() => setImageMode("single")}
             >
               Einzelgenerierung
             </button>
             <button
               type="button"
-              className={`pipeline-mode-toggle__btn ${imageMode === "compare" ? "pipeline-mode-toggle__btn--active" : ""}`}
+              className={`btn btn--ghost ${imageMode === "compare" ? "pipeline-mode-toggle__btn--active" : ""}`}
               onClick={() => setImageMode("compare")}
             >
               Vergleich
@@ -1048,14 +1048,14 @@ export function PipelinePage() {
           <div className="pipeline-mode-toggle" role="group" aria-label="Modus">
             <button
               type="button"
-              className={`pipeline-mode-toggle__btn ${meshMode === "single" ? "pipeline-mode-toggle__btn--active" : ""}`}
+              className={`btn btn--ghost ${meshMode === "single" ? "pipeline-mode-toggle__btn--active" : ""}`}
               onClick={() => setMeshMode("single")}
             >
               Einzelgenerierung
             </button>
             <button
               type="button"
-              className={`pipeline-mode-toggle__btn ${meshMode === "compare" ? "pipeline-mode-toggle__btn--active" : ""}`}
+              className={`btn btn--ghost ${meshMode === "compare" ? "pipeline-mode-toggle__btn--active" : ""}`}
               onClick={() => setMeshMode("compare")}
             >
               Vergleich
@@ -1124,7 +1124,7 @@ export function PipelinePage() {
                 </span>
                 <button
                   type="button"
-                  className="pipeline-asset-context__remove"
+                  className="btn btn--ghost btn--sm"
                   onClick={clearAssetFromUrl}
                 >
                   ✕ Entfernen
@@ -1133,7 +1133,7 @@ export function PipelinePage() {
             ) : (
               <button
                 type="button"
-                className="pipeline-asset-context__load"
+                className="btn btn--outline"
                 onClick={() =>
                   setAssetPickerOpen({ tab: "rigging" })
                 }
@@ -1181,7 +1181,7 @@ export function PipelinePage() {
                 </span>
                 <button
                   type="button"
-                  className="pipeline-asset-context__remove"
+                  className="btn btn--ghost btn--sm"
                   onClick={clearAssetFromUrl}
                 >
                   ✕ Entfernen
@@ -1190,7 +1190,7 @@ export function PipelinePage() {
             ) : (
               <button
                 type="button"
-                className="pipeline-asset-context__load"
+                className="btn btn--outline"
                 onClick={() =>
                   setAssetPickerOpen({ tab: "animation" })
                 }
@@ -1234,7 +1234,7 @@ export function PipelinePage() {
                 </span>
                 <button
                   type="button"
-                  className="pipeline-asset-context__remove"
+                  className="btn btn--ghost btn--sm"
                   onClick={clearAssetFromUrl}
                 >
                   ✕ Entfernen
@@ -1243,7 +1243,7 @@ export function PipelinePage() {
             ) : (
               <button
                 type="button"
-                className="pipeline-asset-context__load"
+                className="btn btn--outline"
                 onClick={() =>
                   setAssetPickerOpen({ tab: "mesh-processing" })
                 }

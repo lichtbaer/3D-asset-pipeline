@@ -284,7 +284,7 @@ export function MeshViewer({
         <div className="mesh-viewer__controls">
           <button
             type="button"
-            className={`mesh-viewer__btn ${autoRotate ? "mesh-viewer__btn--active" : ""}`}
+            className={`btn btn--ghost btn--sm ${autoRotate ? "mesh-viewer__btn--active" : ""}`}
             onClick={() => setAutoRotate((v) => !v)}
             title="Auto-Rotation"
           >
@@ -292,7 +292,7 @@ export function MeshViewer({
           </button>
           <button
             type="button"
-            className={`mesh-viewer__btn ${wireframe ? "mesh-viewer__btn--active" : ""}`}
+            className={`btn btn--ghost btn--sm ${wireframe ? "mesh-viewer__btn--active" : ""}`}
             onClick={() => setWireframe((v) => !v)}
             title="Wireframe"
           >
@@ -312,7 +312,7 @@ export function MeshViewer({
           </div>
           <button
             type="button"
-            className="mesh-viewer__btn"
+            className="btn btn--ghost btn--sm"
             onClick={handleFullscreen}
             title="Vollbild"
           >

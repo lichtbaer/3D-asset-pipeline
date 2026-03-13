@@ -275,7 +275,7 @@ export function AssetDetailModal({ assetId, onClose }: AssetDetailModalProps) {
             {hasImage && imageUrl && !hasBgremoval && (
               <button
                 type="button"
-                className="asset-modal__action-btn"
+                className="btn btn--outline"
                 onClick={() =>
                   handleAction("bgremoval", imageUrl, data.asset_id)
                 }
@@ -288,7 +288,7 @@ export function AssetDetailModal({ assetId, onClose }: AssetDetailModalProps) {
               (bgremovalUrl ?? imageUrl) && (
                 <button
                   type="button"
-                  className="asset-modal__action-btn"
+                  className="btn btn--outline"
                   onClick={() =>
                     handleAction(
                       "mesh",
@@ -304,7 +304,7 @@ export function AssetDetailModal({ assetId, onClose }: AssetDetailModalProps) {
               <>
                 <button
                   type="button"
-                  className="asset-modal__action-btn"
+                  className="btn btn--outline"
                   onClick={() =>
                     handleAction("rigging", meshUrl ?? "", data.asset_id)
                   }
@@ -313,7 +313,7 @@ export function AssetDetailModal({ assetId, onClose }: AssetDetailModalProps) {
                 </button>
                 <button
                   type="button"
-                  className="asset-modal__action-btn"
+                  className="btn btn--outline"
                   onClick={() =>
                     handleAction("mesh-processing", meshUrl ?? "", data.asset_id)
                   }
@@ -326,7 +326,7 @@ export function AssetDetailModal({ assetId, onClose }: AssetDetailModalProps) {
               <>
                 <button
                   type="button"
-                  className="asset-modal__action-btn"
+                  className="btn btn--outline"
                   onClick={() => {
                     const glbUrl =
                       steps.rigging && "file" in steps.rigging
@@ -344,7 +344,7 @@ export function AssetDetailModal({ assetId, onClose }: AssetDetailModalProps) {
                 </button>
                 <button
                   type="button"
-                  className="asset-modal__action-btn"
+                  className="btn btn--outline"
                   onClick={() =>
                     handleAction("rigging", meshUrl ?? "", data.asset_id)
                   }

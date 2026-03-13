@@ -95,14 +95,14 @@ export function MeshJobStatus({ jobId, onJobUpdate, onRetrySuccess }: MeshJobSta
         <div className="compare-results__actions">
           <button
             type="button"
-            className="job-history__use-mesh"
+            className="btn btn--outline btn--sm"
             onClick={handleUseForRigging}
           >
             → Riggen
           </button>
           <button
             type="button"
-            className="job-history__use-mesh"
+            className="btn btn--outline btn--sm"
             onClick={handleUseForAnimation}
           >
             → Animieren
@@ -110,7 +110,7 @@ export function MeshJobStatus({ jobId, onJobUpdate, onRetrySuccess }: MeshJobSta
           {data.asset_id && (
             <Link
               to={`/assets/${data.asset_id}`}
-              className="job-history__use-mesh"
+              className="btn btn--outline btn--sm"
             >
               → Als nächsten Schritt verwenden
             </Link>

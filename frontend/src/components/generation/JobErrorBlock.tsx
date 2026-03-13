@@ -71,7 +71,7 @@ export function JobErrorBlock({
       {onRetry && (
         <button
           type="button"
-          className="job-error-block__retry"
+          className="btn btn--danger"
           onClick={onRetry}
           disabled={isRetrying}
         >

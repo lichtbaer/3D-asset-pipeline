@@ -94,7 +94,7 @@ export function RiggingJobStatus({
         <div className="compare-results__actions">
           <button
             type="button"
-            className="job-history__use-mesh"
+            className="btn btn--outline btn--sm"
             onClick={handleUseForAnimation}
           >
             → Animieren
