@@ -20,7 +20,6 @@ import {
 import {
   postGenerateAnimation,
   getAnimationProviders,
-  getAnimationPresets,
   type AnimationJob,
 } from "../api/animation.js";
 import {
@@ -69,8 +68,12 @@ import {
   CompareHistory,
   type CompareHistoryEntry,
 } from "../components/pipeline/CompareHistory.js";
-import { AnimationForm } from "../components/pipeline/AnimationForm.js";
-import { AnimationJobStatus } from "../components/pipeline/AnimationJobStatus.js";
+import { AnimationForm } from "../components/pipeline/animation/AnimationForm.js";
+import { AnimationJobStatus } from "../components/pipeline/animation/AnimationJobStatus.js";
+import {
+  AnimationJobHistory,
+  type AnimationJobHistoryEntry,
+} from "../components/pipeline/animation/AnimationJobHistory.js";
 import { usePipelineStore } from "../store/PipelineStore.js";
 import "./ImageGenerationPage.css";
 import "./PipelinePage.css";
@@ -99,12 +102,28 @@ function meshJobToHistoryEntry(job: MeshJob): MeshJobHistoryEntry {
   };
 }
 
+function animationJobToHistoryEntry(
+  job: AnimationJob
+): AnimationJobHistoryEntry {
+  return {
+    job_id: job.job_id,
+    motion_prompt: job.motion_prompt,
+    provider_key: job.provider_key,
+    status: job.status,
+    animated_glb_url: job.animated_glb_url,
+    created_at: job.created_at,
+    asset_id: job.asset_id,
+  };
+}
+
 export function PipelinePage() {
   const {
     activeAssetId,
     setActiveAssetId,
     pendingRiggingGlbUrl,
     setPendingRiggingGlbUrl,
+    pendingAnimationGlbUrl,
+    setPendingAnimationGlbUrl,
   } = usePipelineStore();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
@@ -157,6 +176,13 @@ export function PipelinePage() {
       setPendingRiggingGlbUrl(null);
     }
   }, [pendingRiggingGlbUrl, activeTab, setPendingRiggingGlbUrl]);
+
+  useEffect(() => {
+    if (pendingAnimationGlbUrl && activeTab === "animation") {
+      setAnimationSourceGlbUrl(pendingAnimationGlbUrl);
+      setPendingAnimationGlbUrl(null);
+    }
+  }, [pendingAnimationGlbUrl, activeTab, setPendingAnimationGlbUrl]);
 
   // Redirect ?tab=compare → ?tab=image (Vergleichsmodus ist jetzt in den Tabs integriert)
   useEffect(() => {
@@ -511,6 +537,9 @@ export function PipelinePage() {
   const [currentAnimationJobId, setCurrentAnimationJobId] = useState<
     string | null
   >(null);
+  const [animationJobHistory, setAnimationJobHistory] = useState<
+    AnimationJobHistoryEntry[]
+  >([]);
   const { data: animationProvidersData, isLoading: animationProvidersLoading } =
     useQuery({
       queryKey: ["animation-providers"],
@@ -520,39 +549,73 @@ export function PipelinePage() {
     () => animationProvidersData?.providers ?? [],
     [animationProvidersData?.providers]
   );
-  const selectedAnimationProvider =
-    animationProviders[0]?.key ?? "hy-motion";
-  const { data: animationPresetsData, isLoading: animationPresetsLoading } =
-    useQuery({
-      queryKey: ["animation-presets", selectedAnimationProvider],
-      queryFn: () => getAnimationPresets(selectedAnimationProvider),
-      enabled: !!selectedAnimationProvider,
-    });
-  const animationPresets = useMemo(
-    () => animationPresetsData?.presets ?? [],
-    [animationPresetsData?.presets]
-  );
 
   const animationCreateMutation = useMutation({
     mutationFn: postGenerateAnimation,
-    onSuccess: (res) => {
+    onSuccess: (res, variables) => {
       setCurrentAnimationJobId(res.job_id);
+      setAnimationJobHistory((prev) => [
+        {
+          job_id: res.job_id,
+          motion_prompt: variables.motion_prompt,
+          provider_key: variables.provider_key,
+          status: "pending",
+          animated_glb_url: null,
+          created_at: new Date().toISOString(),
+        },
+        ...prev,
+      ]);
     },
   });
 
-  const handleAnimationJobUpdate = useCallback((_job: AnimationJob) => {
-    // Status wird über useQuery aktualisiert
+  const handleAnimationJobUpdate = useCallback((job: AnimationJob) => {
+    setAnimationJobHistory((prev) =>
+      prev.map((entry) =>
+        entry.job_id === job.job_id
+          ? animationJobToHistoryEntry(job)
+          : entry
+      )
+    );
   }, []);
+
+  const handleAnimationRetrySuccess = useCallback((newJobId: string) => {
+    setCurrentAnimationJobId(newJobId);
+    const failedJob = animationJobHistory.find(
+      (j) => j.job_id === currentAnimationJobId
+    );
+    setAnimationJobHistory((prev) => [
+      {
+        job_id: newJobId,
+        motion_prompt: failedJob?.motion_prompt ?? "",
+        provider_key: failedJob?.provider_key ?? "",
+        status: "pending",
+        animated_glb_url: null,
+        created_at: new Date().toISOString(),
+      },
+      ...prev,
+    ]);
+  }, [currentAnimationJobId, animationJobHistory]);
+
+  const currentAnimationJob = animationJobHistory.find(
+    (j) => j.job_id === currentAnimationJobId
+  );
+  const isAnimationJobRunning =
+    !!currentAnimationJobId &&
+    currentAnimationJob?.status !== "done" &&
+    currentAnimationJob?.status !== "failed";
 
   const handleAnimationSubmit = (req: {
     source_glb_url: string;
-    provider_key: string;
     motion_prompt: string;
+    provider_key: string;
+    params?: Record<string, unknown>;
+    asset_id?: string;
   }) => {
     const payload: {
       source_glb_url: string;
-      provider_key: string;
       motion_prompt: string;
+      provider_key: string;
+      params?: Record<string, unknown>;
       asset_id?: string;
     } = { ...req };
     if (activeAssetId) {
@@ -561,6 +624,10 @@ export function PipelinePage() {
     }
     animationCreateMutation.mutate(payload);
   };
+
+  const handleTryDifferentPreset = useCallback(() => {
+    setCurrentAnimationJobId(null);
+  }, []);
 
   const handleImageSubmit = (req: GenerateImageRequest) => {
     imageCreateMutation.mutate(req);
@@ -965,18 +1032,21 @@ export function PipelinePage() {
               sourceGlbUrl={animationSourceGlbUrl}
               onSourceGlbUrlChange={setAnimationSourceGlbUrl}
               providers={animationProviders}
-              presets={animationPresets}
               providersLoading={animationProvidersLoading}
-              presetsLoading={animationPresetsLoading}
               onSubmit={handleAnimationSubmit}
-              disabled={animationCreateMutation.isPending}
+              disabled={isAnimationJobRunning}
             />
           </section>
           <section className="pipeline-page__status">
             <AnimationJobStatus
               jobId={currentAnimationJobId}
               onJobUpdate={handleAnimationJobUpdate}
+              onRetrySuccess={handleAnimationRetrySuccess}
+              onTryDifferentPreset={handleTryDifferentPreset}
             />
+          </section>
+          <section className="pipeline-page__history">
+            <AnimationJobHistory jobs={animationJobHistory} />
           </section>
         </div>
       )}

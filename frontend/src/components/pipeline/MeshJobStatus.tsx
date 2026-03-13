@@ -16,7 +16,7 @@ export function MeshJobStatus({ jobId, onJobUpdate, onRetrySuccess }: MeshJobSta
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [, setSearchParams] = useSearchParams();
-  const { setPendingRiggingGlbUrl } = usePipelineStore();
+  const { setPendingRiggingGlbUrl, setPendingAnimationGlbUrl } = usePipelineStore();
   const { data, isLoading, error } = useQuery({
     queryKey: ["mesh-job", jobId],
     queryFn: () => getMeshJobStatus(jobId!),
@@ -79,6 +79,14 @@ export function MeshJobStatus({ jobId, onJobUpdate, onRetrySuccess }: MeshJobSta
     }
   };
 
+  const handleUseForAnimation = () => {
+    if (glb_url) {
+      setPendingAnimationGlbUrl(glb_url);
+      navigate("/pipeline");
+      setSearchParams({ tab: "animation" });
+    }
+  };
+
   if (status === "done" && glb_url) {
     return (
       <div className="job-status job-status--done">
@@ -91,6 +99,13 @@ export function MeshJobStatus({ jobId, onJobUpdate, onRetrySuccess }: MeshJobSta
             onClick={handleUseForRigging}
           >
             → Riggen
+          </button>
+          <button
+            type="button"
+            className="job-history__use-mesh"
+            onClick={handleUseForAnimation}
+          >
+            → Animieren
           </button>
           {data.asset_id && (
             <Link

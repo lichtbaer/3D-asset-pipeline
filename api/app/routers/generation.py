@@ -1020,3 +1020,155 @@ async def get_animation_job_status(
 async def list_models():
     """Listet alle Provider-Keys (Rückwärtskompatibel mit /generate/image/providers)."""
     return ModelsResponse(models=[p.provider_key for p in list_providers()])
+
+
+# --- Animation (Stub für SMA-165 Backend) ---
+
+ANIMATION_PROVIDERS = [
+    AnimationProviderInfo(
+        key="hy-motion",
+        display_name="HY-Motion",
+        default_params={},
+        param_schema={},
+    ),
+]
+
+ANIMATION_PRESETS = [
+    AnimationPresetInfo(key="walk", label="Gehen", motion_prompt="Gehen"),
+    AnimationPresetInfo(key="run", label="Laufen", motion_prompt="Laufen"),
+    AnimationPresetInfo(key="idle", label="Idle", motion_prompt="Idle"),
+    AnimationPresetInfo(key="jump", label="Springen", motion_prompt="Springen"),
+    AnimationPresetInfo(key="wave", label="Winken", motion_prompt="Winken"),
+]
+
+
+@router.get("/animation/providers", response_model=AnimationProvidersResponse)
+async def list_animation_providers():
+    """Listet alle verfügbaren Animation-Provider."""
+    return AnimationProvidersResponse(providers=ANIMATION_PROVIDERS)
+
+
+@router.get(
+    "/animation/presets/{provider_key}",
+    response_model=AnimationPresetsResponse,
+)
+async def list_animation_presets(provider_key: str):
+    """Listet Presets für einen Animation-Provider."""
+    return AnimationPresetsResponse(presets=ANIMATION_PRESETS)
+
+
+@router.post(
+    "/animation",
+    response_model=AnimationGenerateResponse,
+    status_code=202,
+)
+async def create_animation_generation(
+    body: AnimationGenerateRequest,
+    session: AsyncSession = Depends(get_session),
+):
+    """Erstellt einen Animation-Job. Stub: Job bleibt pending bis SMA-165 Backend."""
+    asset_id: UUID | None = None
+    if body.asset_id:
+        try:
+            asset_id = UUID(body.asset_id)
+        except ValueError:
+            pass
+
+    job = GenerationJob(
+        job_type="animation",
+        status="pending",
+        prompt=body.motion_prompt,
+        provider_key=body.provider_key,
+        source_image_url=body.source_glb_url,
+        asset_id=asset_id,
+    )
+    session.add(job)
+    await session.commit()
+    await session.refresh(job)
+
+    return AnimationGenerateResponse(job_id=job.id, status="pending")
+
+
+@router.get(
+    "/animation/{job_id}",
+    response_model=AnimationJobStatusResponse,
+)
+async def get_animation_job_status(
+    job_id: UUID,
+    session: AsyncSession = Depends(get_session),
+):
+    result = await session.execute(
+        select(GenerationJob).where(
+            GenerationJob.id == job_id,
+            GenerationJob.job_type == "animation",
+        )
+    )
+    job = result.scalar_one_or_none()
+    if not job:
+        raise HTTPException(404, detail="Job nicht gefunden")
+
+    glb_url = None
+    if job.status == "done" and job.glb_file_path:
+        glb_url = f"/static/meshes/{job.id}.glb"
+
+    return AnimationJobStatusResponse(
+        job_id=job.id,
+        status=job.status,
+        glb_url=glb_url,
+        error_msg=job.error_msg,
+        error_type=job.error_type,
+        error_detail=job.error_detail,
+        source_glb_url=job.source_image_url or "",
+        motion_prompt=job.prompt or "",
+        provider_key=job.provider_key or "hy-motion",
+        created_at=job.created_at,
+        updated_at=job.updated_at,
+        asset_id=job.asset_id,
+        failed_at=job.updated_at if job.status == "failed" else None,
+    )
+
+
+@router.post(
+    "/animation/retry/{job_id}",
+    response_model=AnimationGenerateResponse,
+    status_code=202,
+)
+async def retry_animation_job(
+    job_id: UUID,
+    session: AsyncSession = Depends(get_session),
+):
+    """Erstellt neuen Job mit gleichen Parametern wie fehlgeschlagener Job."""
+    result = await session.execute(
+        select(GenerationJob).where(
+            GenerationJob.id == job_id,
+            GenerationJob.job_type == "animation",
+        )
+    )
+    job = result.scalar_one_or_none()
+    if not job:
+        raise HTTPException(404, detail="Job nicht gefunden")
+    if job.status != "failed":
+        raise HTTPException(
+            400,
+            detail="Nur fehlgeschlagene Jobs können erneut versucht werden",
+        )
+
+    source_glb_url = job.source_image_url or ""
+    if not source_glb_url:
+        raise HTTPException(
+            400, detail="Quell-GLB-URL fehlt für Retry"
+        )
+
+    new_job = GenerationJob(
+        job_type="animation",
+        status="pending",
+        prompt=job.prompt or "",
+        provider_key=job.provider_key or "hy-motion",
+        source_image_url=source_glb_url,
+        asset_id=job.asset_id,
+    )
+    session.add(new_job)
+    await session.commit()
+    await session.refresh(new_job)
+
+    return AnimationGenerateResponse(job_id=new_job.id, status="pending")

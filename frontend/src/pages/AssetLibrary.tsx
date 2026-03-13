@@ -15,7 +15,7 @@ function formatDate(iso: string): string {
   }
 }
 
-function StepBadges({ steps }: { steps: Record<string, { file: string }> }) {
+function StepBadges({ steps }: { steps: Record<string, { file?: string }> }) {
   const hasImage = "image" in steps;
   const hasBgremoval = "bgremoval" in steps;
   const hasMesh = "mesh" in steps;

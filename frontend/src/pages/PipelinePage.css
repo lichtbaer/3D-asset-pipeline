@@ -122,10 +122,55 @@
   opacity: 0.9;
 }
 
-.mesh-job-status__hint {
+.mesh-job-status__hint,
+.animation-job-status__hint {
   margin-top: 0.5rem;
   font-size: 0.875rem;
   color: var(--text);
+}
+
+.animation-form__preview {
+  margin: 1rem 0;
+}
+
+.animation-form__preview-viewer {
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.animation-form__presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.animation-form__preset-btn {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8125rem;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.animation-form__preset-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.animation-form__textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 4rem;
+}
+
+.asset-modal__motion-prompt {
+  font-size: 0.875rem;
+  color: var(--text);
+  margin: 0.25rem 0;
 }
 
 .job-history__download {
@@ -173,6 +218,13 @@
 .job-history__use-mesh:hover {
   background: var(--accent);
   color: white;
+}
+
+.job-history__date {
+  font-size: 0.75rem;
+  color: var(--text);
+  opacity: 0.8;
+  margin-left: 0.5rem;
 }
 
 .job-status__library-link,

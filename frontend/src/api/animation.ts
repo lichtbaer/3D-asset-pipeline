@@ -7,7 +7,7 @@ export interface AnimationGenerateRequest {
   asset_id?: string;
 }
 
-export type AnimationJobStatus = "pending" | "processing" | "done" | "failed";
+export type AnimationJobStatus = "pending" | "processing" | "running" | "done" | "failed";
 
 export interface AnimationJob {
   job_id: string;
@@ -36,6 +36,24 @@ export interface MotionPreset {
   prompt: string;
 }
 
+export async function getAnimationProviders(): Promise<{
+  providers: AnimationProvider[];
+}> {
+  const { data } = await apiClient.get<{ providers: AnimationProvider[] }>(
+    "/generate/animation/providers"
+  );
+  return data;
+}
+
+export async function getAnimationPresets(
+  providerKey: string
+): Promise<{ presets: MotionPreset[] }> {
+  const { data } = await apiClient.get<{ presets: MotionPreset[] }>(
+    `/generate/animation/presets/${encodeURIComponent(providerKey)}`
+  );
+  return data;
+}
+
 export async function postGenerateAnimation(
   req: AnimationGenerateRequest
 ): Promise<{ job_id: string; status: string }> {
@@ -52,7 +70,7 @@ export async function postGenerateAnimation(
 export async function getAnimationJobStatus(
   jobId: string
 ): Promise<AnimationJob> {
-  const baseUrl = apiClient.defaults.baseURL ?? "http://localhost:8000";
+  const baseUrl = apiClient.defaults.baseURL ?? import.meta.env.VITE_API_URL ?? "http://localhost:8000";
   const { data } = await apiClient.get<{
     job_id: string;
     status: string;
@@ -68,9 +86,10 @@ export async function getAnimationJobStatus(
     asset_id: string | null;
     failed_at?: string | null;
   }>(`/generate/animation/${jobId}`);
-  const animated_glb_url = data.animated_glb_url
-    ? `${baseUrl}${data.animated_glb_url}`
-    : null;
+  const animated_glb_url =
+    data.animated_glb_url && !data.animated_glb_url.startsWith("http")
+      ? `${baseUrl}${data.animated_glb_url}`
+      : data.animated_glb_url;
   return {
     job_id: String(data.job_id),
     status: data.status as AnimationJobStatus,
@@ -88,20 +107,14 @@ export async function getAnimationJobStatus(
   };
 }
 
-export async function getAnimationProviders(): Promise<{
-  providers: AnimationProvider[];
-}> {
-  const { data } = await apiClient.get<{ providers: AnimationProvider[] }>(
-    "/generate/animation/providers"
+export async function retryAnimationJob(
+  jobId: string
+): Promise<{ job_id: string; status: string }> {
+  const { data } = await apiClient.post<{ job_id: string; status: string }>(
+    `/generate/animation/retry/${jobId}`
   );
-  return data;
-}
-
-export async function getAnimationPresets(
-  providerKey: string
-): Promise<{ presets: MotionPreset[] }> {
-  const { data } = await apiClient.get<{ presets: MotionPreset[] }>(
-    `/generate/animation/presets/${providerKey}`
-  );
-  return data;
+  return {
+    job_id: String(data.job_id),
+    status: data.status,
+  };
 }

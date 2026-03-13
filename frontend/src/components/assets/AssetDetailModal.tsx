@@ -20,6 +20,7 @@ interface AssetStepData {
   provider_key?: string;
   file?: string;
   prompt?: string;
+  motion_prompt?: string;
   generated_at?: string | null;
   [key: string]: unknown;
 }
@@ -120,6 +121,8 @@ export function AssetDetailModal({ assetId, onClose }: AssetDetailModalProps) {
   const animationUrl = animationFile
     ? getAssetFileUrl(data.asset_id, animationFile)
     : null;
+  const animationStep = steps.animation as AssetStepData | undefined;
+  const motionPrompt = animationStep?.prompt ?? animationStep?.motion_prompt;
 
   return (
     <div className="asset-modal" role="dialog" aria-modal="true">
@@ -210,6 +213,11 @@ export function AssetDetailModal({ assetId, onClose }: AssetDetailModalProps) {
             {hasAnimation && animationUrl && (
               <div className="asset-modal__preview-item">
                 <p className="asset-modal__preview-label">🎬 Animation</p>
+                {motionPrompt && (
+                  <p className="asset-modal__motion-prompt">
+                    Motion: {motionPrompt}
+                  </p>
+                )}
                 <a
                   href={animationUrl}
                   download
@@ -229,7 +237,9 @@ export function AssetDetailModal({ assetId, onClose }: AssetDetailModalProps) {
               <div key={stepKey} className="asset-modal__meta-step">
                 <strong>{stepKey}</strong>: Provider{" "}
                 {stepData.provider_key ?? "—"},{" "}
-                {stepData.prompt ? `Prompt: ${stepData.prompt}` : ""}{" "}
+                {(stepData.prompt || stepData.motion_prompt)
+                  ? `Prompt: ${stepData.prompt ?? stepData.motion_prompt}`
+                  : ""}{" "}
                 {stepData.generated_at
                   ? `· ${formatDate(stepData.generated_at)}`
                   : ""}
