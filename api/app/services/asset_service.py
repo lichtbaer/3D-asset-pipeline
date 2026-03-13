@@ -34,11 +34,13 @@ class AssetMetadata:
         created_at: str,
         updated_at: str,
         steps: dict[str, dict[str, Any]],
+        processing: list[dict[str, Any]] | None = None,
     ):
         self.asset_id = asset_id
         self.created_at = created_at
         self.updated_at = updated_at
         self.steps = steps
+        self.processing = processing or []
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -46,6 +48,7 @@ class AssetMetadata:
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "steps": self.steps,
+            "processing": self.processing,
         }
 
 
@@ -116,6 +119,7 @@ def get_asset(asset_id: str) -> AssetMetadata | None:
         created_at=data["created_at"],
         updated_at=data["updated_at"],
         steps=data.get("steps", {}),
+        processing=data.get("processing", []),
     )
 
 
@@ -138,6 +142,43 @@ def get_file_path(asset_id: str, filename: str) -> Path | None:
     if target.exists() and target.is_file():
         return target
     return None
+
+
+def get_asset_dir(asset_id: str) -> Path:
+    """Asset-Ordner-Pfad. Erstellt nicht automatisch."""
+    return _asset_dir(asset_id)
+
+
+def write_asset_file(asset_id: str, filename: str, data: bytes) -> None:
+    """Schreibt Datei in Asset-Ordner."""
+    asset_path = _asset_dir(asset_id)
+    if not asset_path.exists():
+        raise FileNotFoundError(f"Asset {asset_id} existiert nicht")
+    (asset_path / filename).write_bytes(data)
+
+
+def list_mesh_files(asset_id: str) -> list[str]:
+    """Listet alle GLB-Dateien im Asset-Ordner (für Mesh-Processing-Quelle)."""
+    asset_path = _asset_dir(asset_id)
+    if not asset_path.exists():
+        return []
+    return sorted(
+        f.name for f in asset_path.iterdir()
+        if f.is_file() and f.suffix.lower() == ".glb"
+    )
+
+
+def append_processing_entry(asset_id: str, entry: dict[str, Any]) -> None:
+    """Fügt Eintrag zum processing-Array in metadata.json hinzu."""
+    meta_path = _metadata_path(asset_id)
+    if not meta_path.exists():
+        raise FileNotFoundError(f"Asset {asset_id} existiert nicht")
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    if "processing" not in meta:
+        meta["processing"] = []
+    meta["processing"].append(entry)
+    meta["updated_at"] = datetime.now(timezone.utc).isoformat()
+    meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
 
 
 async def _download_bytes(url: str) -> bytes:

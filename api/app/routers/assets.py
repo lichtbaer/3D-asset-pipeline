@@ -1,17 +1,26 @@
 """Asset-API: persistente Speicherung von Pipeline-Outputs."""
 
 from pathlib import Path
-from uuid import UUID
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 
-from app.services import asset_service
 from app.schemas.asset import (
     AssetDetailResponse,
     AssetListItem,
     AssetStepInfo,
     CreateAssetResponse,
+)
+from app.schemas.mesh_processing import (
+    MeshAnalysis,
+    RepairRequest,
+    SimplifyRequest,
+)
+from app.services import asset_service
+from app.services.mesh_processing_service import (
+    analyze as mesh_analyze,
+    repair as mesh_repair,
+    simplify as mesh_simplify,
 )
 
 router = APIRouter(prefix="/assets", tags=["assets"])
@@ -66,7 +75,55 @@ async def get_asset(asset_id: str):
         created_at=meta.created_at,
         updated_at=meta.updated_at,
         steps=meta.steps,
+        processing=meta.processing,
     )
+
+
+@router.get("/{asset_id}/process/sources")
+async def process_sources(asset_id: str):
+    """Liste verfügbarer Mesh-Dateien (GLB) als Quellen für Processing."""
+    if not asset_service.get_asset(asset_id):
+        raise HTTPException(404, detail="Asset nicht gefunden")
+    return {"sources": asset_service.list_mesh_files(asset_id)}
+
+
+@router.get("/{asset_id}/process/analyze", response_model=MeshAnalysis)
+async def process_analyze(asset_id: str, source_file: str = "mesh.glb"):
+    """Mesh-Kennzahlen analysieren (kein neues File)."""
+    if not asset_service.get_asset(asset_id):
+        raise HTTPException(404, detail="Asset nicht gefunden")
+    try:
+        return mesh_analyze(asset_id, source_file)
+    except FileNotFoundError as e:
+        raise HTTPException(404, detail=str(e)) from e
+
+
+@router.post("/{asset_id}/process/simplify")
+async def process_simplify(asset_id: str, body: SimplifyRequest):
+    """Mesh vereinfachen, speichert mesh_simplified_{target_faces}.glb."""
+    if not asset_service.get_asset(asset_id):
+        raise HTTPException(404, detail="Asset nicht gefunden")
+    try:
+        output_file, entry = mesh_simplify(
+            asset_id, body.source_file, body.target_faces
+        )
+        return {"output_file": output_file, "processing": entry}
+    except FileNotFoundError as e:
+        raise HTTPException(404, detail=str(e)) from e
+
+
+@router.post("/{asset_id}/process/repair")
+async def process_repair(asset_id: str, body: RepairRequest):
+    """Mesh reparieren, speichert mesh_repaired.glb."""
+    if not asset_service.get_asset(asset_id):
+        raise HTTPException(404, detail="Asset nicht gefunden")
+    try:
+        output_file, entry = mesh_repair(
+            asset_id, body.source_file, body.operations
+        )
+        return {"output_file": output_file, "processing": entry}
+    except FileNotFoundError as e:
+        raise HTTPException(404, detail=str(e)) from e
 
 
 @router.get("/{asset_id}/files/{filename}")

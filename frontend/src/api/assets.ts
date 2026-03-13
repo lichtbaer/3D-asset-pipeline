@@ -15,11 +15,20 @@ export interface AssetListItem {
   thumbnail_url: string | null;
 }
 
+export interface ProcessingEntry {
+  operation: string;
+  params: Record<string, unknown>;
+  source_file: string;
+  output_file: string;
+  processed_at: string;
+}
+
 export interface AssetDetail {
   asset_id: string;
   created_at: string;
   updated_at: string;
   steps: Record<string, Record<string, unknown>>;
+  processing?: ProcessingEntry[];
 }
 
 export async function listAssets(): Promise<AssetListItem[]> {

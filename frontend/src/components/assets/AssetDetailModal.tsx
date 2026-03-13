@@ -3,6 +3,10 @@ import { useQuery } from "@tanstack/react-query";
 import { getAsset, getAssetFileUrl } from "../../api/assets.js";
 import { usePipelineStore } from "../../store/PipelineStore.js";
 import { MeshViewer } from "../viewer/MeshViewer.js";
+import {
+  MeshProcessingPanel,
+  ProcessingResultsList,
+} from "./MeshProcessingPanel.js";
 
 function formatDate(iso: string): string {
   try {
@@ -48,6 +52,10 @@ export function AssetDetailModal({ assetId, onClose }: AssetDetailModalProps) {
     setActiveAssetId(assetIdForJob);
     onClose();
     navigate(`/pipeline?tab=${tab}&source=${encodeURIComponent(sourceUrl)}`);
+  };
+
+  const handleUseForRigging = (url: string, assetIdForJob: string) => {
+    handleAction("rigging", url, assetIdForJob);
   };
 
   if (!assetId) return null;
@@ -229,6 +237,19 @@ export function AssetDetailModal({ assetId, onClose }: AssetDetailModalProps) {
             )}
           </div>
         </section>
+
+        {hasMesh && (
+          <>
+            <MeshProcessingPanel assetId={data.asset_id} />
+            {data.processing && data.processing.length > 0 && (
+              <ProcessingResultsList
+                assetId={data.asset_id}
+                processing={data.processing}
+                onUseForRigging={handleUseForRigging}
+              />
+            )}
+          </>
+        )}
 
         <section className="asset-modal__meta">
           <h3>Metadaten</h3>

@@ -31,6 +31,10 @@ class AssetDetailResponse(BaseModel):
     created_at: str
     updated_at: str
     steps: dict[str, dict] = Field(default_factory=dict)
+    processing: list[dict] = Field(
+        default_factory=list,
+        description="Mesh-Processing-Einträge (simplify, repair)",
+    )
 
 
 class CreateAssetResponse(BaseModel):

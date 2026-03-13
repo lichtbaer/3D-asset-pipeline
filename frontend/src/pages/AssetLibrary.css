@@ -422,3 +422,144 @@
   text-align: center;
   padding: 2rem;
 }
+
+/* Mesh Processing Panel */
+.mesh-processing-panel {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.mesh-processing-panel h3 {
+  font-size: 1rem;
+  margin: 0 0 0.75rem;
+}
+
+.mesh-processing-panel h4 {
+  font-size: 0.875rem;
+  margin: 1rem 0 0.5rem;
+}
+
+.mesh-processing__source {
+  margin-bottom: 1rem;
+}
+
+.mesh-processing__source label {
+  display: block;
+  font-size: 0.875rem;
+  margin-bottom: 0.25rem;
+}
+
+.mesh-processing__source select {
+  padding: 0.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  font-family: inherit;
+  min-width: 180px;
+}
+
+.mesh-processing__stats {
+  font-size: 0.875rem;
+  color: var(--text);
+  margin: 0;
+}
+
+.mesh-processing__presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.mesh-processing__preset-btn {
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.mesh-processing__preset-btn:hover:not(:disabled) {
+  background: var(--accent);
+  color: white;
+}
+
+.mesh-processing__preset-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.mesh-processing__custom {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.mesh-processing__custom-input {
+  width: 120px;
+  padding: 0.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  font-family: inherit;
+}
+
+.mesh-processing__checkboxes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.mesh-processing__checkbox {
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.mesh-processing__results {
+  margin-top: 1.5rem;
+}
+
+.mesh-processing__results h4 {
+  margin: 0 0 0.75rem;
+}
+
+.mesh-processing__results-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+}
+
+.mesh-processing__result-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.mesh-processing__result-preview {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  width: 200px;
+}
+
+.mesh-processing__result-label {
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.mesh-processing__result-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
