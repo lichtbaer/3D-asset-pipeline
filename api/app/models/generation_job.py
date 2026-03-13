@@ -18,7 +18,8 @@ class GenerationJob(Base):
     job_type: Mapped[str] = mapped_column(String(50), nullable=False)
     status: Mapped[str] = mapped_column(String(50), nullable=False)
     prompt: Mapped[str] = mapped_column(Text, nullable=False)
-    model_key: Mapped[str] = mapped_column(String(100), nullable=False)
+    provider_key: Mapped[str] = mapped_column(String(100), nullable=False)
+    model_key: Mapped[str | None] = mapped_column(String(100), nullable=True)  # Alias, deprecated
     result_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     error_msg: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Mesh job columns
