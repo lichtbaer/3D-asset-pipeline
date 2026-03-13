@@ -10,6 +10,10 @@ export interface MeshViewerProps {
   glbUrl: string;
   height?: number;
   className?: string;
+  /** Auto-Rotation standardmäßig aktiv (z.B. für Preview) */
+  autoRotateDefault?: boolean;
+  /** Nur Viewer ohne Steuerungs-Buttons (Wireframe, Beleuchtung, Fullscreen) */
+  readOnly?: boolean;
 }
 
 function setWireframeRecursive(
@@ -34,6 +38,8 @@ export function MeshViewer({
   glbUrl,
   height = 500,
   className = "",
+  autoRotateDefault = false,
+  readOnly = false,
 }: MeshViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -53,7 +59,7 @@ export function MeshViewer({
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [autoRotate, setAutoRotate] = useState(false);
+  const [autoRotate, setAutoRotate] = useState(autoRotateDefault);
   const [wireframe, setWireframe] = useState(false);
   const [lightingMode, setLightingMode] = useState<LightingMode>("studio");
 
@@ -225,6 +231,10 @@ export function MeshViewer({
   }, [wireframe]);
 
   useEffect(() => {
+    setAutoRotate(autoRotateDefault);
+  }, [autoRotateDefault]);
+
+  useEffect(() => {
     const controls = controlsRef.current;
     if (controls) {
       controls.autoRotate = autoRotate;
@@ -270,44 +280,46 @@ export function MeshViewer({
         )}
         <canvas ref={canvasRef} className="mesh-viewer__canvas" />
       </div>
-      <div className="mesh-viewer__controls">
-        <button
-          type="button"
-          className={`mesh-viewer__btn ${autoRotate ? "mesh-viewer__btn--active" : ""}`}
-          onClick={() => setAutoRotate((v) => !v)}
-          title="Auto-Rotation"
-        >
-          ↺ Auto-Rotation
-        </button>
-        <button
-          type="button"
-          className={`mesh-viewer__btn ${wireframe ? "mesh-viewer__btn--active" : ""}`}
-          onClick={() => setWireframe((v) => !v)}
-          title="Wireframe"
-        >
-          ⬡ Wireframe
-        </button>
-        <div className="mesh-viewer__lighting">
-          <span className="mesh-viewer__lighting-label">☀ Beleuchtung:</span>
-          <select
-            value={lightingMode}
-            onChange={(e) => setLightingMode(e.target.value as LightingMode)}
-            className="mesh-viewer__select"
+      {!readOnly && (
+        <div className="mesh-viewer__controls">
+          <button
+            type="button"
+            className={`mesh-viewer__btn ${autoRotate ? "mesh-viewer__btn--active" : ""}`}
+            onClick={() => setAutoRotate((v) => !v)}
+            title="Auto-Rotation"
           >
-            <option value="studio">Studio</option>
-            <option value="neutral">Neutral</option>
-            <option value="dark">Dunkel</option>
-          </select>
+            ↺ Auto-Rotation
+          </button>
+          <button
+            type="button"
+            className={`mesh-viewer__btn ${wireframe ? "mesh-viewer__btn--active" : ""}`}
+            onClick={() => setWireframe((v) => !v)}
+            title="Wireframe"
+          >
+            ⬡ Wireframe
+          </button>
+          <div className="mesh-viewer__lighting">
+            <span className="mesh-viewer__lighting-label">☀ Beleuchtung:</span>
+            <select
+              value={lightingMode}
+              onChange={(e) => setLightingMode(e.target.value as LightingMode)}
+              className="mesh-viewer__select"
+            >
+              <option value="studio">Studio</option>
+              <option value="neutral">Neutral</option>
+              <option value="dark">Dunkel</option>
+            </select>
+          </div>
+          <button
+            type="button"
+            className="mesh-viewer__btn"
+            onClick={handleFullscreen}
+            title="Vollbild"
+          >
+            ⤢ Fullscreen
+          </button>
         </div>
-        <button
-          type="button"
-          className="mesh-viewer__btn"
-          onClick={handleFullscreen}
-          title="Vollbild"
-        >
-          ⤢ Fullscreen
-        </button>
-      </div>
+      )}
     </div>
   );
 }
