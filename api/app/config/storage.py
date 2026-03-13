@@ -18,5 +18,10 @@ ASSETS_STORAGE_PATH = Path(
     os.getenv("ASSETS_STORAGE_PATH", "/app/storage/assets")
 )
 
+# Animation-Output (temporär vor Asset-Persistenz)
+ANIMATION_STORAGE_PATH = Path(
+    os.getenv("ANIMATION_STORAGE_PATH", "/app/storage/animations")
+)
+
 # Logs: /app/storage/logs (rolling app.log)
 LOGS_PATH = Path(os.getenv("LOG_PATH", "/app/storage/logs"))

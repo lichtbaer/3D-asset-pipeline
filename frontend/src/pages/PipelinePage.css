@@ -73,6 +73,28 @@
   margin-bottom: 2rem;
 }
 
+.animation-form__presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.animation-form__preset-btn {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.animation-form__preset-btn:hover {
+  border-color: var(--text);
+}
+
 .mesh-form__preview {
   margin: 1rem 0;
 }

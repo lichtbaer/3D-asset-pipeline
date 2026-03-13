@@ -20,6 +20,7 @@ function StepBadges({ steps }: { steps: Record<string, { file: string }> }) {
   const hasBgremoval = "bgremoval" in steps;
   const hasMesh = "mesh" in steps;
   const hasRigging = "rigging" in steps;
+  const hasAnimation = "animation" in steps;
   return (
     <span className="asset-card__badges">
       <span
@@ -45,6 +46,12 @@ function StepBadges({ steps }: { steps: Record<string, { file: string }> }) {
         className={hasRigging ? "" : "asset-card__badge--missing"}
       >
         🦴
+      </span>
+      <span
+        title="Animation"
+        className={hasAnimation ? "" : "asset-card__badge--missing"}
+      >
+        🎬
       </span>
     </span>
   );
