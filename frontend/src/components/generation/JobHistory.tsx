@@ -8,6 +8,7 @@ export interface JobHistoryEntry {
 
 export interface JobHistoryProps {
   jobs: JobHistoryEntry[];
+  onUseForMesh?: (resultUrl: string) => void;
 }
 
 function truncatePrompt(prompt: string, maxLen = 50): string {
@@ -15,7 +16,7 @@ function truncatePrompt(prompt: string, maxLen = 50): string {
   return `${prompt.slice(0, maxLen)}…`;
 }
 
-export function JobHistory({ jobs }: JobHistoryProps) {
+export function JobHistory({ jobs, onUseForMesh }: JobHistoryProps) {
   if (jobs.length === 0) {
     return (
       <div className="job-history">
@@ -54,6 +55,15 @@ export function JobHistory({ jobs }: JobHistoryProps) {
               >
                 {job.status}
               </span>
+              {job.status === "done" && job.result_url && onUseForMesh && (
+                <button
+                  type="button"
+                  className="job-history__use-mesh"
+                  onClick={() => onUseForMesh(job.result_url!)}
+                >
+                  → Als Mesh-Input verwenden
+                </button>
+              )}
             </div>
           </li>
         ))}

@@ -30,7 +30,10 @@
 }
 
 .form-group textarea,
-.form-group select {
+.form-group select,
+.form-group input[type="text"],
+.form-group input[type="number"],
+.form-group input[type="url"] {
   width: 100%;
   padding: 0.5rem 0.75rem;
   font-size: 1rem;
@@ -213,4 +216,21 @@
 .job-history__status--failed {
   background: rgba(220, 38, 38, 0.2);
   color: #dc2626;
+}
+
+.job-history__use-mesh {
+  display: inline-block;
+  margin-top: 0.5rem;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.875rem;
+  color: var(--accent);
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.job-history__use-mesh:hover {
+  opacity: 0.9;
 }

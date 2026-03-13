@@ -1,0 +1,89 @@
+.pipeline-page {
+  padding: 2rem;
+  text-align: left;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.pipeline-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.pipeline-tabs__tab {
+  padding: 0.75rem 1.25rem;
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  font-family: inherit;
+  margin-bottom: -1px;
+}
+
+.pipeline-tabs__tab:hover {
+  color: var(--text-h);
+}
+
+.pipeline-tabs__tab--active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.pipeline-tab-content h1 {
+  margin-bottom: 1.5rem;
+}
+
+.pipeline-page__form,
+.pipeline-page__status,
+.pipeline-page__history {
+  margin-bottom: 2rem;
+}
+
+.mesh-form__preview {
+  margin: 1rem 0;
+}
+
+.mesh-form__preview-img {
+  max-width: 200px;
+  max-height: 200px;
+  object-fit: contain;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.job-status__download {
+  display: inline-block;
+  margin-top: 0.5rem;
+  padding: 0.5rem 1rem;
+  color: white;
+  background: var(--accent);
+  border-radius: 6px;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.job-status__download:hover {
+  opacity: 0.9;
+}
+
+.mesh-job-status__hint {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--text);
+}
+
+.job-history__download {
+  display: inline-block;
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--accent);
+}
+
+.job-history__download:hover {
+  text-decoration: underline;
+}
