@@ -1,14 +1,17 @@
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { getJobStatus } from "../../api/generation.js";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { getJobStatus, retryImageJob } from "../../api/generation.js";
+import { JobErrorBlock } from "./JobErrorBlock.js";
 
 export interface JobStatusProps {
   jobId: string | null;
   onJobUpdate?: (job: Awaited<ReturnType<typeof getJobStatus>>) => void;
+  onRetrySuccess?: (newJobId: string) => void;
 }
 
-export function JobStatus({ jobId, onJobUpdate }: JobStatusProps) {
+export function JobStatus({ jobId, onJobUpdate, onRetrySuccess }: JobStatusProps) {
+  const queryClient = useQueryClient();
   const { data, isLoading, error } = useQuery({
     queryKey: ["job", jobId],
     queryFn: () => getJobStatus(jobId!),
@@ -17,6 +20,14 @@ export function JobStatus({ jobId, onJobUpdate }: JobStatusProps) {
       return status === "done" || status === "failed" ? false : 2000;
     },
     enabled: !!jobId,
+  });
+
+  const retryMutation = useMutation({
+    mutationFn: () => retryImageJob(jobId!),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ["job", jobId] });
+      onRetrySuccess?.(res.job_id);
+    },
   });
 
   useEffect(() => {
@@ -53,7 +64,7 @@ export function JobStatus({ jobId, onJobUpdate }: JobStatusProps) {
     return null;
   }
 
-  const { status, result_url, error_msg } = data;
+  const { status, result_url } = data;
 
   if (status === "done" && result_url) {
     return (
@@ -79,10 +90,14 @@ export function JobStatus({ jobId, onJobUpdate }: JobStatusProps) {
   if (status === "failed") {
     return (
       <div className="job-status job-status--failed">
-        <p className="job-status__label">Fehlgeschlagen</p>
-        <p className="job-status__error">
-          {error_msg ?? "Unbekannter Fehler bei der Generierung"}
-        </p>
+        <JobErrorBlock
+          errorType={data.error_type}
+          errorDetail={data.error_detail ?? data.error_msg}
+          providerKey={data.provider_key ?? data.model_key}
+          failedAt={data.failed_at}
+          onRetry={onRetrySuccess ? () => retryMutation.mutate() : undefined}
+          isRetrying={retryMutation.isPending}
+        />
       </div>
     );
   }

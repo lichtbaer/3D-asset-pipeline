@@ -1,6 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
-import { getJobStatus } from "../../api/generation.js";
-import { getMeshJobStatus } from "../../api/mesh.js";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { getJobStatus, retryImageJob } from "../../api/generation.js";
+import { getMeshJobStatus, retryMeshJob } from "../../api/mesh.js";
+import { JobErrorBlock } from "../generation/JobErrorBlock.js";
 
 export type CompareStep = "image" | "mesh";
 
@@ -12,6 +13,8 @@ export interface CompareResultsProps {
   step: CompareStep;
   onUseForMesh?: (resultUrl: string) => void;
   onUseForBgRemoval?: (resultUrl: string) => void;
+  onRetrySuccessA?: (newJobId: string) => void;
+  onRetrySuccessB?: (newJobId: string) => void;
 }
 
 function CompareResultColumnImage({
@@ -19,12 +22,15 @@ function CompareResultColumnImage({
   providerLabel,
   onUseForMesh,
   onUseForBgRemoval,
+  onRetrySuccess,
 }: {
   jobId: string;
   providerLabel: string;
   onUseForMesh?: (resultUrl: string) => void;
   onUseForBgRemoval?: (resultUrl: string) => void;
+  onRetrySuccess?: (newJobId: string) => void;
 }) {
+  const queryClient = useQueryClient();
   const { data, isLoading, error } = useQuery({
     queryKey: ["job", jobId],
     queryFn: () => getJobStatus(jobId),
@@ -35,6 +41,13 @@ function CompareResultColumnImage({
     },
     enabled: !!jobId,
   });
+  const retryMutation = useMutation({
+    mutationFn: () => retryImageJob(jobId),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ["job", jobId] });
+      onRetrySuccess?.(res.job_id);
+    },
+  });
   return (
     <CompareResultColumnContent
       data={data}
@@ -44,6 +57,8 @@ function CompareResultColumnImage({
       step="image"
       onUseForMesh={onUseForMesh}
       onUseForBgRemoval={onUseForBgRemoval}
+      onRetry={onRetrySuccess ? () => retryMutation.mutate() : undefined}
+      isRetrying={retryMutation.isPending}
     />
   );
 }
@@ -51,10 +66,13 @@ function CompareResultColumnImage({
 function CompareResultColumnMesh({
   jobId,
   providerLabel,
+  onRetrySuccess,
 }: {
   jobId: string;
   providerLabel: string;
+  onRetrySuccess?: (newJobId: string) => void;
 }) {
+  const queryClient = useQueryClient();
   const { data, isLoading, error } = useQuery({
     queryKey: ["mesh-job", jobId],
     queryFn: () => getMeshJobStatus(jobId),
@@ -65,6 +83,13 @@ function CompareResultColumnMesh({
     },
     enabled: !!jobId,
   });
+  const retryMutation = useMutation({
+    mutationFn: () => retryMeshJob(jobId),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ["mesh-job", jobId] });
+      onRetrySuccess?.(res.job_id);
+    },
+  });
   return (
     <CompareResultColumnContent
       data={data}
@@ -72,6 +97,8 @@ function CompareResultColumnMesh({
       error={error}
       providerLabel={providerLabel}
       step="mesh"
+      onRetry={onRetrySuccess ? () => retryMutation.mutate() : undefined}
+      isRetrying={retryMutation.isPending}
     />
   );
 }
@@ -84,6 +111,8 @@ function CompareResultColumnContent({
   step,
   onUseForMesh,
   onUseForBgRemoval,
+  onRetry,
+  isRetrying,
 }: {
   data: Awaited<ReturnType<typeof getJobStatus>> | Awaited<ReturnType<typeof getMeshJobStatus>> | undefined;
   isLoading: boolean;
@@ -92,6 +121,8 @@ function CompareResultColumnContent({
   step: CompareStep;
   onUseForMesh?: (resultUrl: string) => void;
   onUseForBgRemoval?: (resultUrl: string) => void;
+  onRetry?: () => void;
+  isRetrying?: boolean;
 }) {
   const isImage = step === "image";
 
@@ -167,10 +198,14 @@ function CompareResultColumnContent({
         <div className="compare-results__column">
           <h4 className="compare-results__column-title">{providerLabel}</h4>
           <div className="job-status job-status--failed">
-            <p className="job-status__label">Fehlgeschlagen</p>
-            <p className="job-status__error">
-              {imageJobData.error_msg ?? "Unbekannter Fehler"}
-            </p>
+            <JobErrorBlock
+              errorType={imageJobData.error_type}
+              errorDetail={imageJobData.error_detail ?? imageJobData.error_msg}
+              providerKey={imageJobData.provider_key ?? imageJobData.model_key}
+              failedAt={imageJobData.failed_at}
+              onRetry={onRetry}
+              isRetrying={isRetrying}
+            />
           </div>
         </div>
       );
@@ -217,10 +252,14 @@ function CompareResultColumnContent({
       <div className="compare-results__column">
         <h4 className="compare-results__column-title">{providerLabel}</h4>
         <div className="job-status job-status--failed">
-          <p className="job-status__label">Fehlgeschlagen</p>
-          <p className="job-status__error">
-            {meshData.error_msg ?? "Unbekannter Fehler"}
-          </p>
+          <JobErrorBlock
+            errorType={meshData.error_type}
+            errorDetail={meshData.error_detail ?? meshData.error_msg}
+            providerKey={meshData.provider_key}
+            failedAt={meshData.failed_at}
+            onRetry={onRetry}
+            isRetrying={isRetrying}
+          />
         </div>
       </div>
     );
@@ -251,6 +290,8 @@ export function CompareResults({
   step,
   onUseForMesh,
   onUseForBgRemoval,
+  onRetrySuccessA,
+  onRetrySuccessB,
 }: CompareResultsProps) {
   if (!jobIdA && !jobIdB) {
     return null;
@@ -267,11 +308,13 @@ export function CompareResults({
               providerLabel={providerLabelA}
               onUseForMesh={onUseForMesh}
               onUseForBgRemoval={onUseForBgRemoval}
+              onRetrySuccess={onRetrySuccessA}
             />
           ) : (
             <CompareResultColumnMesh
               jobId={jobIdA}
               providerLabel={providerLabelA}
+              onRetrySuccess={onRetrySuccessA}
             />
           ))}
         {jobIdB &&
@@ -281,11 +324,13 @@ export function CompareResults({
               providerLabel={providerLabelB}
               onUseForMesh={onUseForMesh}
               onUseForBgRemoval={onUseForBgRemoval}
+              onRetrySuccess={onRetrySuccessB}
             />
           ) : (
             <CompareResultColumnMesh
               jobId={jobIdB}
               providerLabel={providerLabelB}
+              onRetrySuccess={onRetrySuccessB}
             />
           ))}
       </div>

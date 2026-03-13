@@ -1,22 +1,27 @@
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getBgRemovalJobStatus,
+  retryBgRemovalJob,
   type BgRemovalJob,
 } from "../../api/bgremoval.js";
+import { JobErrorBlock } from "../generation/JobErrorBlock.js";
 
 export interface BgRemovalJobStatusProps {
   jobId: string | null;
   onJobUpdate?: (job: BgRemovalJob) => void;
   onUseForMesh?: (resultUrl: string) => void;
+  onRetrySuccess?: (newJobId: string) => void;
 }
 
 export function BgRemovalJobStatus({
   jobId,
   onJobUpdate,
   onUseForMesh,
+  onRetrySuccess,
 }: BgRemovalJobStatusProps) {
+  const queryClient = useQueryClient();
   const { data, isLoading, error } = useQuery({
     queryKey: ["bgremoval-job", jobId],
     queryFn: () => getBgRemovalJobStatus(jobId!),
@@ -25,6 +30,14 @@ export function BgRemovalJobStatus({
       return status === "done" || status === "failed" ? false : 2000;
     },
     enabled: !!jobId,
+  });
+
+  const retryMutation = useMutation({
+    mutationFn: () => retryBgRemovalJob(jobId!),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ["bgremoval-job", jobId] });
+      onRetrySuccess?.(res.job_id);
+    },
   });
 
   useEffect(() => {
@@ -61,7 +74,7 @@ export function BgRemovalJobStatus({
     return null;
   }
 
-  const { status, result_url, error_msg, source_image_url } = data;
+  const { status, result_url, source_image_url } = data;
 
   if (status === "done" && result_url) {
     return (
@@ -112,10 +125,14 @@ export function BgRemovalJobStatus({
   if (status === "failed") {
     return (
       <div className="job-status job-status--failed">
-        <p className="job-status__label">Fehlgeschlagen</p>
-        <p className="job-status__error">
-          {error_msg ?? "Unbekannter Fehler bei der Freistellung"}
-        </p>
+        <JobErrorBlock
+          errorType={data.error_type}
+          errorDetail={data.error_detail ?? data.error_msg}
+          providerKey={data.provider_key}
+          failedAt={data.failed_at}
+          onRetry={onRetrySuccess ? () => retryMutation.mutate() : undefined}
+          isRetrying={retryMutation.isPending}
+        />
       </div>
     );
   }

@@ -17,10 +17,14 @@ export interface MeshJob {
   status: MeshJobStatus;
   glb_url: string | null;
   error_msg: string | null;
+  error_type: string | null;
+  error_detail: string | null;
   source_image_url: string;
   provider_key: string;
   created_at: string;
+  updated_at?: string;
   asset_id: string | null;
+  failed_at?: string | null;
 }
 
 export interface MeshProvider {
@@ -58,10 +62,14 @@ export async function getMeshJobStatus(jobId: string): Promise<MeshJob> {
     status: string;
     glb_url: string | null;
     error_msg: string | null;
+    error_type: string | null;
+    error_detail: string | null;
     source_image_url: string;
     provider_key: string;
     created_at: string;
+    updated_at?: string;
     asset_id: string | null;
+    failed_at?: string | null;
   }>(`/generate/mesh/${jobId}`);
   const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
   const glb_url = data.glb_url
@@ -72,10 +80,24 @@ export async function getMeshJobStatus(jobId: string): Promise<MeshJob> {
     status: data.status as MeshJobStatus,
     glb_url,
     error_msg: data.error_msg,
+    error_type: data.error_type,
+    error_detail: data.error_detail,
     source_image_url: data.source_image_url,
     provider_key: data.provider_key,
     created_at: data.created_at,
+    updated_at: data.updated_at,
     asset_id: data.asset_id ? String(data.asset_id) : null,
+    failed_at: data.failed_at,
+  };
+}
+
+export async function retryMeshJob(jobId: string): Promise<{ job_id: string; status: string }> {
+  const { data } = await apiClient.post<{ job_id: string; status: string }>(
+    `/generate/mesh/retry/${jobId}`
+  );
+  return {
+    job_id: String(data.job_id),
+    status: data.status,
   };
 }
 

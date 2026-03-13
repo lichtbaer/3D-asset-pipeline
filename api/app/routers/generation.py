@@ -125,7 +125,14 @@ async def _persist_job_completion(job_id: str) -> None:
             )
 
 
-async def _update_job(job_id: str, status: str, result_url: str | None, error_msg: str | None) -> None:
+async def _update_job(
+    job_id: str,
+    status: str,
+    result_url: str | None,
+    error_msg: str | None = None,
+    error_type: str | None = None,
+    error_detail: str | None = None,
+) -> None:
     async with async_session_factory() as session:
         result = await session.execute(
             select(GenerationJob).where(GenerationJob.id == UUID(job_id))
@@ -138,13 +145,22 @@ async def _update_job(job_id: str, status: str, result_url: str | None, error_ms
                 job.result_url = result_url
             if error_msg is not None:
                 job.error_msg = error_msg
+            if error_type is not None:
+                job.error_type = error_type
+            if error_detail is not None:
+                job.error_detail = error_detail
             await session.commit()
     if status == "done":
         await _persist_job_completion(job_id)
 
 
 async def _update_mesh_job(
-    job_id: str, status: str, glb_file_path: str | None, error_msg: str | None
+    job_id: str,
+    status: str,
+    glb_file_path: str | None,
+    error_msg: str | None = None,
+    error_type: str | None = None,
+    error_detail: str | None = None,
 ) -> None:
     async with async_session_factory() as session:
         result = await session.execute(
@@ -158,6 +174,10 @@ async def _update_mesh_job(
                 job.glb_file_path = glb_file_path
             if error_msg is not None:
                 job.error_msg = error_msg
+            if error_type is not None:
+                job.error_type = error_type
+            if error_detail is not None:
+                job.error_detail = error_detail
             await session.commit()
     if status == "done":
         await _persist_job_completion(job_id)
@@ -179,7 +199,12 @@ async def _update_mesh_job_bgremoval(
 
 
 async def _update_bgremoval_job(
-    job_id: str, status: str, result_url: str | None, error_msg: str | None
+    job_id: str,
+    status: str,
+    result_url: str | None,
+    error_msg: str | None = None,
+    error_type: str | None = None,
+    error_detail: str | None = None,
 ) -> None:
     async with async_session_factory() as session:
         result = await session.execute(
@@ -194,6 +219,10 @@ async def _update_bgremoval_job(
                 job.bgremoval_result_url = result_url
             if error_msg is not None:
                 job.error_msg = error_msg
+            if error_type is not None:
+                job.error_type = error_type
+            if error_detail is not None:
+                job.error_detail = error_detail
             await session.commit()
     if status == "done":
         await _persist_job_completion(job_id)
@@ -277,14 +306,21 @@ async def get_image_job_status(
     if not job:
         raise HTTPException(404, detail="Job nicht gefunden")
 
+    provider_key = job.provider_key or job.model_key or ""
     return ImageJobStatusResponse(
         job_id=job.id,
         status=job.status,
         result_url=job.result_url,
         error_msg=job.error_msg,
-        model_key=job.provider_key or job.model_key or "",
+        error_type=job.error_type,
+        error_detail=job.error_detail,
+        provider_key=provider_key,
+        model_key=provider_key,
         created_at=job.created_at,
+        updated_at=job.updated_at,
         asset_id=job.asset_id,
+        prompt=job.prompt,
+        failed_at=job.updated_at if job.status == "failed" else None,
     )
 
 
@@ -361,6 +397,52 @@ async def create_bgremoval(
     return BgRemovalGenerateResponse(job_id=job.id, status="pending")
 
 
+@router.post("/image/retry/{job_id}", response_model=ImageGenerateResponse, status_code=202)
+async def retry_image_job(
+    job_id: UUID,
+    background_tasks: BackgroundTasks,
+    response: Response,
+    session: AsyncSession = Depends(get_session),
+):
+    """Erstellt neuen Job mit gleichen Parametern wie fehlgeschlagener Job."""
+    result = await session.execute(
+        select(GenerationJob).where(
+            GenerationJob.id == job_id,
+            GenerationJob.job_type == "image",
+        )
+    )
+    job = result.scalar_one_or_none()
+    if not job:
+        raise HTTPException(404, detail="Job nicht gefunden")
+    if job.status != "failed":
+        raise HTTPException(400, detail="Nur fehlgeschlagene Jobs können erneut versucht werden")
+
+    provider_key = job.provider_key or job.model_key or ""
+    params = {"width": 1024, "height": 1024, "count": 1}
+
+    new_job = GenerationJob(
+        job_type="image",
+        status="pending",
+        prompt=job.prompt,
+        provider_key=provider_key,
+        asset_id=job.asset_id,
+    )
+    session.add(new_job)
+    await session.commit()
+    await session.refresh(new_job)
+
+    background_tasks.add_task(
+        run_image_generation,
+        str(new_job.id),
+        job.prompt,
+        provider_key,
+        params,
+        _update_job,
+    )
+
+    return ImageGenerateResponse(job_id=new_job.id, status="pending")
+
+
 @router.get("/bgremoval/{job_id}", response_model=BgRemovalJobStatusResponse)
 async def get_bgremoval_job_status(
     job_id: UUID,
@@ -376,16 +458,71 @@ async def get_bgremoval_job_status(
     if not job:
         raise HTTPException(404, detail="Job nicht gefunden")
 
+    provider_key = job.bgremoval_provider_key or job.provider_key or ""
     return BgRemovalJobStatusResponse(
         job_id=job.id,
         status=job.status,
         result_url=job.bgremoval_result_url or job.result_url,
         error_msg=job.error_msg,
+        error_type=job.error_type,
+        error_detail=job.error_detail,
         source_image_url=job.source_image_url or "",
-        provider_key=job.bgremoval_provider_key or job.provider_key or "",
+        provider_key=provider_key,
         created_at=job.created_at,
+        updated_at=job.updated_at,
+        asset_id=job.asset_id,
+        failed_at=job.updated_at if job.status == "failed" else None,
+    )
+
+
+@router.post("/bgremoval/retry/{job_id}", response_model=BgRemovalGenerateResponse, status_code=202)
+async def retry_bgremoval_job(
+    job_id: UUID,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),
+):
+    """Erstellt neuen Job mit gleichen Parametern wie fehlgeschlagener Job."""
+    result = await session.execute(
+        select(GenerationJob).where(
+            GenerationJob.id == job_id,
+            GenerationJob.job_type == "bgremoval",
+        )
+    )
+    job = result.scalar_one_or_none()
+    if not job:
+        raise HTTPException(404, detail="Job nicht gefunden")
+    if job.status != "failed":
+        raise HTTPException(400, detail="Nur fehlgeschlagene Jobs können erneut versucht werden")
+
+    source_image_url = job.source_image_url or ""
+    if not source_image_url:
+        raise HTTPException(400, detail="Quellbild-URL fehlt für Retry")
+
+    provider_key = job.bgremoval_provider_key or job.provider_key or ""
+
+    new_job = GenerationJob(
+        job_type="bgremoval",
+        status="pending",
+        prompt="[bgremoval]",
+        provider_key=provider_key,
+        source_image_url=source_image_url,
+        source_job_id=job.source_job_id,
+        bgremoval_provider_key=provider_key,
         asset_id=job.asset_id,
     )
+    session.add(new_job)
+    await session.commit()
+    await session.refresh(new_job)
+
+    background_tasks.add_task(
+        run_bgremoval,
+        str(new_job.id),
+        source_image_url,
+        provider_key,
+        _update_bgremoval_job,
+    )
+
+    return BgRemovalGenerateResponse(job_id=new_job.id, status="pending")
 
 
 @router.get("/mesh/providers", response_model=MeshProvidersResponse)
@@ -509,11 +646,66 @@ async def get_mesh_job_status(
         status=job.status,
         glb_url=glb_url,
         error_msg=job.error_msg,
+        error_type=job.error_type,
+        error_detail=job.error_detail,
         source_image_url=job.source_image_url or "",
         provider_key=provider_key,
         created_at=job.created_at,
+        updated_at=job.updated_at,
+        asset_id=job.asset_id,
+        failed_at=job.updated_at if job.status == "failed" else None,
+    )
+
+
+@router.post("/mesh/retry/{job_id}", response_model=MeshGenerateResponse, status_code=202)
+async def retry_mesh_job(
+    job_id: UUID,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),
+):
+    """Erstellt neuen Job mit gleichen Parametern wie fehlgeschlagener Job."""
+    result = await session.execute(
+        select(GenerationJob).where(
+            GenerationJob.id == job_id,
+            GenerationJob.job_type == "mesh",
+        )
+    )
+    job = result.scalar_one_or_none()
+    if not job:
+        raise HTTPException(404, detail="Job nicht gefunden")
+    if job.status != "failed":
+        raise HTTPException(400, detail="Nur fehlgeschlagene Jobs können erneut versucht werden")
+
+    source_image_url = job.source_image_url or ""
+    if not source_image_url:
+        raise HTTPException(400, detail="Quellbild-URL fehlt für Retry")
+
+    provider_key = job.provider_key or "hunyuan3d-2"
+    params = get_mesh_provider(provider_key).default_params()
+
+    new_job = GenerationJob(
+        job_type="mesh",
+        status="pending",
+        prompt="[mesh from image]",
+        provider_key=provider_key,
+        source_image_url=source_image_url,
+        source_job_id=job.source_job_id,
         asset_id=job.asset_id,
     )
+    session.add(new_job)
+    await session.commit()
+    await session.refresh(new_job)
+
+    background_tasks.add_task(
+        run_mesh_generation,
+        str(new_job.id),
+        source_image_url,
+        provider_key,
+        params,
+        _update_mesh_job,
+    )
+
+    return MeshGenerateResponse(job_id=new_job.id, status="pending")
 
 
 @router.get("/models", response_model=ModelsResponse)

@@ -8,17 +8,18 @@ import os
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Callable, Awaitable
+from typing import Awaitable, Callable
 
 import httpx
 
 from app.config.storage import MESH_STORAGE_PATH
+from app.logging_utils import log_job_error
 from app.services.mesh_providers import get_provider
 
 logger = logging.getLogger(__name__)
 
-# (job_id, status, glb_file_path, error_msg)
-UpdateMeshJobCallback = Callable[[str, str, str | None, str | None], Awaitable[None]]
+# (job_id, status, glb_file_path, error_msg, *, error_type, error_detail)
+UpdateMeshJobCallback = Callable[..., Awaitable[None]]
 
 # (job_id, bgremoval_provider_key, bgremoval_result_url)
 UpdateMeshJobBgRemovalCallback = Callable[
@@ -43,11 +44,22 @@ async def run_mesh_generation(
 
     hf_token = os.getenv("HF_TOKEN")
     if not hf_token:
+        err = "HF_TOKEN nicht konfiguriert"
+        log_job_error(
+            logger,
+            "Mesh-Generierung: HF_TOKEN fehlt",
+            job_id=job_id,
+            provider_key=provider_key,
+            error_type="ValueError",
+            error_detail=err,
+        )
         await update_job_callback(
             job_id,
             "failed",
             None,
-            "HF_TOKEN nicht konfiguriert",
+            err,
+            error_type="ValueError",
+            error_detail=err,
         )
         return
 
@@ -77,30 +89,75 @@ async def run_mesh_generation(
                 timeout=300,
             )
         except asyncio.TimeoutError:
+            err = "predict() timed out after 300s"
+            log_job_error(
+                logger,
+                "Mesh-Generierung Timeout",
+                job_id=job_id,
+                provider_key=provider_key,
+                error_type="ProviderTimeoutError",
+                error_detail=err,
+            )
             await update_job_callback(
                 job_id,
                 "failed",
                 None,
-                "Timeout nach 300s – Mesh-Generierung nicht abgeschlossen",
+                err,
+                error_type="ProviderTimeoutError",
+                error_detail=err,
             )
             return
         except ValueError as e:
-            await update_job_callback(job_id, "failed", None, str(e))
+            log_job_error(
+                logger,
+                "Mesh-Generierung: ungültige Parameter",
+                job_id=job_id,
+                provider_key=provider_key,
+                error_type="ValueError",
+                error_detail=str(e),
+            )
+            await update_job_callback(job_id, "failed", None, str(e), error_type="ValueError", error_detail=str(e))
             return
         except RuntimeError as e:
-            await update_job_callback(job_id, "failed", None, str(e))
+            log_job_error(
+                logger,
+                "Mesh-Generierung fehlgeschlagen",
+                job_id=job_id,
+                provider_key=provider_key,
+                error_type="RuntimeError",
+                error_detail=str(e),
+            )
+            await update_job_callback(job_id, "failed", None, str(e), error_type="RuntimeError", error_detail=str(e))
             return
         except Exception as e:
-            logger.exception("%s Fehler", provider.display_name)
-            await update_job_callback(job_id, "failed", None, str(e))
+            log_job_error(
+                logger,
+                f"{provider.display_name} Fehler",
+                job_id=job_id,
+                provider_key=provider_key,
+                error_type=type(e).__name__,
+                error_detail=str(e),
+            )
+            await update_job_callback(job_id, "failed", None, str(e), error_type=type(e).__name__, error_detail=str(e))
             return
 
         if not glb_path or not Path(glb_path).exists():
+            err = f"{provider.display_name} lieferte keine GLB-Datei"
+            log_job_error(
+                logger,
+                "Mesh-Generierung: ungültige Provider-Antwort",
+                job_id=job_id,
+                provider_key=provider_key,
+                error_type="ProviderInvalidResponseError",
+                error_detail=err,
+            )
             await update_job_callback(
                 job_id,
                 "failed",
                 None,
-                f"{provider.display_name} lieferte keine GLB-Datei",
+                err,
+                error_type="ProviderInvalidResponseError",
+                error_detail=err,
             )
             return
 
@@ -112,20 +169,39 @@ async def run_mesh_generation(
         await update_job_callback(job_id, "done", stored_path, None)
 
     except httpx.HTTPError as e:
-        logger.exception("Bild-Download fehlgeschlagen")
+        err = f"Bild-Download fehlgeschlagen: {str(e)}"
+        log_job_error(
+            logger,
+            "Mesh-Generierung: Bild-Download fehlgeschlagen",
+            job_id=job_id,
+            provider_key=provider_key,
+            error_type=type(e).__name__,
+            error_detail=err,
+        )
         await update_job_callback(
             job_id,
             "failed",
             None,
-            f"Bild-Download fehlgeschlagen: {str(e)}",
+            err,
+            error_type=type(e).__name__,
+            error_detail=err,
         )
     except Exception as e:
-        logger.exception("Unerwarteter Fehler bei Mesh-Generierung")
+        log_job_error(
+            logger,
+            "Unerwarteter Fehler bei Mesh-Generierung",
+            job_id=job_id,
+            provider_key=provider_key,
+            error_type=type(e).__name__,
+            error_detail=str(e),
+        )
         await update_job_callback(
             job_id,
             "failed",
             None,
             str(e),
+            error_type=type(e).__name__,
+            error_detail=str(e),
         )
     finally:
         if temp_image_path and os.path.exists(temp_image_path):
@@ -162,11 +238,26 @@ async def run_mesh_generation_with_auto_bgremoval(
             await update_bgremoval_callback(job_id, bgremoval_provider_key, result_url)
             image_url_for_mesh = result_url
         except (ValueError, RuntimeError) as e:
-            await update_job_callback(job_id, "failed", None, str(e))
+            log_job_error(
+                logger,
+                "Background-Removal vor Mesh fehlgeschlagen",
+                job_id=job_id,
+                provider_key=bgremoval_provider_key,
+                error_type=type(e).__name__,
+                error_detail=str(e),
+            )
+            await update_job_callback(job_id, "failed", None, str(e), error_type=type(e).__name__, error_detail=str(e))
             return
         except Exception as e:
-            logger.exception("Background-Removal vor Mesh fehlgeschlagen")
-            await update_job_callback(job_id, "failed", None, str(e))
+            log_job_error(
+                logger,
+                "Background-Removal vor Mesh fehlgeschlagen",
+                job_id=job_id,
+                provider_key=bgremoval_provider_key,
+                error_type=type(e).__name__,
+                error_detail=str(e),
+            )
+            await update_job_callback(job_id, "failed", None, str(e), error_type=type(e).__name__, error_detail=str(e))
             return
 
     await run_mesh_generation(

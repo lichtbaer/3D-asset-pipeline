@@ -1,14 +1,17 @@
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { getMeshJobStatus, type MeshJob } from "../../api/mesh.js";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { getMeshJobStatus, retryMeshJob, type MeshJob } from "../../api/mesh.js";
+import { JobErrorBlock } from "../generation/JobErrorBlock.js";
 
 export interface MeshJobStatusProps {
   jobId: string | null;
   onJobUpdate?: (job: MeshJob) => void;
+  onRetrySuccess?: (newJobId: string) => void;
 }
 
-export function MeshJobStatus({ jobId, onJobUpdate }: MeshJobStatusProps) {
+export function MeshJobStatus({ jobId, onJobUpdate, onRetrySuccess }: MeshJobStatusProps) {
+  const queryClient = useQueryClient();
   const { data, isLoading, error } = useQuery({
     queryKey: ["mesh-job", jobId],
     queryFn: () => getMeshJobStatus(jobId!),
@@ -17,6 +20,14 @@ export function MeshJobStatus({ jobId, onJobUpdate }: MeshJobStatusProps) {
       return status === "done" || status === "failed" ? false : 3000;
     },
     enabled: !!jobId,
+  });
+
+  const retryMutation = useMutation({
+    mutationFn: () => retryMeshJob(jobId!),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ["mesh-job", jobId] });
+      onRetrySuccess?.(res.job_id);
+    },
   });
 
   useEffect(() => {
@@ -53,7 +64,7 @@ export function MeshJobStatus({ jobId, onJobUpdate }: MeshJobStatusProps) {
     return null;
   }
 
-  const { status, glb_url, error_msg } = data;
+  const { status, glb_url } = data;
 
   if (status === "done" && glb_url) {
     return (
@@ -84,10 +95,14 @@ export function MeshJobStatus({ jobId, onJobUpdate }: MeshJobStatusProps) {
   if (status === "failed") {
     return (
       <div className="job-status job-status--failed">
-        <p className="job-status__label">Fehlgeschlagen</p>
-        <p className="job-status__error">
-          {error_msg ?? "Unbekannter Fehler bei der Generierung"}
-        </p>
+        <JobErrorBlock
+          errorType={data.error_type}
+          errorDetail={data.error_detail ?? data.error_msg}
+          providerKey={data.provider_key}
+          failedAt={data.failed_at}
+          onRetry={onRetrySuccess ? () => retryMutation.mutate() : undefined}
+          isRetrying={retryMutation.isPending}
+        />
       </div>
     );
   }

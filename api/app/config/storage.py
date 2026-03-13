@@ -17,3 +17,6 @@ BGREMOVAL_STORAGE_PATH = Path(
 ASSETS_STORAGE_PATH = Path(
     os.getenv("ASSETS_STORAGE_PATH", "/app/storage/assets")
 )
+
+# Logs: /app/storage/logs (rolling app.log)
+LOGS_PATH = Path(os.getenv("LOG_PATH", "/app/storage/logs"))
