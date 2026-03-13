@@ -213,26 +213,23 @@ export function AssetDetailModal({ assetId, onClose }: AssetDetailModalProps) {
                 → Freistellen
               </button>
             )}
-            {hasImage && imageUrl && !hasMesh && (
-              <button
-                type="button"
-                className="asset-modal__action-btn"
-                onClick={() => handleAction("mesh", imageUrl, data.asset_id)}
-              >
-                → Als Mesh-Input
-              </button>
-            )}
-            {hasBgremoval && bgremovalUrl && !hasMesh && (
-              <button
-                type="button"
-                className="asset-modal__action-btn"
-                onClick={() =>
-                  handleAction("mesh", bgremovalUrl, data.asset_id)
-                }
-              >
-                → Als Mesh-Input
-              </button>
-            )}
+            {(hasImage || hasBgremoval) &&
+              !hasMesh &&
+              (bgremovalUrl ?? imageUrl) && (
+                <button
+                  type="button"
+                  className="asset-modal__action-btn"
+                  onClick={() =>
+                    handleAction(
+                      "mesh",
+                      bgremovalUrl ?? imageUrl ?? "",
+                      data.asset_id
+                    )
+                  }
+                >
+                  → Als Mesh-Input
+                </button>
+              )}
             {hasImage && hasBgremoval && hasMesh && (
               <p className="asset-modal__all-done">
                 Alle Schritte vorhanden. Nutze die Download-Links oben.
