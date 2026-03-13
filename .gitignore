@@ -28,3 +28,7 @@ Thumbs.db
 
 # Alembic
 # (keep migrations in repo)
+
+# Generated mesh files (GLB)
+storage/meshes/*
+!storage/meshes/.gitkeep

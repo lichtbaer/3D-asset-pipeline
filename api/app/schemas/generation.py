@@ -28,3 +28,23 @@ class ImageJobStatusResponse(BaseModel):
 
 class ModelsResponse(BaseModel):
     models: list[str]
+
+
+class MeshGenerateRequest(BaseModel):
+    source_image_url: str = Field(..., min_length=1)
+    source_job_id: UUID | None = None
+    steps: int = Field(default=30, ge=1, le=50)
+
+
+class MeshGenerateResponse(BaseModel):
+    job_id: UUID
+    status: str
+
+
+class MeshJobStatusResponse(BaseModel):
+    job_id: UUID
+    status: str
+    glb_url: str | None = None
+    error_msg: str | None = None
+    source_image_url: str
+    created_at: datetime

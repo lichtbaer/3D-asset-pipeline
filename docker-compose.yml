@@ -23,9 +23,11 @@ services:
       - "8000:8000"
     volumes:
       - ./api:/app
+      - ./storage/meshes:/app/storage/meshes
     environment:
       - DATABASE_URL=postgresql+asyncpg://user:password@db:5432/purzel
       - PICSART_API_KEY=${PICSART_API_KEY:-}
+      - HF_TOKEN=${HF_TOKEN:-}
     depends_on:
       db:
         condition: service_healthy
