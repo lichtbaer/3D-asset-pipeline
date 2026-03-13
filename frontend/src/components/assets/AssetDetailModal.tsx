@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { getAsset, getAssetFileUrl } from "../../api/assets.js";
 import { usePipelineStore } from "../../store/PipelineStore.js";
+import { MeshViewer } from "../viewer/MeshViewer.js";
 
 function formatDate(iso: string): string {
   try {
@@ -100,6 +101,10 @@ export function AssetDetailModal({ assetId, onClose }: AssetDetailModalProps) {
   const bgremovalUrl = bgremovalFile
     ? getAssetFileUrl(data.asset_id, bgremovalFile)
     : null;
+  const meshUrl =
+    hasMesh && steps.mesh && "file" in steps.mesh
+      ? getAssetFileUrl(data.asset_id, String(steps.mesh.file))
+      : null;
 
   return (
     <div className="asset-modal" role="dialog" aria-modal="true">
@@ -161,23 +166,17 @@ export function AssetDetailModal({ assetId, onClose }: AssetDetailModalProps) {
                 </a>
               </div>
             )}
-            {hasMesh && steps.mesh && "file" in steps.mesh && (
+            {hasMesh && meshUrl && (
               <div className="asset-modal__preview-item">
-                <div className="asset-modal__mesh-placeholder">
-                  <span>3D-Mesh</span>
-                </div>
+                <MeshViewer glbUrl={meshUrl} height={450} />
                 <p className="asset-modal__preview-label">mesh.glb</p>
                 <a
-                  href={getAssetFileUrl(
-                    data.asset_id,
-                    String(steps.mesh.file)
-                  )}
+                  href={meshUrl}
                   download
                   className="asset-modal__download"
                 >
                   Download GLB
                 </a>
-                <p className="asset-modal__hint">3D-Viewer folgt</p>
               </div>
             )}
           </div>
