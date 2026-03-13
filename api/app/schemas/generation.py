@@ -67,6 +67,7 @@ class ImageJobStatusResponse(BaseModel):
     error_msg: str | None = None
     model_key: str
     created_at: datetime
+    asset_id: UUID | None = None
 
 
 class ModelsResponse(BaseModel):
@@ -124,6 +125,7 @@ class MeshJobStatusResponse(BaseModel):
     source_image_url: str
     provider_key: str  # NULL in DB → "hunyuan3d-2" (Rückwärtskompatibilität)
     created_at: datetime
+    asset_id: UUID | None = None
 
 
 # --- Background Removal ---
@@ -148,6 +150,7 @@ class BgRemovalJobStatusResponse(BaseModel):
     source_image_url: str
     provider_key: str
     created_at: datetime
+    asset_id: UUID | None = None
 
 
 class BgRemovalProviderInfo(BaseModel):

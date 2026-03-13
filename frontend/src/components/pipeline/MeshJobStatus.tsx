@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { getMeshJobStatus, type MeshJob } from "../../api/mesh.js";
 
@@ -68,6 +69,14 @@ export function MeshJobStatus({ jobId, onJobUpdate }: MeshJobStatusProps) {
         <p className="mesh-job-status__hint">
           Mesh-Generierung kann bis zu 5 Minuten dauern
         </p>
+        {data.asset_id && (
+          <Link
+            to={`/assets/${data.asset_id}`}
+            className="job-status__library-link"
+          >
+            → In Bibliothek ansehen
+          </Link>
+        )}
       </div>
     );
   }

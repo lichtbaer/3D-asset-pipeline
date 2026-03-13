@@ -124,6 +124,20 @@
   color: white;
 }
 
+.job-status__library-link,
+.job-history__library-link {
+  display: inline-block;
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.job-status__library-link:hover,
+.job-history__library-link:hover {
+  text-decoration: underline;
+}
+
 .mesh-form__auto-bgremoval {
   margin-top: 1rem;
   padding-top: 1rem;

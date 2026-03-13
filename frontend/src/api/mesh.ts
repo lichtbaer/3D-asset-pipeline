@@ -19,6 +19,7 @@ export interface MeshJob {
   source_image_url: string;
   provider_key: string;
   created_at: string;
+  asset_id: string | null;
 }
 
 export interface MeshProvider {
@@ -59,6 +60,7 @@ export async function getMeshJobStatus(jobId: string): Promise<MeshJob> {
     source_image_url: string;
     provider_key: string;
     created_at: string;
+    asset_id: string | null;
   }>(`/generate/mesh/${jobId}`);
   const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
   const glb_url = data.glb_url
@@ -72,6 +74,7 @@ export async function getMeshJobStatus(jobId: string): Promise<MeshJob> {
     source_image_url: data.source_image_url,
     provider_key: data.provider_key,
     created_at: data.created_at,
+    asset_id: data.asset_id ? String(data.asset_id) : null,
   };
 }
 

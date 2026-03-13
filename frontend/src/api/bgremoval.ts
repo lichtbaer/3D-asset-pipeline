@@ -20,6 +20,7 @@ export interface BgRemovalJob {
   source_image_url: string;
   provider_key: string;
   created_at: string;
+  asset_id: string | null;
 }
 
 export interface BgRemovalProvider {
@@ -63,6 +64,7 @@ export async function getBgRemovalJobStatus(
     source_image_url: string;
     provider_key: string;
     created_at: string;
+    asset_id: string | null;
   }>(`/generate/bgremoval/${jobId}`);
   const result_url = data.result_url
     ? data.result_url.startsWith("http")
@@ -77,6 +79,7 @@ export async function getBgRemovalJobStatus(
     source_image_url: data.source_image_url,
     provider_key: data.provider_key,
     created_at: data.created_at,
+    asset_id: data.asset_id ? String(data.asset_id) : null,
   };
 }
 

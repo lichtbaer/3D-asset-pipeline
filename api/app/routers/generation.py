@@ -1,3 +1,4 @@
+import re
 from datetime import datetime, timezone
 from uuid import UUID
 
@@ -37,8 +38,91 @@ from app.services.mesh_generation import (
 )
 from app.services.mesh_providers import MESH_PROVIDERS, get_provider as get_mesh_provider
 from app.services.picsart import run_image_generation
+from app.services import asset_service
 
 router = APIRouter(prefix="/generate", tags=["generation"])
+
+
+def _extract_asset_id_from_url(url: str) -> UUID | None:
+    """Extrahiert asset_id aus /assets/{asset_id}/files/... URL."""
+    m = re.search(r"/assets/([0-9a-fA-F-]{36})/files/", url)
+    if m:
+        try:
+            return UUID(m.group(1))
+        except ValueError:
+            pass
+    return None
+
+
+async def _persist_job_completion(job_id: str) -> None:
+    """Persistiert abgeschlossenen Job in Asset-Ordner."""
+    async with async_session_factory() as session:
+        result = await session.execute(
+            select(GenerationJob).where(GenerationJob.id == UUID(job_id))
+        )
+        job = result.scalar_one_or_none()
+        if not job or job.status != "done":
+            return
+
+        # Asset-ID ermitteln: job.asset_id, source_job_id oder aus source_image_url
+        asset_id_str: str | None = str(job.asset_id) if job.asset_id else None
+        if not asset_id_str and job.source_job_id:
+            src = await session.execute(
+                select(GenerationJob).where(GenerationJob.id == job.source_job_id)
+            )
+            src_job = src.scalar_one_or_none()
+            if src_job and src_job.asset_id:
+                asset_id_str = str(src_job.asset_id)
+        if not asset_id_str and job.source_image_url:
+            aid = _extract_asset_id_from_url(job.source_image_url)
+            if aid:
+                asset_id_str = str(aid)
+
+        asset_id = asset_service.get_or_create_asset_id(asset_id_str)
+
+        if job.asset_id != UUID(asset_id):
+            job.asset_id = UUID(asset_id)
+            await session.commit()
+
+        if job.job_type == "image" and job.result_url:
+            await asset_service.persist_image_job(
+                str(job.id),
+                asset_id,
+                job.provider_key,
+                job.prompt,
+                job.result_url,
+            )
+        elif job.job_type == "bgremoval" and (job.result_url or job.bgremoval_result_url):
+            url = job.bgremoval_result_url or job.result_url or ""
+            source_file = "image_original.png"
+            if job.source_image_url and "/assets/" in job.source_image_url:
+                # Quelle war Asset-Datei
+                pass  # source_file bleibt image_original.png
+            await asset_service.persist_bgremoval_job(
+                str(job.id),
+                asset_id,
+                job.provider_key or job.bgremoval_provider_key or "",
+                source_file,
+                url,
+            )
+        elif job.job_type == "mesh" and job.glb_file_path:
+            # Bei auto_bgremoval zuerst BgRemoval-Step persistieren
+            if job.bgremoval_result_url:
+                await asset_service.persist_bgremoval_job(
+                    str(job.id),
+                    asset_id,
+                    job.bgremoval_provider_key or "",
+                    "image_original.png",
+                    job.bgremoval_result_url,
+                )
+            source_file = "image_bgremoved.png" if job.bgremoval_result_url else "image_original.png"
+            await asset_service.persist_mesh_job(
+                str(job.id),
+                asset_id,
+                job.provider_key or "",
+                source_file,
+                job.glb_file_path,
+            )
 
 
 async def _update_job(job_id: str, status: str, result_url: str | None, error_msg: str | None) -> None:
@@ -55,6 +139,8 @@ async def _update_job(job_id: str, status: str, result_url: str | None, error_ms
             if error_msg is not None:
                 job.error_msg = error_msg
             await session.commit()
+    if status == "done":
+        await _persist_job_completion(job_id)
 
 
 async def _update_mesh_job(
@@ -73,6 +159,8 @@ async def _update_mesh_job(
             if error_msg is not None:
                 job.error_msg = error_msg
             await session.commit()
+    if status == "done":
+        await _persist_job_completion(job_id)
 
 
 async def _update_mesh_job_bgremoval(
@@ -107,6 +195,8 @@ async def _update_bgremoval_job(
             if error_msg is not None:
                 job.error_msg = error_msg
             await session.commit()
+    if status == "done":
+        await _persist_job_completion(job_id)
 
 
 @router.get("/image/providers", response_model=ImageProvidersResponse)
@@ -186,6 +276,7 @@ async def get_image_job_status(
         error_msg=job.error_msg,
         model_key=job.provider_key or job.model_key or "",
         created_at=job.created_at,
+        asset_id=job.asset_id,
     )
 
 
@@ -219,6 +310,19 @@ async def create_bgremoval(
             422, detail=f"Unbekannter provider_key: {body.provider_key}"
         )
 
+    asset_id: UUID | None = None
+    if body.source_job_id:
+        src = await session.execute(
+            select(GenerationJob).where(GenerationJob.id == body.source_job_id)
+        )
+        src_job = src.scalar_one_or_none()
+        if src_job and src_job.asset_id:
+            asset_id = src_job.asset_id
+    if asset_id is None:
+        aid = _extract_asset_id_from_url(body.source_image_url)
+        if aid:
+            asset_id = aid
+
     job = GenerationJob(
         job_type="bgremoval",
         status="pending",
@@ -227,6 +331,7 @@ async def create_bgremoval(
         source_image_url=body.source_image_url,
         source_job_id=body.source_job_id,
         bgremoval_provider_key=body.provider_key,
+        asset_id=asset_id,
     )
     session.add(job)
     await session.commit()
@@ -266,6 +371,7 @@ async def get_bgremoval_job_status(
         source_image_url=job.source_image_url or "",
         provider_key=job.bgremoval_provider_key or job.provider_key or "",
         created_at=job.created_at,
+        asset_id=job.asset_id,
     )
 
 
@@ -300,6 +406,19 @@ async def create_mesh_generation(
     if body.steps is not None and body.provider_key == "hunyuan3d-2":
         params.setdefault("steps", body.steps)
 
+    asset_id: UUID | None = None
+    if body.source_job_id:
+        src = await session.execute(
+            select(GenerationJob).where(GenerationJob.id == body.source_job_id)
+        )
+        src_job = src.scalar_one_or_none()
+        if src_job and src_job.asset_id:
+            asset_id = src_job.asset_id
+    if asset_id is None:
+        aid = _extract_asset_id_from_url(body.source_image_url)
+        if aid:
+            asset_id = aid
+
     job = GenerationJob(
         job_type="mesh",
         status="pending",
@@ -307,6 +426,7 @@ async def create_mesh_generation(
         provider_key=body.provider_key,
         source_image_url=body.source_image_url,
         source_job_id=body.source_job_id,
+        asset_id=asset_id,
     )
     session.add(job)
     await session.commit()
@@ -374,6 +494,7 @@ async def get_mesh_job_status(
         source_image_url=job.source_image_url or "",
         provider_key=provider_key,
         created_at=job.created_at,
+        asset_id=job.asset_id,
     )
 
 

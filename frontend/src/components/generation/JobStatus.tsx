@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { getJobStatus } from "../../api/generation.js";
 
@@ -63,6 +64,14 @@ export function JobStatus({ jobId, onJobUpdate }: JobStatusProps) {
           alt="Generiertes Bild"
           className="job-status__image"
         />
+        {data.asset_id && (
+          <Link
+            to={`/assets/${data.asset_id}`}
+            className="job-status__library-link"
+          >
+            → In Bibliothek ansehen
+          </Link>
+        )}
       </div>
     );
   }

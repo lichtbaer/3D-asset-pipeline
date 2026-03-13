@@ -66,6 +66,7 @@ function jobToHistoryEntry(job: GenerationJob, prompt: string): JobHistoryEntry 
     model_key: job.model_key,
     status: job.status,
     result_url: job.result_url,
+    asset_id: job.asset_id,
   };
 }
 
@@ -76,6 +77,7 @@ function meshJobToHistoryEntry(job: MeshJob): MeshJobHistoryEntry {
     provider_key: job.provider_key,
     status: job.status,
     glb_url: job.glb_url,
+    asset_id: job.asset_id,
   };
 }
 
@@ -120,6 +122,19 @@ export function PipelinePage() {
       setPendingBgRemovalImageUrl(null);
     }
   }, [pendingBgRemovalImageUrl, activeTab]);
+
+  // URL-Parameter: ?tab=mesh&source=URL oder ?tab=bgremoval&source=URL (z.B. aus Asset-Bibliothek)
+  useEffect(() => {
+    const source = searchParams.get("source");
+    const tab = searchParams.get("tab");
+    if (source && tab === "mesh") {
+      setMeshSourceImageUrl(source);
+      setActiveTab("mesh");
+    } else if (source && tab === "bgremoval") {
+      setBgRemovalSourceImageUrl(source);
+      setActiveTab("bgremoval");
+    }
+  }, [searchParams]);
 
   const handleUseForMesh = useCallback(
     (resultUrl: string) => {
@@ -284,6 +299,7 @@ export function PipelinePage() {
               ...entry,
               status: job.status,
               result_url: job.result_url,
+              asset_id: job.asset_id,
             }
           : entry
       )

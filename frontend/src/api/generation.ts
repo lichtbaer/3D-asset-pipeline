@@ -17,6 +17,7 @@ export interface GenerationJob {
   error_msg: string | null;
   model_key: string;
   created_at: string;
+  asset_id: string | null;
 }
 
 interface PostGenerateImageResponse {
@@ -49,6 +50,7 @@ export async function getJobStatus(jobId: string): Promise<GenerationJob> {
     error_msg: string | null;
     model_key: string;
     created_at: string;
+    asset_id: string | null;
   }>(`/generate/image/${jobId}`);
   return {
     job_id: String(data.job_id),
@@ -57,6 +59,7 @@ export async function getJobStatus(jobId: string): Promise<GenerationJob> {
     error_msg: data.error_msg,
     model_key: data.model_key,
     created_at: data.created_at,
+    asset_id: data.asset_id ? String(data.asset_id) : null,
   };
 }
 
