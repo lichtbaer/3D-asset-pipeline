@@ -12,6 +12,11 @@ import {
   getMeshProviders,
   type MeshJob,
 } from "../api/mesh.js";
+import {
+  postBgRemoval,
+  getBgRemovalProviders,
+  type BgRemovalJob,
+} from "../api/bgremoval.js";
 import { PromptForm } from "../components/generation/PromptForm.js";
 import { JobStatus } from "../components/generation/JobStatus.js";
 import {
@@ -24,10 +29,16 @@ import {
   MeshJobHistory,
   type MeshJobHistoryEntry,
 } from "../components/pipeline/MeshJobHistory.js";
+import { BgRemovalForm } from "../components/pipeline/BgRemovalForm.js";
+import { BgRemovalJobStatus } from "../components/pipeline/BgRemovalJobStatus.js";
+import {
+  BgRemovalJobHistory,
+  type BgRemovalJobHistoryEntry,
+} from "../components/pipeline/BgRemovalJobHistory.js";
 import "./ImageGenerationPage.css";
 import "./PipelinePage.css";
 
-type TabId = "image" | "mesh";
+type TabId = "image" | "bgremoval" | "mesh";
 
 function jobToHistoryEntry(job: GenerationJob, prompt: string): JobHistoryEntry {
   return {
@@ -53,12 +64,20 @@ export function PipelinePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
   const activeTab: TabId =
-    tabParam === "mesh" ? "mesh" : "image";
+    tabParam === "mesh"
+      ? "mesh"
+      : tabParam === "bgremoval"
+        ? "bgremoval"
+        : "image";
 
   const [pendingMeshImageUrl, setPendingMeshImageUrl] = useState<string | null>(
     null
   );
+  const [pendingBgRemovalImageUrl, setPendingBgRemovalImageUrl] = useState<
+    string | null
+  >(null);
   const [meshSourceImageUrl, setMeshSourceImageUrl] = useState("");
+  const [bgRemovalSourceImageUrl, setBgRemovalSourceImageUrl] = useState("");
 
   const setActiveTab = useCallback(
     (tab: TabId) => {
@@ -74,10 +93,25 @@ export function PipelinePage() {
     }
   }, [pendingMeshImageUrl, activeTab]);
 
+  useEffect(() => {
+    if (pendingBgRemovalImageUrl && activeTab === "bgremoval") {
+      setBgRemovalSourceImageUrl(pendingBgRemovalImageUrl);
+      setPendingBgRemovalImageUrl(null);
+    }
+  }, [pendingBgRemovalImageUrl, activeTab]);
+
   const handleUseForMesh = useCallback(
     (resultUrl: string) => {
       setPendingMeshImageUrl(resultUrl);
       setActiveTab("mesh");
+    },
+    [setActiveTab]
+  );
+
+  const handleUseForBgRemoval = useCallback(
+    (resultUrl: string) => {
+      setPendingBgRemovalImageUrl(resultUrl);
+      setActiveTab("bgremoval");
     },
     [setActiveTab]
   );
@@ -171,6 +205,59 @@ export function PipelinePage() {
     currentMeshJob?.status !== "done" &&
     currentMeshJob?.status !== "failed";
 
+  const [currentBgRemovalJobId, setCurrentBgRemovalJobId] = useState<
+    string | null
+  >(null);
+  const [bgRemovalJobHistory, setBgRemovalJobHistory] = useState<
+    BgRemovalJobHistoryEntry[]
+  >([]);
+
+  const { data: bgRemovalProvidersData, isLoading: bgRemovalProvidersLoading } =
+    useQuery({
+      queryKey: ["bgremoval-providers"],
+      queryFn: getBgRemovalProviders,
+    });
+  const bgRemovalProviders = bgRemovalProvidersData?.providers ?? [];
+
+  const bgRemovalCreateMutation = useMutation({
+    mutationFn: postBgRemoval,
+    onSuccess: (res, variables) => {
+      setCurrentBgRemovalJobId(res.job_id);
+      setBgRemovalJobHistory((prev) => [
+        {
+          job_id: res.job_id,
+          source_image_url: variables.source_image_url,
+          provider_key: variables.provider_key,
+          status: "pending",
+          result_url: null,
+        },
+        ...prev,
+      ]);
+    },
+  });
+
+  const handleBgRemovalJobUpdate = useCallback((job: BgRemovalJob) => {
+    setBgRemovalJobHistory((prev) =>
+      prev.map((entry) =>
+        entry.job_id === job.job_id
+          ? {
+              ...entry,
+              status: job.status,
+              result_url: job.result_url,
+            }
+          : entry
+      )
+    );
+  }, []);
+
+  const currentBgRemovalJob = bgRemovalJobHistory.find(
+    (j) => j.job_id === currentBgRemovalJobId
+  );
+  const isBgRemovalJobRunning =
+    !!currentBgRemovalJobId &&
+    currentBgRemovalJob?.status !== "done" &&
+    currentBgRemovalJob?.status !== "failed";
+
   const handleImageSubmit = (req: GenerateImageRequest) => {
     imageCreateMutation.mutate(req);
   };
@@ -179,8 +266,17 @@ export function PipelinePage() {
     source_image_url: string;
     provider_key: string;
     params: Record<string, unknown>;
+    auto_bgremoval?: boolean;
+    bgremoval_provider_key?: string;
   }) => {
     meshCreateMutation.mutate(req);
+  };
+
+  const handleBgRemovalSubmit = (req: {
+    source_image_url: string;
+    provider_key: string;
+  }) => {
+    bgRemovalCreateMutation.mutate(req);
   };
 
   return (
@@ -194,6 +290,15 @@ export function PipelinePage() {
           onClick={() => setActiveTab("image")}
         >
           Bildgenerierung
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "bgremoval"}
+          className={`pipeline-tabs__tab ${activeTab === "bgremoval" ? "pipeline-tabs__tab--active" : ""}`}
+          onClick={() => setActiveTab("bgremoval")}
+        >
+          Freistellung
         </button>
         <button
           type="button"
@@ -227,6 +332,36 @@ export function PipelinePage() {
             <JobHistory
               jobs={imageJobHistory}
               onUseForMesh={handleUseForMesh}
+              onUseForBgRemoval={handleUseForBgRemoval}
+            />
+          </section>
+        </div>
+      )}
+
+      {activeTab === "bgremoval" && (
+        <div className="pipeline-tab-content" role="tabpanel">
+          <h1>Freistellung</h1>
+          <section className="pipeline-page__form">
+            <BgRemovalForm
+              sourceImageUrl={bgRemovalSourceImageUrl}
+              onSourceImageUrlChange={setBgRemovalSourceImageUrl}
+              providers={bgRemovalProviders}
+              providersLoading={bgRemovalProvidersLoading}
+              onSubmit={handleBgRemovalSubmit}
+              disabled={isBgRemovalJobRunning}
+            />
+          </section>
+          <section className="pipeline-page__status">
+            <BgRemovalJobStatus
+              jobId={currentBgRemovalJobId}
+              onJobUpdate={handleBgRemovalJobUpdate}
+              onUseForMesh={handleUseForMesh}
+            />
+          </section>
+          <section className="pipeline-page__history">
+            <BgRemovalJobHistory
+              jobs={bgRemovalJobHistory}
+              onUseForMesh={handleUseForMesh}
             />
           </section>
         </div>
@@ -241,6 +376,8 @@ export function PipelinePage() {
               onSourceImageUrlChange={setMeshSourceImageUrl}
               providers={meshProviders}
               providersLoading={meshProvidersLoading}
+              bgRemovalProviders={bgRemovalProviders}
+              bgRemovalProvidersLoading={bgRemovalProvidersLoading}
               onSubmit={handleMeshSubmit}
               disabled={isMeshJobRunning}
             />

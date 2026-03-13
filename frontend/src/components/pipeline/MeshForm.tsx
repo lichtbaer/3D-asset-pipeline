@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import type { MeshProvider } from "../../api/mesh.js";
+import type { BgRemovalProvider } from "../../api/bgremoval.js";
 
 interface ParamSchemaProperty {
   type: string;
@@ -20,10 +21,14 @@ export interface MeshFormProps {
   onSourceImageUrlChange: (url: string) => void;
   providers: MeshProvider[];
   providersLoading: boolean;
+  bgRemovalProviders?: BgRemovalProvider[];
+  bgRemovalProvidersLoading?: boolean;
   onSubmit: (req: {
     source_image_url: string;
     provider_key: string;
     params: Record<string, unknown>;
+    auto_bgremoval?: boolean;
+    bgremoval_provider_key?: string;
   }) => void;
   disabled: boolean;
 }
@@ -76,14 +81,23 @@ export function MeshForm({
   onSourceImageUrlChange,
   providers,
   providersLoading,
+  bgRemovalProviders = [],
+  bgRemovalProvidersLoading = false,
   onSubmit,
   disabled,
 }: MeshFormProps) {
   const [providerKey, setProviderKey] = useState("");
   const [params, setParams] = useState<Record<string, unknown>>({});
+  const [autoBgRemoval, setAutoBgRemoval] = useState(false);
+  const [bgRemovalProviderKey, setBgRemovalProviderKey] = useState("");
 
   const selectedProvider = providers.find((p) => p.key === providerKey) ?? providers[0];
   const effectiveProviderKey = providerKey || (selectedProvider?.key ?? "");
+  const selectedBgRemovalProvider =
+    bgRemovalProviders.find((p) => p.key === bgRemovalProviderKey) ??
+    bgRemovalProviders[0];
+  const effectiveBgRemovalProviderKey =
+    bgRemovalProviderKey || (selectedBgRemovalProvider?.key ?? "");
 
   useEffect(() => {
     if (selectedProvider) {
@@ -101,11 +115,22 @@ export function MeshForm({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!sourceImageUrl.trim() || !effectiveProviderKey) return;
-    onSubmit({
+    const req: {
+      source_image_url: string;
+      provider_key: string;
+      params: Record<string, unknown>;
+      auto_bgremoval?: boolean;
+      bgremoval_provider_key?: string;
+    } = {
       source_image_url: sourceImageUrl.trim(),
       provider_key: effectiveProviderKey,
       params,
-    });
+    };
+    if (autoBgRemoval && effectiveBgRemovalProviderKey) {
+      req.auto_bgremoval = true;
+      req.bgremoval_provider_key = effectiveBgRemovalProviderKey;
+    }
+    onSubmit(req);
   };
 
   const paramSchema = selectedProvider?.param_schema as ParamSchema | undefined;
@@ -160,6 +185,40 @@ export function MeshForm({
 
       {Object.entries(properties).map(([key, schema]) =>
         renderParamField(key, schema, params[key], handleParamChange)
+      )}
+
+      {bgRemovalProviders.length > 0 && (
+        <div className="form-group mesh-form__auto-bgremoval">
+          <label className="mesh-form__checkbox-label">
+            <input
+              type="checkbox"
+              checked={autoBgRemoval}
+              onChange={(e) => setAutoBgRemoval(e.target.checked)}
+            />
+            Hintergrund vor Mesh-Generierung automatisch entfernen
+          </label>
+          {autoBgRemoval && (
+            <div className="mesh-form__bgremoval-provider">
+              <label htmlFor="mesh-bgremoval-provider">Provider:</label>
+              <select
+                id="mesh-bgremoval-provider"
+                value={effectiveBgRemovalProviderKey}
+                onChange={(e) => setBgRemovalProviderKey(e.target.value)}
+                disabled={bgRemovalProvidersLoading}
+              >
+                {bgRemovalProvidersLoading ? (
+                  <option value="">Lade Provider...</option>
+                ) : (
+                  bgRemovalProviders.map((p) => (
+                    <option key={p.key} value={p.key}>
+                      {p.display_name}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+          )}
+        </div>
       )}
 
       <button type="submit" disabled={disabled || !isValid || providersLoading}>

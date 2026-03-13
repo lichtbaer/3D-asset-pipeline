@@ -5,6 +5,8 @@ export interface MeshGenerationRequest {
   source_job_id?: string;
   provider_key: string;
   params: Record<string, unknown>;
+  auto_bgremoval?: boolean;
+  bgremoval_provider_key?: string;
 }
 
 export type MeshJobStatus = "pending" | "processing" | "done" | "failed";
