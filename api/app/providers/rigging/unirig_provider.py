@@ -14,7 +14,7 @@ from app.providers.rigging.base import BaseRiggingProvider, RiggingParams, Riggi
 
 logger = logging.getLogger(__name__)
 
-UNIRIG_SPACE = "vast-ai/UniRig"
+UNIRIG_SPACE = "MajorDaniel/UniRig"
 UNIRIG_TIMEOUT_SEC = 300
 
 
@@ -38,7 +38,7 @@ class UniRigProvider(BaseRiggingProvider):
         # UniRig erwartet typischerweise eine 3D-Datei (GLB/OBJ/FBX)
         result = self._client.predict(
             handle_file(glb_path),
-            api_name="/predict",
+            api_name="/main",
         )
         if result is None:
             return None
