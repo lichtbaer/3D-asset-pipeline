@@ -10,6 +10,7 @@ export interface MeshViewerProps {
   glbUrl: string;
   height?: number;
   className?: string;
+  autoRotate?: boolean;
 }
 
 function setWireframeRecursive(
@@ -34,6 +35,7 @@ export function MeshViewer({
   glbUrl,
   height = 500,
   className = "",
+  autoRotate: initialAutoRotate = false,
 }: MeshViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -53,7 +55,7 @@ export function MeshViewer({
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [autoRotate, setAutoRotate] = useState(false);
+  const [autoRotate, setAutoRotate] = useState(initialAutoRotate);
   const [wireframe, setWireframe] = useState(false);
   const [lightingMode, setLightingMode] = useState<LightingMode>("studio");
 
