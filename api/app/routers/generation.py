@@ -16,10 +16,14 @@ from app.schemas.generation import (
     MeshGenerateRequest,
     MeshGenerateResponse,
     MeshJobStatusResponse,
+    MeshProviderInfo,
+    MeshProvidersResponse,
     ModelsResponse,
 )
-from app.services.hunyuan3d import run_mesh_generation
-from app.services.image_providers import get_provider, list_providers
+<<<<<<< HEAD
+from app.services.image_providers import get_provider as get_image_provider, list_providers
+from app.services.mesh_generation import run_mesh_generation
+from app.services.mesh_providers import MESH_PROVIDERS, get_provider as get_mesh_provider
 from app.services.picsart import run_image_generation
 
 router = APIRouter(prefix="/generate", tags=["generation"])
@@ -86,7 +90,7 @@ async def create_image_generation(
     provider_key, params = body.resolve_provider_and_params()
 
     try:
-        get_provider(provider_key)
+        get_image_provider(provider_key)
     except ValueError:
         raise HTTPException(422, detail=f"Unbekannter provider_key: {provider_key}")
 
@@ -139,17 +143,42 @@ async def get_image_job_status(
     )
 
 
+@router.get("/mesh/providers", response_model=MeshProvidersResponse)
+async def list_mesh_providers():
+    """Listet alle verfügbaren Mesh-Provider mit Parametern und Schema."""
+    providers = [
+        MeshProviderInfo(
+            key=p.provider_key,
+            display_name=p.display_name,
+            default_params=p.default_params(),
+            param_schema=p.param_schema(),
+        )
+        for p in MESH_PROVIDERS.values()
+    ]
+    return MeshProvidersResponse(providers=providers)
+
+
 @router.post("/mesh", response_model=MeshGenerateResponse, status_code=202)
 async def create_mesh_generation(
     body: MeshGenerateRequest,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
 ):
+    try:
+        get_mesh_provider(body.provider_key)
+    except ValueError as e:
+        raise HTTPException(422, detail=str(e))
+
+    # Rückwärtskompatibilität: steps → params für hunyuan3d-2
+    params = dict(body.params)
+    if body.steps is not None and body.provider_key == "hunyuan3d-2":
+        params.setdefault("steps", body.steps)
+
     job = GenerationJob(
         job_type="mesh",
         status="pending",
         prompt="[mesh from image]",
-        provider_key="hunyuan3d-2",
+        provider_key=body.provider_key,
         source_image_url=body.source_image_url,
         source_job_id=body.source_job_id,
     )
@@ -161,7 +190,8 @@ async def create_mesh_generation(
         run_mesh_generation,
         str(job.id),
         body.source_image_url,
-        body.steps,
+        body.provider_key,
+        params,
         _update_mesh_job,
     )
 
@@ -187,12 +217,16 @@ async def get_mesh_job_status(
     if job.status == "done" and job.glb_file_path:
         glb_url = f"/static/meshes/{job.id}.glb"
 
+    # Rückwärtskompatibilität: provider_key NULL → "hunyuan3d-2"
+    provider_key = job.provider_key or "hunyuan3d-2"
+
     return MeshJobStatusResponse(
         job_id=job.id,
         status=job.status,
         glb_url=glb_url,
         error_msg=job.error_msg,
         source_image_url=job.source_image_url or "",
+        provider_key=provider_key,
         created_at=job.created_at,
     )
 

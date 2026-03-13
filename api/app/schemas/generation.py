@@ -91,7 +91,21 @@ class ImageProvidersResponse(BaseModel):
 class MeshGenerateRequest(BaseModel):
     source_image_url: str = Field(..., min_length=1)
     source_job_id: UUID | None = None
-    steps: int = Field(default=30, ge=1, le=50)
+    provider_key: str = "hunyuan3d-2"
+    params: dict = Field(default_factory=dict)
+    # Legacy: steps wird für hunyuan3d-2 in params übernommen
+    steps: int | None = Field(default=None, ge=1, le=50)
+
+
+class MeshProviderInfo(BaseModel):
+    key: str
+    display_name: str
+    default_params: dict
+    param_schema: dict
+
+
+class MeshProvidersResponse(BaseModel):
+    providers: list[MeshProviderInfo]
 
 
 class MeshGenerateResponse(BaseModel):
@@ -105,4 +119,5 @@ class MeshJobStatusResponse(BaseModel):
     glb_url: str | None = None
     error_msg: str | None = None
     source_image_url: str
+    provider_key: str  # NULL in DB → "hunyuan3d-2" (Rückwärtskompatibilität)
     created_at: datetime

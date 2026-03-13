@@ -1,5 +1,5 @@
 """
-Hunyuan3D-2 Mesh-Generierung via Hugging Face Space (gradio_client).
+Orchestrierung der Mesh-Generierung: Download, Provider-Aufruf, Speicherung.
 """
 import asyncio
 import logging
@@ -12,53 +12,29 @@ from typing import Callable, Awaitable
 import httpx
 
 from app.config.storage import MESH_STORAGE_PATH
+from app.services.mesh_providers import get_provider
 
 logger = logging.getLogger(__name__)
-
-HUNYUAN_SPACE = "tencent/Hunyuan3D-2"
-MESH_TIMEOUT_SEC = 300
-STORAGE_MESHES = MESH_STORAGE_PATH
 
 # (job_id, status, glb_file_path, error_msg)
 UpdateMeshJobCallback = Callable[[str, str, str | None, str | None], Awaitable[None]]
 
 
-def _run_hunyuan_predict(image_path: str, steps: int, hf_token: str) -> str | None:
-    """
-    Synchroner Aufruf von gradio_client (blockiert).
-    Gibt den Pfad zur GLB-Datei zurück oder None bei Fehler.
-    """
-    from gradio_client import Client, handle_file
-
-    client = Client(HUNYUAN_SPACE, hf_token=hf_token)
-    result = client.predict(
-        image=handle_file(image_path),
-        steps=steps,
-        api_name="/generation_all",
-    )
-    # /generation_all returns (file, file, output, mesh_stats, seed) — erste Datei ist GLB
-    if result is None:
-        return None
-    if isinstance(result, (list, tuple)):
-        for item in result:
-            if item and isinstance(item, str) and (item.endswith(".glb") or item.endswith(".obj")):
-                return item
-        if result and result[0]:
-            return str(result[0])
-        return None
-    return str(result) if result else None
-
-
 async def run_mesh_generation(
     job_id: str,
     source_image_url: str,
-    steps: int,
+    provider_key: str,
+    params: dict,
     update_job_callback: UpdateMeshJobCallback,
 ) -> None:
     """
-    Führt die 3D-Mesh-Generierung via Hunyuan3D-2 HF Space aus.
-    update_job_callback(job_id, status, glb_file_path=None, error_msg=None)
+    Führt die 3D-Mesh-Generierung über den konfigurierten Provider aus.
+    provider_key: z.B. "hunyuan3d-2", "triposr"
+    params: provider-spezifische Parameter (werden mit default_params gemerged)
     """
+    provider = get_provider(provider_key)
+    merged_params = {**provider.default_params(), **params}
+
     hf_token = os.getenv("HF_TOKEN")
     if not hf_token:
         await update_job_callback(
@@ -85,31 +61,32 @@ async def run_mesh_generation(
             temp_image_path = f.name
 
         # 2. Storage-Verzeichnis anlegen
-        STORAGE_MESHES.mkdir(parents=True, exist_ok=True)
-        target_glb = STORAGE_MESHES / f"{job_id}.glb"
+        MESH_STORAGE_PATH.mkdir(parents=True, exist_ok=True)
+        target_glb = MESH_STORAGE_PATH / f"{job_id}.glb"
 
-        # 3. gradio_client (sync) in Thread mit Timeout ausführen
+        # 3. Provider aufrufen (mit Timeout)
         try:
             glb_path = await asyncio.wait_for(
-                asyncio.to_thread(_run_hunyuan_predict, temp_image_path, steps, hf_token),
-                timeout=MESH_TIMEOUT_SEC,
+                provider.generate(temp_image_path, merged_params),
+                timeout=300,
             )
         except asyncio.TimeoutError:
             await update_job_callback(
                 job_id,
                 "failed",
                 None,
-                f"Timeout nach {MESH_TIMEOUT_SEC}s – Mesh-Generierung nicht abgeschlossen",
+                "Timeout nach 300s – Mesh-Generierung nicht abgeschlossen",
             )
             return
+        except ValueError as e:
+            await update_job_callback(job_id, "failed", None, str(e))
+            return
+        except RuntimeError as e:
+            await update_job_callback(job_id, "failed", None, str(e))
+            return
         except Exception as e:
-            logger.exception("Hunyuan3D-2 Fehler")
-            await update_job_callback(
-                job_id,
-                "failed",
-                None,
-                str(e),
-            )
+            logger.exception("%s Fehler", provider.display_name)
+            await update_job_callback(job_id, "failed", None, str(e))
             return
 
         if not glb_path or not Path(glb_path).exists():
@@ -117,7 +94,7 @@ async def run_mesh_generation(
                 job_id,
                 "failed",
                 None,
-                "Hunyuan3D-2 lieferte keine GLB-Datei",
+                f"{provider.display_name} lieferte keine GLB-Datei",
             )
             return
 
