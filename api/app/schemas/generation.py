@@ -179,3 +179,56 @@ class BgRemovalProviderInfo(BaseModel):
 
 class BgRemovalProvidersResponse(BaseModel):
     providers: list[BgRemovalProviderInfo]
+
+
+# --- Animation ---
+
+
+class AnimationGenerateRequest(BaseModel):
+    source_glb_url: str = Field(..., min_length=1)
+    motion_prompt: str = Field(..., min_length=1)
+    provider_key: str = "hy-motion"
+    params: dict = Field(default_factory=dict)
+    asset_id: str | None = None
+
+
+class AnimationGenerateResponse(BaseModel):
+    job_id: UUID
+    status: str
+
+
+class AnimationProviderInfo(BaseModel):
+    key: str
+    display_name: str
+    default_params: dict = Field(default_factory=dict)
+    param_schema: dict = Field(default_factory=dict)
+
+
+class AnimationPresetInfo(BaseModel):
+    key: str
+    label: str
+    motion_prompt: str
+
+
+class AnimationProvidersResponse(BaseModel):
+    providers: list[AnimationProviderInfo]
+
+
+class AnimationPresetsResponse(BaseModel):
+    presets: list[AnimationPresetInfo]
+
+
+class AnimationJobStatusResponse(BaseModel):
+    job_id: UUID
+    status: str
+    glb_url: str | None = None
+    error_msg: str | None = None
+    error_type: str | None = None
+    error_detail: str | None = None
+    source_glb_url: str
+    motion_prompt: str
+    provider_key: str
+    created_at: datetime
+    updated_at: datetime | None = None
+    asset_id: UUID | None = None
+    failed_at: datetime | None = None
