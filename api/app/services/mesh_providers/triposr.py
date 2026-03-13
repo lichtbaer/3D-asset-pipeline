@@ -47,7 +47,7 @@ class TripoSRProvider(MeshProvider):
         Synchroner Aufruf von gradio_client.
         Gibt den Pfad zur GLB-Datei zurück oder None bei Fehler.
         """
-        client = Client(TRIPOSR_SPACE, hf_token=hf_token)
+        client = Client(TRIPOSR_SPACE, token=hf_token)
         # TripoSR Space API: /predict mit image und mc_resolution
         result = client.predict(
             image=handle_file(image_path),

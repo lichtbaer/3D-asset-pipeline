@@ -43,7 +43,7 @@ class Hunyuan3DProvider(MeshProvider):
         Synchroner Aufruf von gradio_client (blockiert).
         Gibt den Pfad zur GLB-Datei zurück oder None bei Fehler.
         """
-        client = Client(HUNYUAN_SPACE, hf_token=hf_token)
+        client = Client(HUNYUAN_SPACE, token=hf_token)
         result = client.predict(
             image=handle_file(image_path),
             steps=steps,
