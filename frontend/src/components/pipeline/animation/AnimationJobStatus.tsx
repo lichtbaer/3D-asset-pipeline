@@ -100,7 +100,7 @@ export function AnimationJobStatus({
           {onTryDifferentPreset && (
             <button
               type="button"
-              className="job-history__use-mesh"
+              className="btn btn--outline btn--sm"
               onClick={onTryDifferentPreset}
             >
               → Nochmal mit anderem Preset

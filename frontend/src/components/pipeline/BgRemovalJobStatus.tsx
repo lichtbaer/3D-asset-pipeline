@@ -104,7 +104,7 @@ export function BgRemovalJobStatus({
         {onUseForMesh && (
           <button
             type="button"
-            className="job-history__use-mesh"
+            className="btn btn--outline btn--sm"
             onClick={() => onUseForMesh(result_url)}
           >
             → Als Mesh-Input verwenden

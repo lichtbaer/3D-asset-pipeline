@@ -138,7 +138,7 @@ export function MeshProcessingPanel({ assetId }: MeshProcessingPanelProps) {
             <button
               key={n}
               type="button"
-              className="mesh-processing__preset-btn"
+              className="btn btn--outline btn--sm"
               onClick={() => handleSimplifyPreset(n)}
               disabled={simplifyMutation.isPending}
             >
@@ -230,7 +230,7 @@ export function ProcessingResultsList({
                 </a>
                 <button
                   type="button"
-                  className="asset-modal__action-btn"
+                  className="btn btn--outline"
                   onClick={() => onUseForRigging(url, assetId)}
                 >
                   → Als Rigging-Input verwenden

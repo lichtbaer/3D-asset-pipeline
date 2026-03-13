@@ -1,16 +1,16 @@
 .main-nav {
   display: flex;
-  gap: 0.5rem;
-  padding: 1rem 2rem;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-xl);
   border-bottom: 1px solid var(--border);
   background: var(--bg);
 }
 
 .main-nav__link {
-  padding: 0.5rem 1rem;
+  padding: var(--space-sm) var(--space-md);
   color: var(--text);
   text-decoration: none;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   font-weight: 500;
 }
 

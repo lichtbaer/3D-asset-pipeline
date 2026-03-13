@@ -68,7 +68,7 @@ export function JobHistory({
                   {onUseForMesh && (
                     <button
                       type="button"
-                      className="job-history__use-mesh"
+                      className="btn btn--outline btn--sm"
                       onClick={() => onUseForMesh(job.result_url!)}
                     >
                       → Als Mesh-Input verwenden
@@ -77,7 +77,7 @@ export function JobHistory({
                   {onUseForBgRemoval && (
                     <button
                       type="button"
-                      className="job-history__use-mesh"
+                      className="btn btn--outline btn--sm"
                       onClick={() => onUseForBgRemoval(job.result_url!)}
                     >
                       → Freistellen

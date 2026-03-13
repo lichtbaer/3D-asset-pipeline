@@ -174,7 +174,7 @@ function CompareResultColumnContent({
               {onUseForMesh && (
                 <button
                   type="button"
-                  className="job-history__use-mesh"
+                  className="btn btn--outline btn--sm"
                   onClick={() => onUseForMesh(imageJobData.result_url!)}
                 >
                   → Weiter verwenden (Mesh)
@@ -183,7 +183,7 @@ function CompareResultColumnContent({
               {onUseForBgRemoval && (
                 <button
                   type="button"
-                  className="job-history__use-mesh"
+                  className="btn btn--outline btn--sm"
                   onClick={() => onUseForBgRemoval(imageJobData.result_url!)}
                 >
                   → Weiter verwenden (Freistellung)

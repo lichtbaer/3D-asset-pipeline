@@ -115,7 +115,7 @@ export function PromptForm({
         </div>
       </div>
 
-      <button type="submit" disabled={disabled || !isValid || modelsLoading}>
+      <button type="submit" className="btn btn--primary btn--lg" disabled={disabled || !isValid || modelsLoading}>
         Generieren
       </button>
     </form>

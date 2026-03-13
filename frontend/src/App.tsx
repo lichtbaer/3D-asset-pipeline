@@ -5,6 +5,7 @@ import { PipelinePage } from "./pages/PipelinePage";
 import { AssetLibrary } from "./pages/AssetLibrary";
 import { PipelineStoreProvider } from "./store/PipelineStore";
 import "./App.css";
+import "./styles/buttons.css";
 import "./pages/AssetLibrary.css";
 
 function App() {

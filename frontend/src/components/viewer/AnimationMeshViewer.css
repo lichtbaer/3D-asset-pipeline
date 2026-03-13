@@ -3,7 +3,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.5rem 0.75rem;
+  padding: var(--space-sm) 0.75rem;
   background: var(--bg);
   border-top: 1px solid var(--border);
 }
@@ -27,7 +27,7 @@
 .animation-mesh-viewer__time {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: var(--space-xs);
   flex: 1;
   min-width: 120px;
 }
@@ -38,7 +38,7 @@
 }
 
 .animation-mesh-viewer__time-label {
-  font-size: 0.75rem;
-  color: var(--text-muted, var(--text));
+  font-size: var(--font-size-xs);
+  color: var(--text);
   opacity: 0.9;
 }

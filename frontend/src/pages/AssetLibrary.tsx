@@ -78,7 +78,7 @@ function AssetCardActions({
         <>
           <button
             type="button"
-            className="asset-card__action-btn"
+            className="btn btn--outline btn--sm"
             onClick={(e) => {
               e.stopPropagation();
               onNavigate("rigging", asset.asset_id);
@@ -88,7 +88,7 @@ function AssetCardActions({
           </button>
           <button
             type="button"
-            className="asset-card__action-btn"
+            className="btn btn--outline btn--sm"
             onClick={(e) => {
               e.stopPropagation();
               onNavigate("mesh-processing", asset.asset_id);
@@ -102,7 +102,7 @@ function AssetCardActions({
         <>
           <button
             type="button"
-            className="asset-card__action-btn"
+            className="btn btn--outline btn--sm"
             onClick={(e) => {
               e.stopPropagation();
               onNavigate("animation", asset.asset_id);
@@ -112,7 +112,7 @@ function AssetCardActions({
           </button>
           <button
             type="button"
-            className="asset-card__action-btn"
+            className="btn btn--outline btn--sm"
             onClick={(e) => {
               e.stopPropagation();
               onNavigate("rigging", asset.asset_id);
