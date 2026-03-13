@@ -32,3 +32,11 @@ Thumbs.db
 # Generated mesh files (GLB)
 storage/meshes/*
 !storage/meshes/.gitkeep
+
+# BG-Removal outputs
+storage/bgremoval/*
+!storage/bgremoval/.gitkeep
+
+# rembg model cache
+storage/rembg_cache/*
+!storage/rembg_cache/.gitkeep

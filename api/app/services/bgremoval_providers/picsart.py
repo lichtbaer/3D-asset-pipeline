@@ -28,7 +28,9 @@ class PicsArtBgRemovalProvider(BgRemovalProvider):
     def param_schema(self) -> dict:
         return PARAM_SCHEMA.copy()
 
-    async def remove_background(self, image_url: str) -> str:
+    async def remove_background(
+        self, image_url: str, *, job_id: str | None = None
+    ) -> str:
         """
         Ruft die PicsArt Remove Background API auf.
 

@@ -156,7 +156,9 @@ async def run_mesh_generation_with_auto_bgremoval(
             from app.services.bgremoval_providers import get_provider as get_bgremoval_provider
 
             provider = get_bgremoval_provider(bgremoval_provider_key)
-            result_url = await provider.remove_background(source_image_url)
+            result_url = await provider.remove_background(
+                source_image_url, job_id=job_id
+            )
             await update_bgremoval_callback(job_id, bgremoval_provider_key, result_url)
             image_url_for_mesh = result_url
         except (ValueError, RuntimeError) as e:
