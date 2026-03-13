@@ -55,7 +55,7 @@ services:
       - api
     networks:
       - purzel-net
-    command: npm run dev -- --host 0.0.0.0
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
 
 volumes:
   purzel-db-data:
