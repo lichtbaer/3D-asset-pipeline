@@ -1022,40 +1022,6 @@ async def list_models():
     return ModelsResponse(models=[p.provider_key for p in list_providers()])
 
 
-# --- Animation (Stub für SMA-165 Backend) ---
-
-ANIMATION_PROVIDERS = [
-    AnimationProviderInfo(
-        key="hy-motion",
-        display_name="HY-Motion",
-        default_params={},
-        param_schema={},
-    ),
-]
-
-ANIMATION_PRESETS = [
-    MotionPresetSchema(key="walk", display_name="Gehen", prompt="Gehen"),
-    MotionPresetSchema(key="run", display_name="Laufen", prompt="Laufen"),
-    MotionPresetSchema(key="idle", display_name="Idle", prompt="Idle"),
-    MotionPresetSchema(key="jump", display_name="Springen", prompt="Springen"),
-    MotionPresetSchema(key="wave", display_name="Winken", prompt="Winken"),
-]
-
-
-@router.get("/animation/providers", response_model=AnimationProvidersResponse)
-async def list_animation_providers():
-    """Listet alle verfügbaren Animation-Provider."""
-    return AnimationProvidersResponse(providers=ANIMATION_PROVIDERS)
-
-
-@router.get(
-    "/animation/presets/{provider_key}",
-    response_model=AnimationPresetsResponse,
-)
-async def list_animation_presets(provider_key: str):
-    """Listet Presets für einen Animation-Provider."""
-    return AnimationPresetsResponse(presets=ANIMATION_PRESETS)
-
 
 @router.post(
     "/animation",
