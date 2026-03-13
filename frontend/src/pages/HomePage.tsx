@@ -7,6 +7,8 @@ export function HomePage() {
       <p>Placeholder-Startseite — bereit für PURZEL-002</p>
       <p>
         <Link to="/pipeline?tab=image">Zur Bildgenerierung</Link>
+        {" · "}
+        <Link to="/assets">Asset-Bibliothek</Link>
       </p>
     </main>
   );

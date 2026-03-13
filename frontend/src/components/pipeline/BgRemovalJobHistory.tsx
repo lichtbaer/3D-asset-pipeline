@@ -1,9 +1,12 @@
+import { Link } from "react-router-dom";
+
 export interface BgRemovalJobHistoryEntry {
   job_id: string;
   source_image_url: string;
   provider_key: string;
   status: string;
   result_url: string | null;
+  asset_id?: string | null;
 }
 
 export interface BgRemovalJobHistoryProps {
@@ -60,6 +63,14 @@ export function BgRemovalJobHistory({
                 >
                   → Als Mesh-Input verwenden
                 </button>
+              )}
+              {job.status === "done" && job.asset_id && (
+                <Link
+                  to={`/assets/${job.asset_id}`}
+                  className="job-history__library-link"
+                >
+                  → In Bibliothek ansehen
+                </Link>
               )}
             </div>
           </li>

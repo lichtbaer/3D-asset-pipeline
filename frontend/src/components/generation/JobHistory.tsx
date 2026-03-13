@@ -1,9 +1,12 @@
+import { Link } from "react-router-dom";
+
 export interface JobHistoryEntry {
   job_id: string;
   prompt: string;
   model_key: string;
   status: string;
   result_url: string | null;
+  asset_id?: string | null;
 }
 
 export interface JobHistoryProps {
@@ -79,6 +82,14 @@ export function JobHistory({
                     >
                       → Freistellen
                     </button>
+                  )}
+                  {job.asset_id && (
+                    <Link
+                      to={`/assets/${job.asset_id}`}
+                      className="job-history__library-link"
+                    >
+                      → In Bibliothek ansehen
+                    </Link>
                   )}
                 </>
               )}

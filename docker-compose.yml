@@ -25,6 +25,7 @@ services:
       - ./api:/app
       - ./storage/meshes:/app/storage/meshes
       - ./storage/bgremoval:/app/storage/bgremoval
+      - ./storage/assets:/app/storage/assets
       - ./storage/rembg_cache:/app/storage/rembg_cache
     environment:
       - DATABASE_URL=postgresql+asyncpg://user:password@db:5432/purzel

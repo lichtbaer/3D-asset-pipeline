@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   getBgRemovalJobStatus,
@@ -95,6 +96,14 @@ export function BgRemovalJobStatus({
           >
             → Als Mesh-Input verwenden
           </button>
+        )}
+        {data.asset_id && (
+          <Link
+            to={`/assets/${data.asset_id}`}
+            className="job-status__library-link"
+          >
+            → In Bibliothek ansehen
+          </Link>
         )}
       </div>
     );

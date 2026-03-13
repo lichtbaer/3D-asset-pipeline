@@ -29,6 +29,11 @@ class GenerationJob(Base):
         nullable=True,
     )
     glb_file_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Asset-Persistenz: UUID des Asset-Ordners (keine FK, nur Referenz)
+    asset_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=True,
+    )
     # Background-Removal-Spalten (für job_type=bgremoval oder mesh mit auto_bgremoval)
     bgremoval_provider_key: Mapped[str | None] = mapped_column(
         String(100), nullable=True

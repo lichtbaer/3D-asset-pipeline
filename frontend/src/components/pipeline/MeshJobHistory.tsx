@@ -1,9 +1,12 @@
+import { Link } from "react-router-dom";
+
 export interface MeshJobHistoryEntry {
   job_id: string;
   source_image_url: string;
   provider_key: string;
   status: string;
   glb_url: string | null;
+  asset_id?: string | null;
 }
 
 export interface MeshJobHistoryProps {
@@ -55,6 +58,14 @@ export function MeshJobHistory({ jobs }: MeshJobHistoryProps) {
                 >
                   GLB herunterladen
                 </a>
+              )}
+              {job.status === "done" && job.asset_id && (
+                <Link
+                  to={`/assets/${job.asset_id}`}
+                  className="job-history__library-link"
+                >
+                  → In Bibliothek ansehen
+                </Link>
               )}
             </div>
           </li>

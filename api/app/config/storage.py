@@ -12,3 +12,8 @@ MESH_STORAGE_PATH = Path(
 BGREMOVAL_STORAGE_PATH = Path(
     os.getenv("BGREMOVAL_STORAGE_PATH", "/app/storage/bgremoval")
 )
+
+# Asset-Persistenz: /app/storage/assets (Ordnerstruktur mit metadata.json)
+ASSETS_STORAGE_PATH = Path(
+    os.getenv("ASSETS_STORAGE_PATH", "/app/storage/assets")
+)
