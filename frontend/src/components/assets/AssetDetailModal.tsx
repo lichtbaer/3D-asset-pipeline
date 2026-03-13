@@ -40,7 +40,7 @@ export function AssetDetailModal({ assetId, onClose }: AssetDetailModalProps) {
   });
 
   const handleAction = (
-    tab: "bgremoval" | "mesh",
+    tab: "bgremoval" | "mesh" | "animation",
     sourceUrl: string,
     assetIdForJob: string
   ) => {
@@ -87,6 +87,10 @@ export function AssetDetailModal({ assetId, onClose }: AssetDetailModalProps) {
   const hasBgremoval =
     "bgremoval" in steps && steps.bgremoval && "file" in steps.bgremoval;
   const hasMesh = "mesh" in steps && steps.mesh && "file" in steps.mesh;
+  const hasRigging =
+    "rigging" in steps && steps.rigging && "file" in steps.rigging;
+  const hasAnimation =
+    "animation" in steps && steps.animation && "file" in steps.animation;
 
   const imageFile =
     hasImage && steps.image && "file" in steps.image
@@ -105,6 +109,13 @@ export function AssetDetailModal({ assetId, onClose }: AssetDetailModalProps) {
     hasMesh && steps.mesh && "file" in steps.mesh
       ? getAssetFileUrl(data.asset_id, String(steps.mesh.file))
       : null;
+  const animationFile =
+    hasAnimation && steps.animation && "file" in steps.animation
+      ? String(steps.animation.file)
+      : null;
+  const animationUrl = animationFile
+    ? getAssetFileUrl(data.asset_id, animationFile)
+    : null;
 
   return (
     <div className="asset-modal" role="dialog" aria-modal="true">
@@ -179,6 +190,18 @@ export function AssetDetailModal({ assetId, onClose }: AssetDetailModalProps) {
                 </a>
               </div>
             )}
+            {hasAnimation && animationUrl && (
+              <div className="asset-modal__preview-item">
+                <p className="asset-modal__preview-label">🎬 Animation</p>
+                <a
+                  href={animationUrl}
+                  download
+                  className="asset-modal__download"
+                >
+                  Download {animationFile ?? "Animation"}
+                </a>
+              </div>
+            )}
           </div>
         </section>
 
@@ -229,7 +252,40 @@ export function AssetDetailModal({ assetId, onClose }: AssetDetailModalProps) {
                   → Als Mesh-Input
                 </button>
               )}
-            {hasImage && hasBgremoval && hasMesh && (
+            {(hasRigging || hasMesh) && !hasAnimation && (
+              <button
+                type="button"
+                className="asset-modal__action-btn"
+                onClick={() => {
+                  const glbUrl =
+                    hasRigging && steps.rigging && "file" in steps.rigging
+                      ? getAssetFileUrl(
+                          data.asset_id,
+                          String(steps.rigging.file)
+                        )
+                      : meshUrl ?? "";
+                  if (glbUrl) {
+                    handleAction("animation", glbUrl, data.asset_id);
+                  }
+                }}
+                disabled={
+                  !meshUrl &&
+                  !(
+                    hasRigging &&
+                    steps.rigging &&
+                    "file" in steps.rigging
+                  )
+                }
+              >
+                → Animieren
+              </button>
+            )}
+            {hasImage && hasBgremoval && hasMesh && !hasAnimation && (
+              <p className="asset-modal__all-done">
+                Mesh vorhanden. Nutze „→ Animieren“ für Animation.
+              </p>
+            )}
+            {hasImage && hasBgremoval && hasMesh && hasAnimation && (
               <p className="asset-modal__all-done">
                 Alle Schritte vorhanden. Nutze die Download-Links oben.
               </p>

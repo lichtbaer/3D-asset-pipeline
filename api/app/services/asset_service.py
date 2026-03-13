@@ -280,6 +280,37 @@ async def persist_mesh_job(
     logger.info("Asset %s: mesh step persisted", asset_id)
 
 
+async def persist_animation_job(
+    job_id: str,
+    asset_id: str,
+    provider_key: str,
+    motion_prompt: str,
+    source_file: str,
+    animated_bytes: bytes,
+    filename: str = "mesh_animated.glb",
+) -> None:
+    """
+    Speichert Animation-Job-Output im Asset-Ordner.
+    filename: mesh_animated.glb oder mesh_animated.fbx (je nach Provider-Ausgabe).
+    """
+    step_data: dict[str, Any] = {
+        "job_id": job_id,
+        "provider_key": provider_key,
+        "motion_prompt": motion_prompt,
+        "source_file": source_file,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    update_step(
+        asset_id,
+        "animation",
+        step_data,
+        file_bytes=animated_bytes,
+        filename=filename,
+    )
+    logger.info("Asset %s: animation step persisted", asset_id)
+
+
 def get_or_create_asset_id(existing_asset_id: str | None) -> str:
     """Gibt existing_asset_id zurück oder erstellt neues Asset."""
     if existing_asset_id and get_asset(existing_asset_id):

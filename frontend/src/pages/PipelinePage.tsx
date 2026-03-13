@@ -18,6 +18,12 @@ import {
   type BgRemovalJob,
 } from "../api/bgremoval.js";
 import {
+  postGenerateAnimation,
+  getAnimationProviders,
+  getAnimationPresets,
+  type AnimationJob,
+} from "../api/animation.js";
+import {
   getImageProviders,
   type ImageProvider,
 } from "../api/generation.js";
@@ -52,11 +58,13 @@ import {
   CompareHistory,
   type CompareHistoryEntry,
 } from "../components/pipeline/CompareHistory.js";
+import { AnimationForm } from "../components/pipeline/AnimationForm.js";
+import { AnimationJobStatus } from "../components/pipeline/AnimationJobStatus.js";
 import { usePipelineStore } from "../store/PipelineStore.js";
 import "./ImageGenerationPage.css";
 import "./PipelinePage.css";
 
-type TabId = "image" | "bgremoval" | "mesh";
+type TabId = "image" | "bgremoval" | "mesh" | "animation";
 
 function jobToHistoryEntry(job: GenerationJob, prompt: string): JobHistoryEntry {
   return {
@@ -85,11 +93,13 @@ export function PipelinePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
   const activeTab: TabId =
-    tabParam === "mesh"
-      ? "mesh"
-      : tabParam === "bgremoval"
-        ? "bgremoval"
-        : "image";
+    tabParam === "animation"
+      ? "animation"
+      : tabParam === "mesh"
+        ? "mesh"
+        : tabParam === "bgremoval"
+          ? "bgremoval"
+          : "image";
 
   const [pendingMeshImageUrl, setPendingMeshImageUrl] = useState<string | null>(
     null
@@ -99,6 +109,7 @@ export function PipelinePage() {
   >(null);
   const [meshSourceImageUrl, setMeshSourceImageUrl] = useState("");
   const [bgRemovalSourceImageUrl, setBgRemovalSourceImageUrl] = useState("");
+  const [animationSourceGlbUrl, setAnimationSourceGlbUrl] = useState("");
 
   const setActiveTab = useCallback(
     (tab: TabId) => {
@@ -128,7 +139,7 @@ export function PipelinePage() {
     }
   }, [searchParams, setSearchParams]);
 
-  // URL-Parameter: ?tab=mesh&source=URL oder ?tab=bgremoval&source=URL (z.B. aus Asset-Bibliothek)
+  // URL-Parameter: ?tab=mesh&source=URL oder ?tab=bgremoval&source=URL oder ?tab=animation&source=URL
   useEffect(() => {
     const source = searchParams.get("source");
     const tab = searchParams.get("tab");
@@ -138,6 +149,9 @@ export function PipelinePage() {
     } else if (source && tab === "bgremoval") {
       setBgRemovalSourceImageUrl(source);
       setActiveTab("bgremoval");
+    } else if (source && tab === "animation") {
+      setAnimationSourceGlbUrl(source);
+      setActiveTab("animation");
     }
   }, [searchParams]);
 
@@ -364,6 +378,60 @@ export function PipelinePage() {
     currentBgRemovalJob?.status !== "done" &&
     currentBgRemovalJob?.status !== "failed";
 
+  const [currentAnimationJobId, setCurrentAnimationJobId] = useState<
+    string | null
+  >(null);
+  const { data: animationProvidersData, isLoading: animationProvidersLoading } =
+    useQuery({
+      queryKey: ["animation-providers"],
+      queryFn: getAnimationProviders,
+    });
+  const animationProviders = useMemo(
+    () => animationProvidersData?.providers ?? [],
+    [animationProvidersData?.providers]
+  );
+  const selectedAnimationProvider =
+    animationProviders[0]?.key ?? "hy-motion";
+  const { data: animationPresetsData, isLoading: animationPresetsLoading } =
+    useQuery({
+      queryKey: ["animation-presets", selectedAnimationProvider],
+      queryFn: () => getAnimationPresets(selectedAnimationProvider),
+      enabled: !!selectedAnimationProvider,
+    });
+  const animationPresets = useMemo(
+    () => animationPresetsData?.presets ?? [],
+    [animationPresetsData?.presets]
+  );
+
+  const animationCreateMutation = useMutation({
+    mutationFn: postGenerateAnimation,
+    onSuccess: (res, variables) => {
+      setCurrentAnimationJobId(res.job_id);
+    },
+  });
+
+  const handleAnimationJobUpdate = useCallback((_job: AnimationJob) => {
+    // Status wird über useQuery aktualisiert
+  }, []);
+
+  const handleAnimationSubmit = (req: {
+    source_glb_url: string;
+    provider_key: string;
+    motion_prompt: string;
+  }) => {
+    const payload: {
+      source_glb_url: string;
+      provider_key: string;
+      motion_prompt: string;
+      asset_id?: string;
+    } = { ...req };
+    if (activeAssetId) {
+      payload.asset_id = activeAssetId;
+      setActiveAssetId(null);
+    }
+    animationCreateMutation.mutate(payload);
+  };
+
   const handleImageSubmit = (req: GenerateImageRequest) => {
     imageCreateMutation.mutate(req);
   };
@@ -537,6 +605,15 @@ export function PipelinePage() {
         >
           Mesh-Generierung
         </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "animation"}
+          className={`pipeline-tabs__tab ${activeTab === "animation" ? "pipeline-tabs__tab--active" : ""}`}
+          onClick={() => setActiveTab("animation")}
+        >
+          Animation
+        </button>
       </nav>
 
       {activeTab === "image" && (
@@ -707,6 +784,30 @@ export function PipelinePage() {
             ) : (
               <CompareHistory entries={meshCompareHistory} />
             )}
+          </section>
+        </div>
+      )}
+
+      {activeTab === "animation" && (
+        <div className="pipeline-tab-content" role="tabpanel">
+          <h1>Animation</h1>
+          <section className="pipeline-page__form">
+            <AnimationForm
+              sourceGlbUrl={animationSourceGlbUrl}
+              onSourceGlbUrlChange={setAnimationSourceGlbUrl}
+              providers={animationProviders}
+              presets={animationPresets}
+              providersLoading={animationProvidersLoading}
+              presetsLoading={animationPresetsLoading}
+              onSubmit={handleAnimationSubmit}
+              disabled={animationCreateMutation.isPending}
+            />
+          </section>
+          <section className="pipeline-page__status">
+            <AnimationJobStatus
+              jobId={currentAnimationJobId}
+              onJobUpdate={handleAnimationJobUpdate}
+            />
           </section>
         </div>
       )}
