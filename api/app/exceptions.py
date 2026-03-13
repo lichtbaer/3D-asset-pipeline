@@ -26,3 +26,16 @@ class AssetStorageError(Exception):
     """Fehler beim Speichern oder Lesen von Assets im Filesystem."""
 
     pass
+
+
+class UniRigTimeoutError(ProviderTimeoutError):
+    """UniRig-Aufruf hat das Timeout überschritten."""
+
+    pass
+
+
+class UniRigInvalidMeshError(ProviderAPIError):
+    """Mesh ist nicht riggbar (z.B. ungültige Geometrie)."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(status_code=400, body=message)
