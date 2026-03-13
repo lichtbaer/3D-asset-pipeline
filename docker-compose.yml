@@ -24,10 +24,13 @@ services:
     volumes:
       - ./api:/app
       - ./storage/meshes:/app/storage/meshes
+      - ./storage/bgremoval:/app/storage/bgremoval
+      - ./storage/rembg_cache:/app/storage/rembg_cache
     environment:
       - DATABASE_URL=postgresql+asyncpg://user:password@db:5432/purzel
       - PICSART_API_KEY=${PICSART_API_KEY:-}
       - HF_TOKEN=${HF_TOKEN:-}
+      - U2NET_HOME=/app/storage/rembg_cache
     depends_on:
       db:
         condition: service_healthy

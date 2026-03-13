@@ -97,7 +97,7 @@ class MeshGenerateRequest(BaseModel):
     steps: int | None = Field(default=None, ge=1, le=50)
     # Optional: Background-Removal vor Mesh-Generierung
     auto_bgremoval: bool = False
-    bgremoval_provider_key: str = "picsart"
+    bgremoval_provider_key: str = "rembg-local"
 
 
 class MeshProviderInfo(BaseModel):
@@ -132,7 +132,7 @@ class MeshJobStatusResponse(BaseModel):
 class BgRemovalGenerateRequest(BaseModel):
     source_image_url: str = Field(..., min_length=1)
     source_job_id: UUID | None = None
-    provider_key: str = "picsart"
+    provider_key: str = "rembg-local"
 
 
 class BgRemovalGenerateResponse(BaseModel):

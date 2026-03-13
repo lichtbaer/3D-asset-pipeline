@@ -10,12 +10,15 @@ class BgRemovalProvider(ABC):
     display_name: str
 
     @abstractmethod
-    async def remove_background(self, image_url: str) -> str:
+    async def remove_background(
+        self, image_url: str, *, job_id: str | None = None
+    ) -> str:
         """
         Entfernt den Hintergrund eines Bildes.
 
         Args:
             image_url: URL des Quellbilds
+            job_id: Optional Job-ID für lokale Provider (Speicherpfad)
 
         Returns:
             URL des freigestellten Bilds

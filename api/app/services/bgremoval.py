@@ -32,7 +32,9 @@ async def run_bgremoval(
     await update_job_callback(job_id, "processing", None, None)
 
     try:
-        result_url = await provider.remove_background(source_image_url)
+        result_url = await provider.remove_background(
+            source_image_url, job_id=job_id
+        )
         await update_job_callback(job_id, "done", result_url, None)
     except RuntimeError as e:
         logger.warning("Background-Removal fehlgeschlagen: %s", e)

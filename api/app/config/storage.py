@@ -7,3 +7,8 @@ from pathlib import Path
 MESH_STORAGE_PATH = Path(
     os.getenv("MESH_STORAGE_PATH", "/app/storage/meshes")
 )
+
+# BG-Removal-Output-Speicher: /app/storage/bgremoval
+BGREMOVAL_STORAGE_PATH = Path(
+    os.getenv("BGREMOVAL_STORAGE_PATH", "/app/storage/bgremoval")
+)
