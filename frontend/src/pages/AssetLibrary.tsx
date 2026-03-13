@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { listAssets } from "../api/assets.js";
 import { AssetDetailModal } from "../components/assets/AssetDetailModal.js";
+import type { AssetListItem } from "../api/assets.js";
 
 function formatDate(iso: string): string {
   try {
@@ -57,7 +58,76 @@ function StepBadges({ steps }: { steps: Record<string, { file?: string }> }) {
   );
 }
 
+function AssetCardActions({
+  asset,
+  onNavigate,
+  onClick,
+}: {
+  asset: AssetListItem;
+  onNavigate: (tab: string, assetId: string) => void;
+  onClick: (e: React.MouseEvent) => void;
+}) {
+  const hasMesh = "mesh" in asset.steps && asset.steps.mesh?.file;
+  const hasRigging = "rigging" in asset.steps && asset.steps.rigging?.file;
+
+  if (!hasMesh && !hasRigging) return null;
+
+  return (
+    <div className="asset-card__actions" onClick={onClick}>
+      {hasMesh && (
+        <>
+          <button
+            type="button"
+            className="asset-card__action-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              onNavigate("rigging", asset.asset_id);
+            }}
+          >
+            → Riggen
+          </button>
+          <button
+            type="button"
+            className="asset-card__action-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              onNavigate("mesh-processing", asset.asset_id);
+            }}
+          >
+            → Mesh-Processing
+          </button>
+        </>
+      )}
+      {hasRigging && (
+        <>
+          <button
+            type="button"
+            className="asset-card__action-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              onNavigate("animation", asset.asset_id);
+            }}
+          >
+            → Animieren
+          </button>
+          <button
+            type="button"
+            className="asset-card__action-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              onNavigate("rigging", asset.asset_id);
+            }}
+          >
+            → Riggen (erneut)
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 export function AssetLibrary() {
+  const navigate = useNavigate();
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
 
   const { data: assets, isLoading, error } = useQuery({
@@ -67,6 +137,10 @@ export function AssetLibrary() {
 
   const baseUrl =
     import.meta.env.VITE_API_URL || "http://localhost:8000";
+
+  const handleNavigateToPipeline = (tab: string, assetId: string) => {
+    navigate(`/pipeline?tab=${tab}&assetId=${encodeURIComponent(assetId)}`);
+  };
 
   return (
     <main className="asset-library">
@@ -112,32 +186,38 @@ export function AssetLibrary() {
               ? `${baseUrl}${asset.thumbnail_url}`
               : null;
             return (
-              <button
-                key={asset.asset_id}
-                type="button"
-                className="asset-card"
-                onClick={() => setSelectedAssetId(asset.asset_id)}
-              >
-                <div className="asset-card__thumb">
-                  {thumbUrl ? (
-                    <img
-                      src={thumbUrl}
-                      alt=""
-                      className="asset-card__img"
-                    />
-                  ) : (
-                    <div className="asset-card__placeholder">
-                      <span>🧊</span>
-                    </div>
-                  )}
-                </div>
-                <div className="asset-card__meta">
-                  <p className="asset-card__date">
-                    {formatDate(asset.created_at)}
-                  </p>
-                  <StepBadges steps={asset.steps} />
-                </div>
-              </button>
+              <div key={asset.asset_id} className="asset-card-wrapper">
+                <button
+                  type="button"
+                  className="asset-card"
+                  onClick={() => setSelectedAssetId(asset.asset_id)}
+                >
+                  <div className="asset-card__thumb">
+                    {thumbUrl ? (
+                      <img
+                        src={thumbUrl}
+                        alt=""
+                        className="asset-card__img"
+                      />
+                    ) : (
+                      <div className="asset-card__placeholder">
+                        <span>🧊</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="asset-card__meta">
+                    <p className="asset-card__date">
+                      {formatDate(asset.created_at)}
+                    </p>
+                    <StepBadges steps={asset.steps} />
+                  </div>
+                </button>
+                <AssetCardActions
+                  asset={asset}
+                  onNavigate={handleNavigateToPipeline}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
             );
           })}
         </div>
