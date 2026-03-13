@@ -399,3 +399,10 @@
   color: var(--text);
   margin: 1rem 0;
 }
+
+.rigging-form__hint {
+  font-size: 0.8125rem;
+  color: var(--text);
+  margin-top: 0.5rem;
+  line-height: 1.4;
+}

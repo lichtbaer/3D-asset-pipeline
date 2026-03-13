@@ -95,6 +95,13 @@ export function RiggingForm({
             ))
           )}
         </select>
+        {effectiveProviderKey === "blender-rigify" && (
+          <p className="rigging-form__hint">
+            ⚡ Schnell · Kein GPU · Qualität mesh-abhängig
+            <br />
+            Tipp: Mesh vorher mit Open3D reparieren für bessere Ergebnisse
+          </p>
+        )}
       </div>
 
       <button type="submit" disabled={disabled || !isValid || providersLoading}>
