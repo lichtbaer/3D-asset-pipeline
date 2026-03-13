@@ -68,6 +68,21 @@ services:
       - purzel-net
     command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
 
+  # Blender 4.2 LTS headless – für Rigging-PoC (SMA-172)
+  # Leichtgewichtiges Image via Tarball (~400MB vs. blenderkit ~800MB)
+  blender:
+    build:
+      context: ./blender
+      dockerfile: Dockerfile
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
+    networks:
+      - purzel-net
+    # Kein dauerhafter Prozess – wird per `docker compose run blender ...` ausgeführt
+    profiles:
+      - tools
+
 volumes:
   purzel-db-data:
 
