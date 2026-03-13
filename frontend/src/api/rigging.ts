@@ -1,39 +1,46 @@
 import { apiClient } from "./client.js";
 
-export interface RiggingRequest {
+export interface RiggingGenerateRequest {
   source_glb_url: string;
   provider_key: string;
-  asset_id?: string;
+  asset_id?: string | null;
 }
 
-export type RiggingJobStatus = "pending" | "running" | "done" | "failed";
+export type RiggingJobStatus = "pending" | "processing" | "done" | "failed";
 
 export interface RiggingJob {
   job_id: string;
   status: RiggingJobStatus;
-  provider_key: string;
-  result_url: string | null;
+  glb_url: string | null;
+  error_msg: string | null;
   error_type: string | null;
   error_detail: string | null;
-  asset_id: string | null;
+  source_glb_url: string;
+  provider_key: string;
   created_at: string;
+  updated_at?: string;
+  asset_id: string | null;
+  failed_at?: string | null;
 }
 
 export interface RiggingProvider {
   key: string;
   display_name: string;
-  default_params?: Record<string, unknown>;
-  param_schema?: Record<string, unknown>;
+}
+
+interface PostRiggingResponse {
+  job_id: string;
+  status: string;
 }
 
 interface GetRiggingProvidersResponse {
   providers: RiggingProvider[];
 }
 
-export async function startRiggingJob(
-  req: RiggingRequest
-): Promise<{ job_id: string; status: string }> {
-  const { data } = await apiClient.post<{ job_id: string; status: string }>(
+export async function postRigging(
+  req: RiggingGenerateRequest
+): Promise<PostRiggingResponse> {
+  const { data } = await apiClient.post<PostRiggingResponse>(
     "/generate/rigging",
     req
   );
@@ -43,32 +50,42 @@ export async function startRiggingJob(
   };
 }
 
-export async function getRiggingJob(jobId: string): Promise<RiggingJob> {
-  const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
+export async function getRiggingJobStatus(
+  jobId: string
+): Promise<RiggingJob> {
   const { data } = await apiClient.get<{
     job_id: string;
     status: string;
-    provider_key: string;
-    result_url: string | null;
+    glb_url: string | null;
+    error_msg: string | null;
     error_type: string | null;
     error_detail: string | null;
-    asset_id: string | null;
+    source_glb_url: string;
+    provider_key: string;
     created_at: string;
+    updated_at?: string;
+    asset_id: string | null;
+    failed_at?: string | null;
   }>(`/generate/rigging/${jobId}`);
-  const result_url = data.result_url
-    ? data.result_url.startsWith("http")
-      ? data.result_url
-      : `${baseUrl}${data.result_url}`
+  const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
+  const glb_url = data.glb_url
+    ? data.glb_url.startsWith("http")
+      ? data.glb_url
+      : `${baseUrl}${data.glb_url}`
     : null;
   return {
     job_id: String(data.job_id),
     status: data.status as RiggingJobStatus,
+    glb_url,
+    error_msg: data.error_msg,
+    error_type: data.error_type,
+    error_detail: data.error_detail,
+    source_glb_url: data.source_glb_url,
     provider_key: data.provider_key,
-    result_url,
-    error_type: data.error_type ?? null,
-    error_detail: data.error_detail ?? null,
-    asset_id: data.asset_id ? String(data.asset_id) : null,
     created_at: data.created_at,
+    updated_at: data.updated_at,
+    asset_id: data.asset_id ? String(data.asset_id) : null,
+    failed_at: data.failed_at,
   };
 }
 

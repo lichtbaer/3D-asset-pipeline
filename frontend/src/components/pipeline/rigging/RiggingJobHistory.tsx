@@ -3,7 +3,7 @@ export interface RiggingJobHistoryEntry {
   source_glb_url: string;
   provider_key: string;
   status: string;
-  result_url: string | null;
+  glb_url: string | null;
   asset_id?: string | null;
   created_at?: string;
 }

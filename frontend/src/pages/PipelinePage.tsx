@@ -18,7 +18,7 @@ import {
   type BgRemovalJob,
 } from "../api/bgremoval.js";
 import {
-  startRiggingJob,
+  postRigging,
   getRiggingProviders,
   type RiggingJob,
 } from "../api/rigging.js";
@@ -413,7 +413,7 @@ export function PipelinePage() {
   );
 
   const riggingCreateMutation = useMutation({
-    mutationFn: startRiggingJob,
+    mutationFn: postRigging,
     onSuccess: (res, variables) => {
       setCurrentRiggingJobId(res.job_id);
       setRiggingJobHistory((prev) => [
@@ -422,8 +422,8 @@ export function PipelinePage() {
           source_glb_url: variables.source_glb_url,
           provider_key: variables.provider_key,
           status: "pending",
-          result_url: null,
-          asset_id: variables.asset_id,
+          glb_url: null,
+          asset_id: variables.asset_id ?? null,
           created_at: new Date().toISOString(),
         },
         ...prev,
@@ -438,7 +438,7 @@ export function PipelinePage() {
           ? {
               ...entry,
               status: job.status,
-              result_url: job.result_url,
+              glb_url: job.glb_url,
               created_at: job.created_at,
             }
           : entry
@@ -457,8 +457,8 @@ export function PipelinePage() {
         source_glb_url: failedJob?.source_glb_url ?? "",
         provider_key: failedJob?.provider_key ?? "",
         status: "pending",
-        result_url: null,
-        asset_id: failedJob?.asset_id,
+        glb_url: null,
+        asset_id: failedJob?.asset_id ?? null,
         created_at: new Date().toISOString(),
       },
       ...prev,
@@ -468,16 +468,18 @@ export function PipelinePage() {
   const handleRiggingSubmit = (req: {
     source_glb_url: string;
     provider_key: string;
-    asset_id?: string;
+    asset_id?: string | null;
   }) => {
     const payload: {
       source_glb_url: string;
       provider_key: string;
-      asset_id?: string;
+      asset_id?: string | null;
     } = { ...req };
     if (activeAssetId) {
       payload.asset_id = activeAssetId;
       setActiveAssetId(null);
+    } else if (req.asset_id) {
+      payload.asset_id = req.asset_id;
     }
     riggingCreateMutation.mutate(payload);
   };

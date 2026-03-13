@@ -107,13 +107,10 @@ export function AssetDetailModal({ assetId, onClose }: AssetDetailModalProps) {
     hasMesh && steps.mesh && "file" in steps.mesh
       ? getAssetFileUrl(data.asset_id, String(steps.mesh.file))
       : null;
-  const riggingFile =
+  const riggedUrl =
     hasRigging && steps.rigging && "file" in steps.rigging
-      ? String(steps.rigging.file)
+      ? getAssetFileUrl(data.asset_id, String(steps.rigging.file))
       : null;
-  const riggingUrl = riggingFile
-    ? getAssetFileUrl(data.asset_id, riggingFile)
-    : null;
 
   return (
     <div className="asset-modal" role="dialog" aria-modal="true">
@@ -188,16 +185,16 @@ export function AssetDetailModal({ assetId, onClose }: AssetDetailModalProps) {
                 </a>
               </div>
             )}
-            {hasRigging && riggingUrl && (
+            {hasRigging && riggedUrl && (
               <div className="asset-modal__preview-item">
-                <MeshViewer glbUrl={riggingUrl} height={450} />
-                <p className="asset-modal__preview-label">rigging.glb</p>
+                <MeshViewer glbUrl={riggedUrl} height={450} />
+                <p className="asset-modal__preview-label">mesh_rigged.glb</p>
                 <a
-                  href={riggingUrl}
+                  href={riggedUrl}
                   download
                   className="asset-modal__download"
                 >
-                  Download GLB
+                  Download rigged GLB
                 </a>
               </div>
             )}

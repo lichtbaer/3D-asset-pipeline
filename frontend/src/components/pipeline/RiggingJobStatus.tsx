@@ -1,30 +1,19 @@
 import { useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  getRiggingJobStatus,
-  retryRiggingJob,
-  type RiggingJob,
-} from "../../../api/rigging.js";
-import { JobErrorBlock } from "../../generation/JobErrorBlock.js";
-import { MeshViewer } from "../../viewer/MeshViewer.js";
-import { usePipelineStore } from "../../../store/PipelineStore.js";
+import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { getRiggingJobStatus, type RiggingJob } from "../../api/rigging.js";
+import { JobErrorBlock } from "../generation/JobErrorBlock.js";
+import { MeshViewer } from "../viewer/MeshViewer.js";
 
 export interface RiggingJobStatusProps {
   jobId: string | null;
   onJobUpdate?: (job: RiggingJob) => void;
-  onRetrySuccess?: (newJobId: string) => void;
 }
 
 export function RiggingJobStatus({
   jobId,
   onJobUpdate,
-  onRetrySuccess,
 }: RiggingJobStatusProps) {
-  const queryClient = useQueryClient();
-  const [, setSearchParams] = useSearchParams();
-  const { setPendingAnimationGlbUrl } = usePipelineStore();
-
   const { data, isLoading, error } = useQuery({
     queryKey: ["rigging-job", jobId],
     queryFn: () => getRiggingJobStatus(jobId!),
@@ -35,26 +24,11 @@ export function RiggingJobStatus({
     enabled: !!jobId,
   });
 
-  const retryMutation = useMutation({
-    mutationFn: () => retryRiggingJob(jobId!),
-    onSuccess: (res) => {
-      queryClient.invalidateQueries({ queryKey: ["rigging-job", jobId] });
-      onRetrySuccess?.(res.job_id);
-    },
-  });
-
   useEffect(() => {
     if (data) {
       onJobUpdate?.(data);
     }
   }, [data, onJobUpdate]);
-
-  const handleUseForAnimation = () => {
-    if (data?.glb_url) {
-      setPendingAnimationGlbUrl(data.glb_url);
-      setSearchParams({ tab: "animation" });
-    }
-  };
 
   if (!jobId) {
     return null;
@@ -89,24 +63,16 @@ export function RiggingJobStatus({
   if (status === "done" && glb_url) {
     return (
       <div className="job-status job-status--done">
-        <p className="job-status__label">Fertig!</p>
-        <MeshViewer glbUrl={glb_url} height={400} />
-        <div className="compare-results__actions">
-          <button
-            type="button"
-            className="job-history__use-mesh"
-            onClick={handleUseForAnimation}
+        <p className="job-status__label">Rigging fertig!</p>
+        <MeshViewer glbUrl={glb_url} height={350} />
+        {data.asset_id && (
+          <Link
+            to={`/assets/${data.asset_id}`}
+            className="job-status__library-link"
           >
-            → Animieren
-          </button>
-          <a
-            href={glb_url}
-            download
-            className="job-status__download"
-          >
-            Download GLB
-          </a>
-        </div>
+            → In Bibliothek ansehen
+          </Link>
+        )}
       </div>
     );
   }
@@ -119,8 +85,6 @@ export function RiggingJobStatus({
           errorDetail={data.error_detail ?? data.error_msg}
           providerKey={data.provider_key}
           failedAt={data.failed_at}
-          onRetry={onRetrySuccess ? () => retryMutation.mutate() : undefined}
-          isRetrying={retryMutation.isPending}
         />
       </div>
     );
@@ -132,7 +96,7 @@ export function RiggingJobStatus({
       <p>
         {status === "pending"
           ? "Wartet auf Verarbeitung..."
-          : "UniRig analysiert Mesh..."}
+          : "Wird geriggt..."}
       </p>
     </div>
   );
