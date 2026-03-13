@@ -30,14 +30,14 @@ def _get_script_path() -> Path:
     global _SCRIPT_PATH
     if _SCRIPT_PATH is not None:
         return _SCRIPT_PATH
-    # Im Container: /app mit Volume scripts -> /app/scripts/
-    # Lokal: scripts/ ist Sibling von api/ (Projektroot/scripts/)
+    # Im Container: /app/scripts (COPY . . oder Volume ./scripts:/app/scripts)
+    # api_dir = .../api (enthält app/, scripts/)
     api_dir = Path(__file__).resolve().parent.parent.parent  # .../api/app/providers/rigging -> api
     project_root = api_dir.parent  # Sibling von api
     candidates = [
-        Path("/app/scripts") / SCRIPT_NAME,  # Docker mit Volume ./scripts:/app/scripts
-        project_root / "scripts" / SCRIPT_NAME,
-        api_dir / "scripts" / SCRIPT_NAME,
+        Path("/app/scripts") / SCRIPT_NAME,  # Docker
+        api_dir / "scripts" / SCRIPT_NAME,  # api/scripts (im Build enthalten)
+        project_root / "scripts" / SCRIPT_NAME,  # Projektroot/scripts
     ]
     for candidate in candidates:
         if candidate.exists():

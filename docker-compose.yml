@@ -31,7 +31,6 @@ services:
     #           capabilities: [gpu]
     volumes:
       - ./api:/app
-      - ./scripts:/app/scripts
       - ./storage/meshes:/app/storage/meshes
       - ./storage/bgremoval:/app/storage/bgremoval
       - ./storage/assets:/app/storage/assets
