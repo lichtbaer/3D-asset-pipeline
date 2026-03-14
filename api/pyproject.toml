@@ -8,7 +8,6 @@ omit = [
     "app/routers/generation.py",
     "app/routers/sketchfab.py",
     "app/routers/storage.py",
-    "app/services/storage_service.py",
     "app/services/mesh_generation.py",
     "app/services/animation_generation.py",
     "app/services/rigging_generation.py",
