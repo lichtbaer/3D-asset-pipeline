@@ -19,7 +19,7 @@ from app.config.storage import (
     IMAGE_STORAGE_PATH,
     MESH_STORAGE_PATH,
 )
-from app.routers import assets
+from app.routers import assets, sketchfab
 
 MESH_STORAGE_PATH.mkdir(parents=True, exist_ok=True)
 BGREMOVAL_STORAGE_PATH.mkdir(parents=True, exist_ok=True)
@@ -30,6 +30,7 @@ IMAGE_STORAGE_PATH.mkdir(parents=True, exist_ok=True)
 app = FastAPI(title="Purzel ML Asset Pipeline API")
 app.include_router(generation.router)
 app.include_router(assets.router)
+app.include_router(sketchfab.router)
 app.mount("/static/meshes", StaticFiles(directory=str(MESH_STORAGE_PATH)), name="meshes")
 app.mount(
     "/static/bgremoval",

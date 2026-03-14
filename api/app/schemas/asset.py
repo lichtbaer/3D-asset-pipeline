@@ -24,6 +24,16 @@ class AssetListItem(BaseModel):
     thumbnail_url: str | None = None  # Erste Bild-URL falls vorhanden
 
 
+class SketchfabUploadInfo(BaseModel):
+    """Sketchfab-Upload-Metadaten in Asset."""
+
+    uid: str
+    url: str
+    embed_url: str = ""
+    uploaded_at: str
+    is_private: bool = False
+
+
 class AssetDetailResponse(BaseModel):
     """Vollständige metadata.json für GET /assets/{asset_id}."""
 
@@ -35,6 +45,12 @@ class AssetDetailResponse(BaseModel):
         default_factory=list,
         description="Mesh-Processing-Einträge (simplify, repair)",
     )
+    sketchfab_upload: SketchfabUploadInfo | None = None
+    source: str | None = None
+    sketchfab_uid: str | None = None
+    sketchfab_url: str | None = None
+    sketchfab_author: str | None = None
+    downloaded_at: str | None = None
     exports: list[dict] = Field(
         default_factory=list,
         description="Export-Einträge (STL, OBJ, PLY, GLTF)",

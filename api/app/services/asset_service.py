@@ -37,6 +37,12 @@ class AssetMetadata:
         updated_at: str,
         steps: dict[str, dict[str, Any]],
         processing: list[dict[str, Any]] | None = None,
+        sketchfab_upload: dict[str, Any] | None = None,
+        source: str | None = None,
+        sketchfab_uid: str | None = None,
+        sketchfab_url: str | None = None,
+        sketchfab_author: str | None = None,
+        downloaded_at: str | None = None,
         exports: list[dict[str, Any]] | None = None,
     ):
         self.asset_id = asset_id
@@ -44,10 +50,16 @@ class AssetMetadata:
         self.updated_at = updated_at
         self.steps = steps
         self.processing = processing or []
+        self.sketchfab_upload = sketchfab_upload
+        self.source = source
+        self.sketchfab_uid = sketchfab_uid
+        self.sketchfab_url = sketchfab_url
+        self.sketchfab_author = sketchfab_author
+        self.downloaded_at = downloaded_at
         self.exports = exports or []
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        out: dict[str, Any] = {
             "asset_id": self.asset_id,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
@@ -55,6 +67,19 @@ class AssetMetadata:
             "processing": self.processing,
             "exports": self.exports,
         }
+        if self.sketchfab_upload is not None:
+            out["sketchfab_upload"] = self.sketchfab_upload
+        if self.source is not None:
+            out["source"] = self.source
+        if self.sketchfab_uid is not None:
+            out["sketchfab_uid"] = self.sketchfab_uid
+        if self.sketchfab_url is not None:
+            out["sketchfab_url"] = self.sketchfab_url
+        if self.sketchfab_author is not None:
+            out["sketchfab_author"] = self.sketchfab_author
+        if self.downloaded_at is not None:
+            out["downloaded_at"] = self.downloaded_at
+        return out
 
 
 def _asset_dir(asset_id: str) -> Path:
@@ -130,6 +155,12 @@ def get_asset(asset_id: str) -> AssetMetadata | None:
         updated_at=data["updated_at"],
         steps=data.get("steps", {}),
         processing=data.get("processing", []),
+        sketchfab_upload=data.get("sketchfab_upload"),
+        source=data.get("source"),
+        sketchfab_uid=data.get("sketchfab_uid"),
+        sketchfab_url=data.get("sketchfab_url"),
+        sketchfab_author=data.get("sketchfab_author"),
+        downloaded_at=data.get("downloaded_at"),
         exports=data.get("exports", []),
     )
 
@@ -194,6 +225,17 @@ def append_processing_entry(asset_id: str, entry: dict[str, Any]) -> None:
     if "processing" not in meta:
         meta["processing"] = []
     meta["processing"].append(entry)
+    meta["updated_at"] = datetime.now(timezone.utc).isoformat()
+    meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+
+
+def update_metadata_fields(asset_id: str, fields: dict[str, Any]) -> None:
+    """Aktualisiert Top-Level-Felder in metadata.json (z.B. sketchfab_upload, source)."""
+    meta_path = _metadata_path(asset_id)
+    if not meta_path.exists():
+        raise FileNotFoundError(f"Asset {asset_id} existiert nicht")
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    meta.update(fields)
     meta["updated_at"] = datetime.now(timezone.utc).isoformat()
     meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
 

@@ -23,12 +23,26 @@ export interface ProcessingEntry {
   processed_at: string;
 }
 
+export interface SketchfabUploadInfo {
+  uid: string;
+  url: string;
+  embed_url?: string;
+  uploaded_at: string;
+  is_private?: boolean;
+}
+
 export interface AssetDetail {
   asset_id: string;
   created_at: string;
   updated_at: string;
   steps: Record<string, Record<string, unknown>>;
   processing?: ProcessingEntry[];
+  sketchfab_upload?: SketchfabUploadInfo | null;
+  source?: string | null;
+  sketchfab_uid?: string | null;
+  sketchfab_url?: string | null;
+  sketchfab_author?: string | null;
+  downloaded_at?: string | null;
   exports?: ExportEntry[];
 }
 
