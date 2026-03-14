@@ -4,6 +4,8 @@ import asyncio
 from pathlib import Path
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
+
+from app.services import preset_service
 from fastapi.responses import FileResponse
 
 from app.schemas.asset import (
@@ -269,6 +271,19 @@ async def get_asset(asset_id: str):
         notes=meta.notes,
         favorited=meta.favorited,
     )
+
+
+@router.get("/{asset_id}/preset-suggestions")
+async def get_preset_suggestions(asset_id: str):
+    """Vorschläge für Preset aus Asset-Zustand (für 'Als Preset speichern')."""
+    meta = asset_service.get_asset(asset_id)
+    if not meta:
+        raise HTTPException(404, detail="Asset nicht gefunden")
+    suggested_name = meta.name or f"Preset {asset_id[:8]}"
+    steps = await asyncio.to_thread(
+        preset_service.asset_to_preset_steps, meta
+    )
+    return {"suggested_name": suggested_name, "steps": steps}
 
 
 @router.get("/{asset_id}/process/sources")

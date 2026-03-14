@@ -30,3 +30,8 @@ IMAGE_STORAGE_PATH = Path(
 
 # Logs: /app/storage/logs (rolling app.log)
 LOGS_PATH = Path(os.getenv("LOG_PATH", "/app/storage/logs"))
+
+# Pipeline-Presets: /app/storage/presets (JSON-Files pro Preset)
+PRESETS_STORAGE_PATH = Path(
+    os.getenv("PRESETS_STORAGE_PATH", "/app/storage/presets")
+)
