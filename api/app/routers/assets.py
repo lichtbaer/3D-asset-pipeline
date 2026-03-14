@@ -20,6 +20,7 @@ from app.schemas.asset import (
     ExportsListResponse,
     AssetStepInfo,
     SketchfabUploadInfo,
+    StepDeleteResponse,
     UploadAssetResponse,
 )
 from app.schemas.image_processing import (
@@ -506,6 +507,22 @@ async def process_remove_components(asset_id: str, body: RemoveComponentsRequest
         raise HTTPException(404, detail=str(e)) from e
 
 
+@router.delete("/{asset_id}/files/{filename}", status_code=204)
+async def delete_asset_file(asset_id: str, filename: str):
+    """
+    Einzelne Datei löschen (Processing, Export, Image-Processing).
+    Original-Files (mesh.glb, image_original.*, image_bgremoved.png) sind nicht löschbar.
+    """
+    if not asset_service.get_asset(asset_id):
+        raise HTTPException(404, detail="Asset nicht gefunden")
+    try:
+        asset_service.delete_asset_file(asset_id, filename)
+    except PermissionError as e:
+        raise HTTPException(403, detail=str(e)) from e
+    except FileNotFoundError as e:
+        raise HTTPException(404, detail=str(e)) from e
+
+
 @router.get("/{asset_id}/files/{filename}")
 async def get_asset_file(asset_id: str, filename: str):
     """Static-File-Download für Asset-Dateien (Bild, GLB, Export-Formate)."""
@@ -583,6 +600,41 @@ async def restore_asset(asset_id: str):
     """Asset aus Papierkorb wiederherstellen."""
     if not asset_service.restore_asset(asset_id):
         raise HTTPException(404, detail="Asset nicht gefunden oder nicht gelöscht")
+
+
+@router.delete("/{asset_id}/steps/{step_name}", status_code=200)
+async def delete_asset_step(
+    asset_id: str,
+    step_name: str,
+    cascade: bool = Query(False, description="Abhängige Steps mit löschen"),
+    force: bool = Query(False, description="Ohne Bestätigung löschen"),
+):
+    """
+    Pipeline-Step löschen. Bei Abhängigkeiten ohne cascade/force: Warnung zurückgeben.
+    Mit cascade=true: abhängige Steps ebenfalls löschen.
+    """
+    if step_name not in ("image", "bgremoval", "mesh", "rigging", "animation"):
+        raise HTTPException(400, detail="Ungültiger Step-Name")
+    if not asset_service.get_asset(asset_id):
+        raise HTTPException(404, detail="Asset nicht gefunden")
+    try:
+        result = asset_service.delete_step(
+            asset_id,
+            step_name,
+            cascade=cascade,
+            force=force,
+        )
+        if result.get("requires_confirmation"):
+            return StepDeleteResponse(**result)
+        return StepDeleteResponse(
+            requires_confirmation=False,
+            affected_steps=[],
+            message="",
+        )
+    except FileNotFoundError as e:
+        raise HTTPException(404, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(400, detail=str(e)) from e
 
 
 @router.delete("/{asset_id}", status_code=204)
