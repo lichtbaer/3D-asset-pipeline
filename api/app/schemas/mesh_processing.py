@@ -2,7 +2,7 @@
 
 from enum import Enum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class RepairOperation(str, Enum):
@@ -73,3 +73,47 @@ class ProcessingResult(BaseModel):
     processing: dict = Field(
         description="Eintrag für metadata.json processing-Array"
     )
+
+
+class TextureBakeRequest(BaseModel):
+    """Request für POST /assets/{asset_id}/texture/bake."""
+
+    source_mesh: str = Field(..., description="High-Poly mit Texturen, z.B. mesh.glb")
+    target_mesh: str = Field(
+        ...,
+        description="Low-Poly ohne Texturen, z.B. mesh_simplified_10000.glb",
+    )
+    resolution: int = Field(
+        default=1024,
+        ge=512,
+        le=2048,
+        description="Textur-Auflösung: 512, 1024, 2048",
+    )
+    bake_types: list[str] = Field(
+        default=["diffuse", "roughness", "metallic"],
+        description="Bake-Typen: diffuse, roughness, metallic",
+    )
+
+    @field_validator("bake_types")
+    @classmethod
+    def validate_bake_types(cls, v: list[str]) -> list[str]:
+        valid = {"diffuse", "roughness", "metallic"}
+        filtered = [t for t in v if t in valid]
+        return filtered if filtered else ["diffuse", "roughness", "metallic"]
+
+
+class TextureBakeStartResponse(BaseModel):
+    """Response für POST /assets/{asset_id}/texture/bake (Job gestartet)."""
+
+    job_id: str
+    status: str = "pending"
+
+
+class TextureBakeStatusResponse(BaseModel):
+    """Response für GET /assets/{asset_id}/texture/bake/status/{job_id}."""
+
+    job_id: str
+    status: str  # pending | processing | done | failed
+    output_file: str | None = None
+    duration_seconds: float | None = None
+    error_msg: str | None = None

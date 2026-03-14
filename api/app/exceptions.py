@@ -99,3 +99,15 @@ class BlenderNotAvailableError(ProviderConfigError):
     """Blender ist nicht installiert oder nicht ausführbar."""
 
     pass
+
+
+class TextureBakingError(Exception):
+    """Texture-Baking-Service hat einen Fehler zurückgegeben."""
+
+    pass
+
+
+class TextureBakingTimeoutError(ProviderTimeoutError):
+    """Texture-Baking Subprocess hat das Timeout überschritten."""
+
+    pass

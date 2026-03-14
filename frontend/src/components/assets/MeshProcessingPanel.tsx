@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   analyzeMesh,
@@ -12,9 +12,20 @@ import {
 import {
   getAssetFileUrl,
   deleteAssetFile,
+  startTextureBake,
+  getTextureBakeStatus,
+  getAsset,
+  type TextureBakingEntry,
 } from "../../api/assets.js";
 import { MeshViewer } from "../viewer/MeshViewer.js";
 import type { ProcessingEntry } from "../../api/assets.js";
+
+const RESOLUTION_OPTIONS = [512, 1024, 2048] as const;
+const BAKE_TYPE_OPTIONS = [
+  { value: "diffuse" as const, label: "Diffuse" },
+  { value: "roughness" as const, label: "Roughness" },
+  { value: "metallic" as const, label: "Metallic" },
+] as const;
 
 const SIMPLIFY_PRESETS = [500000, 100000, 50000, 10000];
 
@@ -33,9 +44,15 @@ const COMPONENT_RATIO_PRESETS = [
 
 interface MeshProcessingPanelProps {
   assetId: string;
+  textureBaking?: TextureBakingEntry[];
+  onUseForRigging?: (url: string, assetId: string) => void;
 }
 
-export function MeshProcessingPanel({ assetId }: MeshProcessingPanelProps) {
+export function MeshProcessingPanel({
+  assetId,
+  textureBaking = [],
+  onUseForRigging,
+}: MeshProcessingPanelProps) {
   const queryClient = useQueryClient();
   const [sourceFile, setSourceFile] = useState("mesh.glb");
   const [customFaces, setCustomFaces] = useState("");
@@ -50,6 +67,15 @@ export function MeshProcessingPanel({ assetId }: MeshProcessingPanelProps) {
   const [customYThreshold, setCustomYThreshold] = useState("");
   const [componentRatio, setComponentRatio] = useState(0.05);
   const [customComponentRatio, setCustomComponentRatio] = useState("");
+  const [bakeSourceMesh, setBakeSourceMesh] = useState("mesh.glb");
+  const [bakeTargetMesh, setBakeTargetMesh] = useState("");
+  const [bakeResolution, setBakeResolution] = useState(1024);
+  const [bakeTypes, setBakeTypes] = useState<string[]>([
+    "diffuse",
+    "roughness",
+    "metallic",
+  ]);
+  const [bakeJobId, setBakeJobId] = useState<string | null>(null);
 
   const { data: sources } = useQuery({
     queryKey: ["mesh-sources", assetId],
@@ -132,6 +158,59 @@ export function MeshProcessingPanel({ assetId }: MeshProcessingPanelProps) {
       queryClient.invalidateQueries({ queryKey: ["mesh-sources", assetId] });
     },
   });
+
+  const bakeMutation = useMutation({
+    mutationFn: () =>
+      startTextureBake(assetId, {
+        source_mesh: bakeSourceMesh,
+        target_mesh: bakeTargetMesh,
+        resolution: bakeResolution,
+        bake_types: bakeTypes,
+      }),
+    onSuccess: (data) => {
+      setBakeJobId(data.job_id);
+    },
+  });
+
+  const { data: bakeStatus } = useQuery({
+    queryKey: ["texture-bake-status", assetId, bakeJobId],
+    queryFn: () => getTextureBakeStatus(assetId, bakeJobId!),
+    enabled: !!assetId && !!bakeJobId,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status === "pending" || status === "processing" ? 2000 : false;
+    },
+  });
+
+  useEffect(() => {
+    if (bakeStatus?.status === "done" || bakeStatus?.status === "failed") {
+      queryClient.invalidateQueries({ queryKey: ["asset", assetId] });
+      queryClient.invalidateQueries({ queryKey: ["mesh-sources", assetId] });
+      setBakeJobId(null);
+    }
+  }, [bakeStatus?.status, queryClient, assetId]);
+
+  const showTextureBaking =
+    meshSources.length >= 2 && meshSources.includes("mesh.glb");
+
+  const effectiveBakeSource = meshSources.includes(bakeSourceMesh)
+    ? bakeSourceMesh
+    : meshSources[0] ?? "mesh.glb";
+  const effectiveBakeTarget = meshSources.includes(bakeTargetMesh)
+    ? bakeTargetMesh
+    : meshSources.find((f) => f !== "mesh.glb") ?? meshSources[1] ?? "";
+
+  useEffect(() => {
+    if (effectiveBakeTarget && !bakeTargetMesh) {
+      setBakeTargetMesh(effectiveBakeTarget);
+    }
+  }, [effectiveBakeTarget, bakeTargetMesh]);
+
+  const toggleBakeType = (t: string) => {
+    setBakeTypes((prev) =>
+      prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]
+    );
+  };
 
   const handleSimplifyPreset = (targetFaces: number) => {
     simplifyMutation.mutate(targetFaces);
@@ -327,6 +406,172 @@ export function MeshProcessingPanel({ assetId }: MeshProcessingPanelProps) {
           </button>
         </div>
       </div>
+
+      {showTextureBaking && (
+        <div className="mesh-processing__texture-baking">
+          <h4>Textur-Rebaking</h4>
+          <p className="mesh-processing__info">
+            ℹ Empfohlen nach Simplification um PBR-Texturen zu erhalten.
+            Laufzeit: ca. 30–120s je nach Mesh-Komplexität.
+          </p>
+          <div className="mesh-processing__texture-baking-fields">
+            <div className="mesh-processing__source">
+              <label htmlFor="bake-source">Textur-Quelle (High-Poly)</label>
+              <select
+                id="bake-source"
+                value={effectiveBakeSource}
+                onChange={(e) => setBakeSourceMesh(e.target.value)}
+              >
+                {meshSources.map((f) => (
+                  <option key={f} value={f}>
+                    {f}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="mesh-processing__source">
+              <label htmlFor="bake-target">Ziel-Mesh (Low-Poly)</label>
+              <select
+                id="bake-target"
+                value={effectiveBakeTarget}
+                onChange={(e) => setBakeTargetMesh(e.target.value)}
+              >
+                {meshSources
+                  .filter((f) => f !== effectiveBakeSource)
+                  .map((f) => (
+                    <option key={f} value={f}>
+                      {f}
+                    </option>
+                  ))}
+              </select>
+            </div>
+            <div className="mesh-processing__texture-baking-resolution">
+              <label>Auflösung</label>
+              <div className="mesh-processing__presets">
+                {RESOLUTION_OPTIONS.map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    className={`btn btn--outline btn--sm ${bakeResolution === r ? "btn--active" : ""}`}
+                    onClick={() => setBakeResolution(r)}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="mesh-processing__texture-baking-types">
+              <label>Bake-Typen</label>
+              <div className="mesh-processing__checkboxes">
+                {BAKE_TYPE_OPTIONS.map(({ value, label }) => (
+                  <label key={value} className="mesh-processing__checkbox">
+                    <input
+                      type="checkbox"
+                      checked={bakeTypes.includes(value)}
+                      onChange={() => toggleBakeType(value)}
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="btn btn--outline"
+            onClick={() => bakeMutation.mutate()}
+            disabled={
+              bakeMutation.isPending ||
+              !!bakeJobId ||
+              bakeTypes.length === 0 ||
+              effectiveBakeSource === effectiveBakeTarget
+            }
+          >
+            {bakeMutation.isPending || bakeJobId
+              ? `Baking läuft…${bakeStatus?.duration_seconds ? ` (${Math.round(bakeStatus.duration_seconds)}s)` : ""}`
+              : "Texturen baken"}
+          </button>
+          {bakeStatus?.status === "failed" && bakeStatus.error_msg && (
+            <p className="mesh-processing__error">{bakeStatus.error_msg}</p>
+          )}
+          {bakeStatus?.status === "done" && bakeStatus.output_file && (
+            <div className="mesh-processing__bake-result">
+              <p className="mesh-processing__result-label">
+                Ergebnis: {bakeStatus.output_file}
+              </p>
+              <div className="mesh-processing__result-actions">
+                <a
+                  href={getAssetFileUrl(assetId, bakeStatus.output_file)}
+                  download
+                  className="asset-modal__download"
+                >
+                  Download
+                </a>
+                {onUseForRigging && (
+                  <button
+                    type="button"
+                    className="btn btn--outline"
+                    onClick={() =>
+                      onUseForRigging(
+                        getAssetFileUrl(assetId, bakeStatus.output_file),
+                        assetId
+                      )
+                    }
+                  >
+                    → Als Rigging-Input verwenden
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+          {textureBaking.length > 0 && (
+            <div className="mesh-processing__texture-baking-results">
+              <p className="mesh-processing__subsection-title">
+                Bisher gebackene Texturen
+              </p>
+              <ul className="mesh-processing__results-list">
+                {textureBaking.map((tb, i) => (
+                  <li key={i} className="mesh-processing__result-item">
+                    <div className="mesh-processing__result-preview">
+                      <MeshViewer
+                        glbUrl={getAssetFileUrl(assetId, tb.output_file)}
+                        height={200}
+                        readOnly
+                      />
+                    </div>
+                    <p className="mesh-processing__result-label">
+                      {tb.output_file}
+                    </p>
+                    <div className="mesh-processing__result-actions">
+                      <a
+                        href={getAssetFileUrl(assetId, tb.output_file)}
+                        download
+                        className="asset-modal__download"
+                      >
+                        Download
+                      </a>
+                      {onUseForRigging && (
+                        <button
+                          type="button"
+                          className="btn btn--outline"
+                          onClick={() =>
+                            onUseForRigging(
+                              getAssetFileUrl(assetId, tb.output_file),
+                              assetId
+                            )
+                          }
+                        >
+                          → Als Rigging-Input verwenden
+                        </button>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
     </section>
   );
 }

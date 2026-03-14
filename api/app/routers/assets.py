@@ -1,9 +1,11 @@
 """Asset-API: persistente Speicherung von Pipeline-Outputs."""
 
 import asyncio
+import time
+import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Query, UploadFile
 
 from app.services import preset_service
 from fastapi.responses import FileResponse
@@ -36,6 +38,9 @@ from app.schemas.mesh_processing import (
     RemoveComponentsRequest,
     RepairRequest,
     SimplifyRequest,
+    TextureBakeRequest,
+    TextureBakeStartResponse,
+    TextureBakeStatusResponse,
 )
 from app.services import asset_service
 from app.services.image_processing_service import (
@@ -52,8 +57,17 @@ from app.services.mesh_processing_service import (
     remove_small_components as mesh_remove_components,
     simplify as mesh_simplify,
 )
+from app.services.texture_baking_service import run_bake_sync
+from app.exceptions import (
+    BlenderNotAvailableError,
+    TextureBakingError,
+    TextureBakingTimeoutError,
+)
 
 router = APIRouter(prefix="/assets", tags=["assets"])
+
+# In-Memory Job-Store für Texture-Baking (pending/processing/done/failed)
+_texture_bake_jobs: dict[str, dict] = {}
 
 
 def _step_to_info(step_data: dict) -> dict:
@@ -273,6 +287,7 @@ async def get_asset(asset_id: str):
         steps=meta.steps,
         processing=meta.processing,
         image_processing=meta.image_processing,
+        texture_baking=meta.texture_baking,
         sketchfab_upload=_to_sketchfab_upload_info(meta.sketchfab_upload),
         source=meta.source,
         sketchfab_uid=meta.sketchfab_uid,
@@ -505,6 +520,126 @@ async def process_remove_components(asset_id: str, body: RemoveComponentsRequest
         return result
     except FileNotFoundError as e:
         raise HTTPException(404, detail=str(e)) from e
+
+
+def _run_texture_bake_task(
+    job_id: str,
+    asset_id: str,
+    source_mesh: str,
+    target_mesh: str,
+    resolution: int,
+    bake_types: list[str],
+) -> None:
+    """Background-Task: Führt Texture-Baking aus und aktualisiert Job-Status."""
+    from datetime import datetime, timezone
+
+    _texture_bake_jobs[job_id]["status"] = "processing"
+    started = time.monotonic()
+    try:
+        output_file = run_bake_sync(
+            asset_id=asset_id,
+            source_mesh=source_mesh,
+            target_mesh=target_mesh,
+            resolution=resolution,
+            bake_types=bake_types,
+        )
+        duration = time.monotonic() - started
+        _texture_bake_jobs[job_id].update(
+            status="done",
+            output_file=output_file,
+            duration_seconds=round(duration, 1),
+            error_msg=None,
+        )
+        entry = {
+            "source_mesh": source_mesh,
+            "target_mesh": target_mesh,
+            "output_file": output_file,
+            "resolution": resolution,
+            "bake_types": bake_types,
+            "baked_at": datetime.now(timezone.utc).isoformat(),
+        }
+        asset_service.append_texture_baking_entry(asset_id, entry)
+    except (BlenderNotAvailableError, TextureBakingError, TextureBakingTimeoutError) as e:
+        _texture_bake_jobs[job_id].update(
+            status="failed",
+            output_file=None,
+            duration_seconds=round(time.monotonic() - started, 1),
+            error_msg=str(e),
+        )
+    except Exception as e:
+        _texture_bake_jobs[job_id].update(
+            status="failed",
+            output_file=None,
+            duration_seconds=round(time.monotonic() - started, 1),
+            error_msg=str(e),
+        )
+
+
+@router.post(
+    "/{asset_id}/texture/bake",
+    response_model=TextureBakeStartResponse,
+    status_code=202,
+)
+async def start_texture_bake(
+    asset_id: str,
+    body: TextureBakeRequest,
+    background_tasks: BackgroundTasks,
+):
+    """Startet Texture-Baking-Job. Baking läuft asynchron (30–120s)."""
+    if not asset_service.get_asset(asset_id):
+        raise HTTPException(404, detail="Asset nicht gefunden")
+    source_path = asset_service.get_file_path(asset_id, body.source_mesh)
+    target_path = asset_service.get_file_path(asset_id, body.target_mesh)
+    if not source_path or not source_path.is_file():
+        raise HTTPException(
+            404,
+            detail=f"Source-Mesh {body.source_mesh} nicht gefunden",
+        )
+    if not target_path or not target_path.is_file():
+        raise HTTPException(
+            404,
+            detail=f"Target-Mesh {body.target_mesh} nicht gefunden",
+        )
+    job_id = str(uuid.uuid4())
+    _texture_bake_jobs[job_id] = {
+        "asset_id": asset_id,
+        "status": "pending",
+        "output_file": None,
+        "duration_seconds": None,
+        "error_msg": None,
+    }
+    background_tasks.add_task(
+        _run_texture_bake_task,
+        job_id,
+        asset_id,
+        body.source_mesh,
+        body.target_mesh,
+        body.resolution,
+        body.bake_types,
+    )
+    return TextureBakeStartResponse(job_id=job_id, status="pending")
+
+
+@router.get(
+    "/{asset_id}/texture/bake/status/{job_id}",
+    response_model=TextureBakeStatusResponse,
+)
+async def get_texture_bake_status(asset_id: str, job_id: str):
+    """Status eines Texture-Baking-Jobs abfragen."""
+    if not asset_service.get_asset(asset_id):
+        raise HTTPException(404, detail="Asset nicht gefunden")
+    if job_id not in _texture_bake_jobs:
+        raise HTTPException(404, detail="Job nicht gefunden")
+    job = _texture_bake_jobs[job_id]
+    if job["asset_id"] != asset_id:
+        raise HTTPException(404, detail="Job gehört nicht zu diesem Asset")
+    return TextureBakeStatusResponse(
+        job_id=job_id,
+        status=job["status"],
+        output_file=job.get("output_file"),
+        duration_seconds=job.get("duration_seconds"),
+        error_msg=job.get("error_msg"),
+    )
 
 
 @router.delete("/{asset_id}/files/{filename}", status_code=204)

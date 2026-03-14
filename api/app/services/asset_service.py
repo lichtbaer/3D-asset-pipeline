@@ -38,6 +38,7 @@ class AssetMetadata:
         steps: dict[str, dict[str, Any]],
         processing: list[dict[str, Any]] | None = None,
         image_processing: list[dict[str, Any]] | None = None,
+        texture_baking: list[dict[str, Any]] | None = None,
         sketchfab_upload: dict[str, Any] | None = None,
         source: str | None = None,
         sketchfab_uid: str | None = None,
@@ -58,6 +59,7 @@ class AssetMetadata:
         self.steps = steps
         self.processing = processing or []
         self.image_processing = image_processing or []
+        self.texture_baking = texture_baking or []
         self.sketchfab_upload = sketchfab_upload
         self.source = source
         self.sketchfab_uid = sketchfab_uid
@@ -80,6 +82,7 @@ class AssetMetadata:
             "steps": self.steps,
             "processing": self.processing,
             "image_processing": self.image_processing,
+            "texture_baking": self.texture_baking,
             "exports": self.exports,
         }
         if self.sketchfab_upload is not None:
@@ -183,6 +186,7 @@ def get_asset(asset_id: str) -> AssetMetadata | None:
         steps=data.get("steps", {}),
         processing=data.get("processing", []),
         image_processing=data.get("image_processing", []),
+        texture_baking=data.get("texture_baking", []),
         sketchfab_upload=data.get("sketchfab_upload"),
         source=data.get("source"),
         sketchfab_uid=data.get("sketchfab_uid"),
@@ -563,6 +567,19 @@ def append_image_processing_entry(asset_id: str, entry: dict[str, Any]) -> None:
     if "image_processing" not in meta:
         meta["image_processing"] = []
     meta["image_processing"].append(entry)
+    meta["updated_at"] = datetime.now(timezone.utc).isoformat()
+    meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+
+
+def append_texture_baking_entry(asset_id: str, entry: dict[str, Any]) -> None:
+    """Fügt Eintrag zum texture_baking-Array in metadata.json hinzu."""
+    meta_path = _metadata_path(asset_id)
+    if not meta_path.exists():
+        raise FileNotFoundError(f"Asset {asset_id} existiert nicht")
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    if "texture_baking" not in meta:
+        meta["texture_baking"] = []
+    meta["texture_baking"].append(entry)
     meta["updated_at"] = datetime.now(timezone.utc).isoformat()
     meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
 
