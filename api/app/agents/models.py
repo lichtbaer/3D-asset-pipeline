@@ -24,10 +24,11 @@ class TagSuggestion(BaseModel):
 class PromptSuggestion(BaseModel):
     """Optimierter Prompt mit Varianten."""
 
-    optimized_prompt: str
-    negative_prompt: str
+    optimized_prompt: str = Field(min_length=1, description="Technisch optimierter Prompt")
+    negative_prompt: str = Field(description="Was explizit vermieden werden soll")
     reasoning: str = Field(description="Kurze Begründung der Änderungen")
     variants: list[str] = Field(
+        min_length=2,
         max_length=3,
         description="2-3 alternative Prompt-Varianten",
     )

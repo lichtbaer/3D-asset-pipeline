@@ -40,6 +40,7 @@ services:
     environment:
       - DATABASE_URL=postgresql+asyncpg://user:password@db:5432/purzel
       - PICSART_API_KEY=${PICSART_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - HF_TOKEN=${HF_TOKEN:-}
       - PIAPI_API_KEY=${PIAPI_API_KEY:-}
       - U2NET_HOME=/app/storage/rembg_cache

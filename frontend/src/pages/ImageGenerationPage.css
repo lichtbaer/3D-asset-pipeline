@@ -22,6 +22,103 @@
   gap: var(--space-md);
 }
 
+/* PromptAssistant */
+.prompt-assistant {
+  margin-top: var(--space-sm);
+}
+
+.prompt-assistant__buttons {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.prompt-assistant__from-description {
+  margin-top: var(--space-md);
+  padding: var(--space-md);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--code-bg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.prompt-assistant__error {
+  margin-top: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-error-bg);
+  border: 1px solid var(--color-error-border);
+  border-radius: var(--radius-md);
+  color: var(--color-error);
+  font-size: var(--font-size-sm);
+}
+
+.prompt-assistant__result {
+  margin-top: var(--space-md);
+}
+
+.prompt-assistant__hint {
+  font-size: var(--font-size-xs);
+  color: var(--text);
+  margin: 0 0 var(--space-sm);
+}
+
+.prompt-assistant__reasoning-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  color: var(--accent);
+  padding: 0;
+  text-align: left;
+}
+
+.prompt-assistant__reasoning-toggle:hover {
+  text-decoration: underline;
+}
+
+.prompt-assistant__reasoning-content {
+  margin-top: var(--space-sm);
+  padding: var(--space-sm) 0;
+}
+
+.prompt-assistant__reasoning {
+  font-size: var(--font-size-sm);
+  color: var(--text);
+  margin: 0 0 var(--space-sm);
+  line-height: 1.5;
+}
+
+.prompt-assistant__variants {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  align-items: center;
+}
+
+.prompt-assistant__variants-label {
+  font-size: var(--font-size-sm);
+  color: var(--text);
+}
+
+.prompt-assistant__variant-chip {
+  padding: 0.25rem var(--space-sm);
+  font-size: var(--font-size-xs);
+  background: var(--accent-bg);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.prompt-assistant__variant-chip:hover {
+  background: var(--accent);
+  color: white;
+}
+
 .form-group label {
   display: block;
   font-weight: 500;
