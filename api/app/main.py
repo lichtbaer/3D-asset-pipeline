@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.database import check_db_connection
-from app.routers import generation
+from app.routers import agents, generation
 
 from app.config.storage import (
     ANIMATION_STORAGE_PATH,
@@ -28,6 +28,7 @@ ANIMATION_STORAGE_PATH.mkdir(parents=True, exist_ok=True)
 IMAGE_STORAGE_PATH.mkdir(parents=True, exist_ok=True)
 
 app = FastAPI(title="Purzel ML Asset Pipeline API")
+app.include_router(agents.router)
 app.include_router(generation.router)
 app.include_router(assets.router)
 app.include_router(sketchfab.router)
