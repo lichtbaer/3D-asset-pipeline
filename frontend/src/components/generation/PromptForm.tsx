@@ -3,6 +3,7 @@ import type { GenerateImageRequest } from "../../api/generation.js";
 import { InlineError } from "../../components/ui/InlineError.js";
 import { CharacterCounter } from "../../components/ui/CharacterCounter.js";
 import { Tooltip } from "../../components/ui/Tooltip.js";
+import { PromptAssistant } from "./PromptAssistant.js";
 import { useFormValidation } from "../../hooks/useFormValidation.js";
 
 const SIZE_OPTIONS = [512, 768, 1024] as const;
@@ -63,6 +64,13 @@ export function PromptForm({
           minLength={10}
           required
           aria-describedby="prompt-error"
+        />
+        <PromptAssistant
+          prompt={prompt}
+          negativePrompt={negativePrompt}
+          onPromptChange={setPrompt}
+          onNegativePromptChange={setNegativePrompt}
+          disabled={disabled}
         />
         <InlineError message={getError("prompt", prompt)} id="prompt-error" />
       </div>
