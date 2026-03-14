@@ -77,9 +77,11 @@ import {
 import { usePipelineStore } from "../store/PipelineStore.js";
 import { useAssetFromUrl } from "../hooks/useAssetFromUrl.js";
 import { getAssetFileUrl } from "../api/assets.js";
+import { getSketchfabStatus } from "../api/sketchfab.js";
 import { getMeshSources } from "../api/meshProcessing.js";
 import { MeshProcessingPanel } from "../components/assets/MeshProcessingPanel.js";
 import { AssetPickerModal } from "../components/assets/AssetPickerModal.js";
+import { SketchfabImportModal } from "../components/assets/SketchfabImportModal.js";
 import { useToast } from "../components/ui/ToastContext.js";
 import { PipelineStepper, type PipelineStep } from "../components/ui/PipelineStepper.js";
 import "./ImageGenerationPage.css";
@@ -156,6 +158,7 @@ export function PipelinePage() {
   const [assetPickerOpen, setAssetPickerOpen] = useState<{
     tab: "rigging" | "animation" | "mesh-processing";
   } | null>(null);
+  const [showSketchfabImport, setShowSketchfabImport] = useState(false);
 
   const [pendingMeshImageUrl, setPendingMeshImageUrl] = useState<string | null>(
     null
@@ -824,6 +827,11 @@ export function PipelinePage() {
     [imageProvidersData?.providers]
   );
 
+  const { data: sketchfabEnabled } = useQuery({
+    queryKey: ["sketchfab-status"],
+    queryFn: getSketchfabStatus,
+  });
+
   const [imageMode, setImageMode] = useState<"single" | "compare">("single");
   const [meshMode, setMeshMode] = useState<"single" | "compare">("single");
 
@@ -940,6 +948,17 @@ export function PipelinePage() {
       {activeTab === "image" && (
         <div className="pipeline-tab-content" role="tabpanel">
           <h1>Bildgenerierung</h1>
+          {sketchfabEnabled?.enabled && (
+            <p className="pipeline-tab__sketchfab-link">
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm"
+                onClick={() => setShowSketchfabImport(true)}
+              >
+                Von Sketchfab importieren
+              </button>
+            </p>
+          )}
           <div className="pipeline-mode-toggle" role="group" aria-label="Modus">
             <button
               type="button"
@@ -1270,6 +1289,9 @@ export function PipelinePage() {
             assetPickerOpen.tab === "animation" ? "has_rigging" : "has_mesh"
           }
         />
+      )}
+      {showSketchfabImport && (
+        <SketchfabImportModal onClose={() => setShowSketchfabImport(false)} />
       )}
     </main>
   );

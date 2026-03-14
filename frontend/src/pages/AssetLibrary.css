@@ -17,6 +17,13 @@
   margin-bottom: var(--space-md);
 }
 
+.asset-library__header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  align-items: center;
+}
+
 .asset-library__link {
   display: inline-block;
   color: var(--accent);
@@ -609,4 +616,216 @@
   display: flex;
   gap: var(--space-xs);
   margin: 0 var(--space-sm) var(--space-sm);
+}
+
+/* Sketchfab Panel */
+.sketchfab-panel {
+  margin-top: var(--space-lg);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--border);
+}
+
+.sketchfab-panel h3 {
+  font-size: var(--font-size-base);
+  margin: 0 0 0.75rem;
+}
+
+.sketchfab-panel__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.sketchfab-panel__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.sketchfab-panel__field label {
+  font-size: var(--font-size-sm);
+}
+
+.sketchfab-panel__field input,
+.sketchfab-panel__field select {
+  padding: var(--space-sm);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  font-family: inherit;
+}
+
+.sketchfab-panel__radio {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.sketchfab-panel__radio label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  cursor: pointer;
+}
+
+.sketchfab-panel__uploaded {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.sketchfab-panel__link {
+  font-size: var(--font-size-sm);
+  color: var(--accent);
+  word-break: break-all;
+}
+
+.sketchfab-panel__status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.sketchfab-panel__error {
+  color: var(--error, #c00);
+  font-size: var(--font-size-sm);
+  margin: 0 0 var(--space-md);
+}
+
+/* Sketchfab Import Modal */
+.sketchfab-import-modal__content {
+  max-width: 560px;
+}
+
+.sketchfab-import__url {
+  margin-bottom: var(--space-lg);
+}
+
+.sketchfab-import__url label {
+  display: block;
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--space-xs);
+}
+
+.sketchfab-import__url-row {
+  display: flex;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+
+.sketchfab-import__url-row input {
+  flex: 1;
+  padding: var(--space-sm);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  font-family: inherit;
+}
+
+.sketchfab-import__url-optional {
+  margin-top: var(--space-md);
+}
+
+.sketchfab-import__url-optional label {
+  display: block;
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--space-xs);
+}
+
+.sketchfab-import__url-optional input {
+  width: 100%;
+  padding: var(--space-sm);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  font-family: inherit;
+}
+
+.sketchfab-import__error {
+  color: var(--error, #c00);
+  font-size: var(--font-size-sm);
+  margin-top: var(--space-sm);
+}
+
+.sketchfab-import__divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: var(--space-lg) 0;
+}
+
+.sketchfab-import__own h3 {
+  font-size: var(--font-size-base);
+  margin: 0 0 var(--space-md);
+}
+
+.sketchfab-import__loading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-lg);
+}
+
+.sketchfab-import__empty {
+  color: var(--text);
+  font-size: var(--font-size-sm);
+  margin: 0;
+}
+
+.sketchfab-import__model-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.sketchfab-import__model-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.sketchfab-import__model-thumb {
+  width: 80px;
+  height: 80px;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--border);
+}
+
+.sketchfab-import__model-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sketchfab-import__model-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+}
+
+.sketchfab-import__model-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.sketchfab-import__model-name {
+  font-weight: 500;
+}
+
+.sketchfab-import__model-stats {
+  font-size: var(--font-size-sm);
+  color: var(--text);
 }
