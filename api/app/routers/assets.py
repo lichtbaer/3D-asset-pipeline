@@ -1,5 +1,6 @@
 """Asset-API: persistente Speicherung von Pipeline-Outputs."""
 
+import asyncio
 from pathlib import Path
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
@@ -8,8 +9,12 @@ from fastapi.responses import FileResponse
 from app.schemas.asset import (
     AssetDetailResponse,
     AssetListItem,
-    AssetStepInfo,
     CreateAssetResponse,
+    ExportListItem,
+    ExportRequest,
+    ExportResponse,
+    ExportsListResponse,
+    AssetStepInfo,
     UploadAssetResponse,
 )
 from app.schemas.mesh_processing import (
@@ -20,6 +25,7 @@ from app.schemas.mesh_processing import (
     SimplifyRequest,
 )
 from app.services import asset_service
+from app.services.mesh_export_service import export as mesh_export, list_exports
 from app.services.mesh_processing_service import (
     analyze as mesh_analyze,
     clip_floor as mesh_clip_floor,
@@ -153,6 +159,7 @@ async def get_asset(asset_id: str):
         updated_at=meta.updated_at,
         steps=meta.steps,
         processing=meta.processing,
+        exports=meta.exports,
     )
 
 
@@ -235,7 +242,7 @@ async def process_remove_components(asset_id: str, body: RemoveComponentsRequest
 
 @router.get("/{asset_id}/files/{filename}")
 async def get_asset_file(asset_id: str, filename: str):
-    """Static-File-Download für Asset-Dateien (Bild, GLB)."""
+    """Static-File-Download für Asset-Dateien (Bild, GLB, Export-Formate)."""
     path = asset_service.get_file_path(asset_id, filename)
     if not path:
         raise HTTPException(404, detail="Datei nicht gefunden")
@@ -248,10 +255,47 @@ async def get_asset_file(asset_id: str, filename: str):
         ".jpeg": "image/jpeg",
         ".webp": "image/webp",
         ".glb": "model/gltf-binary",
+        ".stl": "model/stl",
+        ".obj": "text/plain",
+        ".mtl": "text/plain",
+        ".ply": "application/octet-stream",
+        ".gltf": "model/gltf+json",
+        ".bin": "application/octet-stream",
+        ".zip": "application/zip",
     }
     media_type = media_types.get(suffix, "application/octet-stream")
 
     return FileResponse(path, media_type=media_type)
+
+
+@router.post("/{asset_id}/export", response_model=ExportResponse)
+async def export_asset(asset_id: str, body: ExportRequest):
+    """Mesh in Zielformat exportieren (STL, OBJ, PLY, GLTF)."""
+    if not asset_service.get_asset(asset_id):
+        raise HTTPException(404, detail="Asset nicht gefunden")
+    try:
+        result = await asyncio.to_thread(
+            mesh_export,
+            asset_id=asset_id,
+            source_file=body.source_file,
+            target_format=body.format,
+        )
+        return ExportResponse(**result)
+    except FileNotFoundError as e:
+        raise HTTPException(404, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(400, detail=str(e)) from e
+
+
+@router.get("/{asset_id}/exports", response_model=ExportsListResponse)
+async def get_asset_exports(asset_id: str):
+    """Liste aller vorhandenen Exports des Assets."""
+    if not asset_service.get_asset(asset_id):
+        raise HTTPException(404, detail="Asset nicht gefunden")
+    exports = list_exports(asset_id)
+    return ExportsListResponse(
+        exports=[ExportListItem(**e) for e in exports]
+    )
 
 
 @router.delete("/{asset_id}", status_code=204)

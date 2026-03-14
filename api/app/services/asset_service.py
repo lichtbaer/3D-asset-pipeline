@@ -37,12 +37,14 @@ class AssetMetadata:
         updated_at: str,
         steps: dict[str, dict[str, Any]],
         processing: list[dict[str, Any]] | None = None,
+        exports: list[dict[str, Any]] | None = None,
     ):
         self.asset_id = asset_id
         self.created_at = created_at
         self.updated_at = updated_at
         self.steps = steps
         self.processing = processing or []
+        self.exports = exports or []
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -51,6 +53,7 @@ class AssetMetadata:
             "updated_at": self.updated_at,
             "steps": self.steps,
             "processing": self.processing,
+            "exports": self.exports,
         }
 
 
@@ -127,6 +130,7 @@ def get_asset(asset_id: str) -> AssetMetadata | None:
         updated_at=data["updated_at"],
         steps=data.get("steps", {}),
         processing=data.get("processing", []),
+        exports=data.get("exports", []),
     )
 
 
