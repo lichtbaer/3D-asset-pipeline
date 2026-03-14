@@ -1,0 +1,47 @@
+[tool.coverage.run]
+source = ["app"]
+omit = [
+    "*/__init__.py",
+    "app/logging_config.py",
+    "app/database.py",
+    "app/main.py",
+    "app/routers/generation.py",
+    "app/routers/sketchfab.py",
+    "app/routers/storage.py",
+    "app/services/sketchfab_service.py",
+    "app/services/storage_service.py",
+    "app/services/mesh_generation.py",
+    "app/services/animation_generation.py",
+    "app/services/rigging_generation.py",
+    "app/services/bgremoval.py",
+    "app/services/texture_baking_service.py",
+    "app/services/mesh_export_service.py",
+    "app/services/mesh_providers/*",
+    "app/services/bgremoval_providers/*",
+    "app/services/image_providers/picsart.py",
+    "app/providers/rigging/*",
+    "app/providers/animation/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_return_any = true
+warn_unused_ignores = true
+ignore_missing_imports = true
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W"]
+ignore = ["E501"]
