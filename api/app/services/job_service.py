@@ -6,6 +6,7 @@ Konsolidiert pending → running → done/failed Logik.
 import re
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
@@ -200,7 +201,7 @@ class JobService:
             error_detail=error_detail or error,
         )
 
-    async def get(self, job_id: str) -> dict | None:
+    async def get(self, job_id: str) -> dict[str, Any] | None:
         """Gibt Job-Daten als Dict zurück oder None wenn nicht gefunden."""
         async with async_session_factory() as session:
             result = await session.execute(
