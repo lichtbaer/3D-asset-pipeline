@@ -149,3 +149,45 @@ def test_restore_asset(client: TestClient, sample_asset: str):
     assert r.status_code == 204
     r2 = client.get("/assets")
     assert any(a["asset_id"] == sample_asset for a in r2.json())
+
+
+def test_list_assets_with_filters(client: TestClient, sample_asset: str):
+    """GET /assets mit tags, search, has_step Parametern."""
+    client.patch(
+        f"/assets/{sample_asset}/meta",
+        json={"name": "Dog Asset", "tags": ["purzel", "dog"], "rating": 5},
+    )
+    r = client.get("/assets", params={"tags": "purzel"})
+    assert r.status_code == 200
+    assert any(a["asset_id"] == sample_asset for a in r.json())
+
+    r2 = client.get("/assets", params={"has_step": "mesh"})
+    assert r2.status_code == 200
+    assert any(a["asset_id"] == sample_asset for a in r2.json())
+
+    r3 = client.get("/assets", params={"search": "Dog"})
+    assert r3.status_code == 200
+    assert any(a["asset_id"] == sample_asset for a in r3.json())
+
+
+def test_get_all_tags(client: TestClient, sample_asset: str):
+    """GET /assets/tags liefert alle Tags."""
+    client.patch(
+        f"/assets/{sample_asset}/meta",
+        json={"tags": ["purzel", "test-tag"]},
+    )
+    r = client.get("/assets/tags")
+    assert r.status_code == 200
+    tags = r.json().get("tags", r.json())
+    assert "purzel" in tags
+    assert "test-tag" in tags
+
+
+def test_permanent_delete(client: TestClient):
+    """DELETE /assets/{id}?permanent=true löscht Asset dauerhaft."""
+    r = client.post("/assets")
+    asset_id = r.json()["asset_id"]
+    r2 = client.delete(f"/assets/{asset_id}", params={"permanent": "true"})
+    assert r2.status_code == 204
+    r3 = client.get(f"/assets/{asset_id}")
+    assert r3.status_code == 404

@@ -19,11 +19,6 @@ omit = [
     "app/providers/animation/*",
     "app/providers/rigging/blender_rigify.py",
     "app/providers/rigging/unirig_local.py",
-    "app/services/preset_service.py",
-    "app/services/asset_service.py",
-    "app/routers/agents.py",
-    "app/routers/assets.py",
-    "app/core/file_validation.py",
     "alembic/*",
 ]
 
