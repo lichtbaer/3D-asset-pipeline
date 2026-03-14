@@ -1,7 +1,11 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import type { RiggingProvider } from "../../../api/rigging.js";
 import { getAssetFileUrl } from "../../../api/assets.js";
 import { MeshViewer } from "../../viewer/MeshViewer.js";
+import { InlineError } from "../../../components/ui/InlineError.js";
+import { Tooltip } from "../../../components/ui/Tooltip.js";
+import { useFormValidation } from "../../../hooks/useFormValidation.js";
+
 
 export interface RiggingFormProps {
   sourceGlbUrl: string;
@@ -34,8 +38,14 @@ export function RiggingForm({
   const effectiveProviderKey =
     providerKey || (selectedProvider?.key ?? "");
 
+  const validationRules = useMemo(() => ({
+    sourceGlbUrl: { validate: (v: string) => v.trim().length > 0, message: "Quell-GLB-URL ist erforderlich." },
+  }), []);
+  const { touchField, getError, handleSubmitAttempt } = useFormValidation(validationRules);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    handleSubmitAttempt();
     if (!sourceGlbUrl.trim() || !effectiveProviderKey) return;
     const req: {
       source_glb_url: string;
@@ -84,15 +94,18 @@ export function RiggingForm({
         </div>
       )}
 
-      <div className="form-group">
+      <div className={`form-group${getError("sourceGlbUrl", sourceGlbUrl) ? " form-group--error" : ""}`}>
         <label htmlFor="rigging-source-glb">Quell-Mesh-GLB-URL</label>
         <input
           id="rigging-source-glb"
           type="url"
           value={sourceGlbUrl}
           onChange={(e) => onSourceGlbUrlChange(e.target.value)}
+          onBlur={() => touchField("sourceGlbUrl")}
           placeholder="https://... oder /assets/.../files/..."
+          aria-describedby="sourceGlbUrl-error"
         />
+        <InlineError message={getError("sourceGlbUrl", sourceGlbUrl)} id="sourceGlbUrl-error" />
       </div>
 
       {sourceGlbUrl.trim() && (
@@ -133,9 +146,17 @@ export function RiggingForm({
         )}
       </div>
 
-      <button type="submit" disabled={disabled || !isValid || providersLoading}>
-        Riggen starten
-      </button>
+      {(disabled || !isValid || providersLoading) && !isValid ? (
+        <Tooltip text="Bitte alle Pflichtfelder korrekt ausfüllen.">
+          <button type="submit" disabled={disabled || !isValid || providersLoading}>
+            Riggen starten
+          </button>
+        </Tooltip>
+      ) : (
+        <button type="submit" disabled={disabled || providersLoading}>
+          Riggen starten
+        </button>
+      )}
     </form>
   );
 }

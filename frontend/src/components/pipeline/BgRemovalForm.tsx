@@ -1,5 +1,8 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import type { BgRemovalProvider } from "../../api/bgremoval.js";
+import { InlineError } from "../../components/ui/InlineError.js";
+import { Tooltip } from "../../components/ui/Tooltip.js";
+import { useFormValidation } from "../../hooks/useFormValidation.js";
 
 export interface BgRemovalFormProps {
   sourceImageUrl: string;
@@ -27,8 +30,14 @@ export function BgRemovalForm({
   const effectiveProviderKey =
     providerKey || (selectedProvider?.key ?? "");
 
+  const validationRules = useMemo(() => ({
+    sourceImageUrl: { validate: (v: string) => v.trim().length > 0, message: "Quellbild-URL ist erforderlich." },
+  }), []);
+  const { touchField, getError, handleSubmitAttempt } = useFormValidation(validationRules);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    handleSubmitAttempt();
     if (!sourceImageUrl.trim() || !effectiveProviderKey) return;
     onSubmit({
       source_image_url: sourceImageUrl.trim(),
@@ -43,15 +52,18 @@ export function BgRemovalForm({
 
   return (
     <form onSubmit={handleSubmit} className="bgremoval-form prompt-form">
-      <div className="form-group">
+      <div className={`form-group${getError("sourceImageUrl", sourceImageUrl) ? " form-group--error" : ""}`}>
         <label htmlFor="bgremoval-source-url">Quellbild-URL</label>
         <input
           id="bgremoval-source-url"
           type="url"
           value={sourceImageUrl}
           onChange={(e) => onSourceImageUrlChange(e.target.value)}
+          onBlur={() => touchField("sourceImageUrl")}
           placeholder="https://..."
+          aria-describedby="sourceImageUrl-error"
         />
+        <InlineError message={getError("sourceImageUrl", sourceImageUrl)} id="sourceImageUrl-error" />
       </div>
 
       {sourceImageUrl.trim() && (
@@ -87,9 +99,17 @@ export function BgRemovalForm({
         </select>
       </div>
 
-      <button type="submit" disabled={disabled || !isValid || providersLoading}>
-        Freistellen
-      </button>
+      {(disabled || !isValid || providersLoading) && !isValid ? (
+        <Tooltip text="Bitte alle Pflichtfelder korrekt ausfüllen.">
+          <button type="submit" disabled={disabled || !isValid || providersLoading}>
+            Freistellen
+          </button>
+        </Tooltip>
+      ) : (
+        <button type="submit" disabled={disabled || providersLoading}>
+          Freistellen
+        </button>
+      )}
     </form>
   );
 }

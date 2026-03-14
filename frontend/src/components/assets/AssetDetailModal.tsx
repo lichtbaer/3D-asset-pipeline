@@ -1,7 +1,11 @@
+import { useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { getAsset, getAssetFileUrl } from "../../api/assets.js";
 import { usePipelineStore } from "../../store/PipelineStore.js";
+import { useFocusTrap } from "../../hooks/useFocusTrap.js";
+import { useEscapeKey } from "../../hooks/useEscapeKey.js";
+import { useBodyScrollLock } from "../../hooks/useBodyScrollLock.js";
 import { MeshViewer } from "../viewer/MeshViewer.js";
 import {
   MeshProcessingPanel,
@@ -38,15 +42,21 @@ export function AssetDetailModal({ assetId, onClose }: AssetDetailModalProps) {
   const navigate = useNavigate();
   const { setActiveAssetId } = usePipelineStore();
 
+  const modalRef = useRef<HTMLDivElement>(null);
+
   const { data, isLoading, error } = useQuery({
     queryKey: ["asset", assetId],
     queryFn: () => getAsset(assetId),
     enabled: !!assetId,
   });
 
+  useFocusTrap(modalRef, true);
+  useEscapeKey(onClose);
+  useBodyScrollLock(true);
+
   const handleAction = (
     tab: "bgremoval" | "mesh" | "rigging" | "animation" | "mesh-processing",
-    sourceUrl: string,
+    _sourceUrl: string,
     assetIdForJob: string
   ) => {
     setActiveAssetId(assetIdForJob);
@@ -62,7 +72,7 @@ export function AssetDetailModal({ assetId, onClose }: AssetDetailModalProps) {
 
   if (isLoading && !data) {
     return (
-      <div className="asset-modal" role="dialog" aria-modal="true">
+      <div className="asset-modal" role="dialog" aria-modal="true" ref={modalRef} aria-labelledby="asset-detail-title">
         <div className="asset-modal__backdrop" onClick={onClose} />
         <div className="asset-modal__content">
           <div className="asset-modal__loading">
@@ -76,7 +86,7 @@ export function AssetDetailModal({ assetId, onClose }: AssetDetailModalProps) {
 
   if (error || !data) {
     return (
-      <div className="asset-modal" role="dialog" aria-modal="true">
+      <div className="asset-modal" role="dialog" aria-modal="true" ref={modalRef} aria-labelledby="asset-detail-title">
         <div className="asset-modal__backdrop" onClick={onClose} />
         <div className="asset-modal__content">
           <p className="asset-modal__error">
@@ -133,11 +143,11 @@ export function AssetDetailModal({ assetId, onClose }: AssetDetailModalProps) {
   const motionPrompt = animationStep?.prompt ?? animationStep?.motion_prompt;
 
   return (
-    <div className="asset-modal" role="dialog" aria-modal="true">
+    <div className="asset-modal" role="dialog" aria-modal="true" ref={modalRef} aria-labelledby="asset-detail-title">
       <div className="asset-modal__backdrop" onClick={onClose} />
       <div className="asset-modal__content" onClick={(e) => e.stopPropagation()}>
         <header className="asset-modal__header">
-          <h2>Asset {data.asset_id.slice(0, 8)}…</h2>
+          <h2 id="asset-detail-title">Asset {data.asset_id.slice(0, 8)}…</h2>
           <button
             type="button"
             className="asset-modal__close"

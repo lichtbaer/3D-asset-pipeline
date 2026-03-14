@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { MeshViewer } from "../../viewer/MeshViewer.js";
 import {
@@ -6,6 +6,9 @@ import {
   type AnimationProvider,
   type MotionPreset,
 } from "../../../api/animation.js";
+import { InlineError } from "../../../components/ui/InlineError.js";
+import { Tooltip } from "../../../components/ui/Tooltip.js";
+import { useFormValidation } from "../../../hooks/useFormValidation.js";
 
 const DEFAULT_PRESETS: MotionPreset[] = [
   { key: "walk", display_name: "Gehen", prompt: "Gehen" },
@@ -44,6 +47,12 @@ export function AnimationForm({
     providers.find((p) => p.key === providerKey) ?? providers[0];
   const effectiveProviderKey = providerKey || (selectedProvider?.key ?? "");
 
+  const validationRules = useMemo(() => ({
+    sourceGlbUrl: { validate: (v: string) => v.trim().length > 0, message: "Quell-GLB-URL ist erforderlich." },
+    motionPrompt: { validate: (v: string) => v.trim().length > 0, message: "Bewegungsbeschreibung ist erforderlich." },
+  }), []);
+  const { touchField, getError, handleSubmitAttempt } = useFormValidation(validationRules);
+
   const { data: presetsData, isLoading: presetsLoading } = useQuery({
     queryKey: ["animation-presets", effectiveProviderKey],
     queryFn: () => getAnimationPresets(effectiveProviderKey),
@@ -65,6 +74,7 @@ export function AnimationForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    handleSubmitAttempt();
     if (!sourceGlbUrl.trim() || !effectiveProviderKey || !motionPrompt.trim())
       return;
     onSubmit({
@@ -82,15 +92,18 @@ export function AnimationForm({
 
   return (
     <form onSubmit={handleSubmit} className="animation-form prompt-form">
-      <div className="form-group">
+      <div className={`form-group${getError("sourceGlbUrl", sourceGlbUrl) ? " form-group--error" : ""}`}>
         <label htmlFor="animation-source-glb">Quell-GLB (rigged mesh)</label>
         <input
           id="animation-source-glb"
           type="url"
           value={sourceGlbUrl}
           onChange={(e) => onSourceGlbUrlChange(e.target.value)}
+          onBlur={() => touchField("sourceGlbUrl")}
           placeholder="https://... oder /static/meshes/..."
+          aria-describedby="sourceGlbUrl-error"
         />
+        <InlineError message={getError("sourceGlbUrl", sourceGlbUrl)} id="sourceGlbUrl-error" />
       </div>
 
       {sourceGlbUrl.trim() && (
@@ -104,7 +117,7 @@ export function AnimationForm({
         </div>
       )}
 
-      <div className="form-group">
+      <div className={`form-group${getError("motionPrompt", motionPrompt) ? " form-group--error" : ""}`}>
         <label>Motion-Auswahl</label>
         <div className="animation-form__presets">
           {effectivePresets.map((preset) => (
@@ -126,10 +139,13 @@ export function AnimationForm({
           id="animation-motion-prompt"
           value={motionPrompt}
           onChange={(e) => setMotionPrompt(e.target.value)}
+          onBlur={() => touchField("motionPrompt")}
           placeholder="z.B. Gehen, Laufen, Idle..."
           rows={3}
           className="animation-form__textarea"
+          aria-describedby="motionPrompt-error"
         />
+        <InlineError message={getError("motionPrompt", motionPrompt)} id="motionPrompt-error" />
       </div>
 
       <div className="form-group">
@@ -152,9 +168,17 @@ export function AnimationForm({
         </select>
       </div>
 
-      <button type="submit" disabled={disabled || !isValid || providersLoading}>
-        Animation generieren
-      </button>
+      {(disabled || !isValid || providersLoading) && !isValid ? (
+        <Tooltip text="Bitte alle Pflichtfelder korrekt ausfüllen.">
+          <button type="submit" disabled={disabled || !isValid || providersLoading}>
+            Animation generieren
+          </button>
+        </Tooltip>
+      ) : (
+        <button type="submit" disabled={disabled || providersLoading}>
+          Animation generieren
+        </button>
+      )}
     </form>
   );
 }

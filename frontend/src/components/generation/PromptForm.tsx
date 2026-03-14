@@ -1,5 +1,9 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import type { GenerateImageRequest } from "../../api/generation.js";
+import { InlineError } from "../../components/ui/InlineError.js";
+import { CharacterCounter } from "../../components/ui/CharacterCounter.js";
+import { Tooltip } from "../../components/ui/Tooltip.js";
+import { useFormValidation } from "../../hooks/useFormValidation.js";
 
 const SIZE_OPTIONS = [512, 768, 1024] as const;
 
@@ -24,8 +28,14 @@ export function PromptForm({
 
   const selectedModel = modelKey || (models[0] ?? "");
 
+  const validationRules = useMemo(() => ({
+    prompt: { validate: (v: string) => v.trim().length >= 10, message: "Mindestens 10 Zeichen erforderlich." },
+  }), []);
+  const { touchField, getError, handleSubmitAttempt } = useFormValidation(validationRules);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    handleSubmitAttempt();
     if (prompt.trim().length < 10) return;
     onSubmit({
       prompt: prompt.trim(),
@@ -40,17 +50,21 @@ export function PromptForm({
 
   return (
     <form onSubmit={handleSubmit} className="prompt-form">
-      <div className="form-group">
+      <div className={`form-group${getError("prompt", prompt) ? " form-group--error" : ""}`}>
         <label htmlFor="prompt">Prompt (mind. 10 Zeichen)</label>
+        <CharacterCounter current={prompt.trim().length} minimum={10} />
         <textarea
           id="prompt"
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
+          onBlur={() => touchField("prompt")}
           placeholder="Beschreibe das gewünschte Bild..."
           rows={3}
           minLength={10}
           required
+          aria-describedby="prompt-error"
         />
+        <InlineError message={getError("prompt", prompt)} id="prompt-error" />
       </div>
 
       <div className="form-group">
@@ -115,9 +129,17 @@ export function PromptForm({
         </div>
       </div>
 
-      <button type="submit" className="btn btn--primary btn--lg" disabled={disabled || !isValid || modelsLoading}>
-        Generieren
-      </button>
+      {(disabled || !isValid || modelsLoading) && !isValid ? (
+        <Tooltip text="Bitte alle Pflichtfelder korrekt ausfüllen.">
+          <button type="submit" className="btn btn--primary btn--lg" disabled={disabled || !isValid || modelsLoading}>
+            Generieren
+          </button>
+        </Tooltip>
+      ) : (
+        <button type="submit" className="btn btn--primary btn--lg" disabled={disabled || modelsLoading}>
+          Generieren
+        </button>
+      )}
     </form>
   );
 }
