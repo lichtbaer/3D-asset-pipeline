@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
 from app.schemas.asset import (
@@ -10,6 +10,7 @@ from app.schemas.asset import (
     AssetListItem,
     AssetStepInfo,
     CreateAssetResponse,
+    UploadAssetResponse,
 )
 from app.schemas.mesh_processing import (
     ClipFloorRequest,
@@ -66,6 +67,78 @@ async def list_assets():
         )
         for a in assets
     ]
+
+
+# Upload-Endpunkte (vor /{asset_id} definieren)
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+IMAGE_MAX_BYTES = 20 * 1024 * 1024  # 20 MB
+MESH_EXTENSIONS = {".glb", ".gltf", ".obj", ".ply", ".stl", ".zip"}
+MESH_MAX_BYTES = 100 * 1024 * 1024  # 100 MB
+
+
+@router.post("/upload/image", response_model=UploadAssetResponse)
+async def upload_image(
+    file: UploadFile = File(...),
+    name: str | None = Form(None),
+):
+    """Bild hochladen (JPG, PNG, WebP, max. 20 MB). Erstellt Asset mit steps.image."""
+    ext = Path(file.filename or "").suffix.lower()
+    if ext not in IMAGE_EXTENSIONS:
+        raise HTTPException(
+            400,
+            detail=f"Ungültiges Format. Erlaubt: {', '.join(IMAGE_EXTENSIONS)}",
+        )
+    content = await file.read()
+    if len(content) > IMAGE_MAX_BYTES:
+        raise HTTPException(
+            400,
+            detail=f"Datei zu groß. Maximum: {IMAGE_MAX_BYTES // (1024*1024)} MB",
+        )
+    target_ext = ext if ext in IMAGE_EXTENSIONS else ".png"
+    target_filename = f"image_original{target_ext}"
+    asset_id = asset_service.create_asset_from_image_upload(
+        content, file.filename or "image" + ext, name
+    )
+    return UploadAssetResponse(asset_id=asset_id, file=target_filename)
+
+
+@router.post("/upload/mesh", response_model=UploadAssetResponse)
+async def upload_mesh(
+    file: UploadFile = File(...),
+    name: str | None = Form(None),
+    mtl_file: UploadFile | None = File(None),
+):
+    """3D-Modell hochladen (GLB, GLTF, OBJ, PLY, STL, ZIP; max. 100 MB). Konvertiert zu GLB."""
+    ext = Path(file.filename or "").suffix.lower()
+    if ext not in MESH_EXTENSIONS:
+        raise HTTPException(
+            400,
+            detail=f"Ungültiges Format. Erlaubt: {', '.join(MESH_EXTENSIONS)}",
+        )
+    content = await file.read()
+    if len(content) > MESH_MAX_BYTES:
+        raise HTTPException(
+            400,
+            detail=f"Datei zu groß. Maximum: {MESH_MAX_BYTES // (1024*1024)} MB",
+        )
+    mtl_bytes: bytes | None = None
+    mtl_filename: str | None = None
+    if mtl_file and mtl_file.filename:
+        mtl_ext = Path(mtl_file.filename).suffix.lower()
+        if mtl_ext == ".mtl":
+            mtl_bytes = await mtl_file.read()
+            mtl_filename = Path(mtl_file.filename).name
+    try:
+        asset_id = asset_service.create_asset_from_mesh_upload(
+            content,
+            file.filename or "mesh" + ext,
+            name,
+            mtl_bytes=mtl_bytes,
+            mtl_filename=mtl_filename,
+        )
+    except ValueError as e:
+        raise HTTPException(400, detail=str(e)) from e
+    return UploadAssetResponse(asset_id=asset_id, file="mesh.glb")
 
 
 @router.get("/{asset_id}", response_model=AssetDetailResponse)
@@ -173,6 +246,7 @@ async def get_asset_file(asset_id: str, filename: str):
         ".png": "image/png",
         ".jpg": "image/jpeg",
         ".jpeg": "image/jpeg",
+        ".webp": "image/webp",
         ".glb": "model/gltf-binary",
     }
     media_type = media_types.get(suffix, "application/octet-stream")

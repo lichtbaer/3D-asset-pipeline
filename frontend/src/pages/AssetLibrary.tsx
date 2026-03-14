@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { listAssets } from "../api/assets.js";
 import { AssetDetailModal } from "../components/assets/AssetDetailModal.js";
+import { AssetUploadZone } from "../components/assets/AssetUploadZone.js";
 import type { AssetListItem } from "../api/assets.js";
 
 function formatDate(iso: string): string {
@@ -153,6 +154,11 @@ export function AssetLibrary() {
           Zur Pipeline
         </Link>
       </header>
+
+      <div className="asset-library__upload-row">
+        <AssetUploadZone type="image" />
+        <AssetUploadZone type="mesh" />
+      </div>
 
       {isLoading && !assets && (
         <div className="asset-library__loading">

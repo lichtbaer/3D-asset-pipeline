@@ -41,3 +41,10 @@ class CreateAssetResponse(BaseModel):
     """Response für POST /assets."""
 
     asset_id: str
+
+
+class UploadAssetResponse(BaseModel):
+    """Response für POST /assets/upload/image und /upload/mesh."""
+
+    asset_id: str
+    file: str  # Dateiname des erstellten Steps (z.B. image_original.png, mesh.glb)
