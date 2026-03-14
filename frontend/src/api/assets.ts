@@ -15,6 +15,10 @@ export interface AssetListItem {
   steps: Record<string, AssetStepInfo>;
   thumbnail_url: string | null;
   deleted_at?: string | null;
+  name?: string | null;
+  tags?: string[];
+  rating?: number | null;
+  favorited?: boolean;
 }
 
 export interface ProcessingEntry {
@@ -46,6 +50,29 @@ export interface AssetDetail {
   sketchfab_author?: string | null;
   downloaded_at?: string | null;
   exports?: ExportEntry[];
+  name?: string | null;
+  tags?: string[];
+  rating?: number | null;
+  notes?: string | null;
+  favorited?: boolean;
+}
+
+export interface AssetMetaUpdate {
+  name?: string | null;
+  tags?: string[];
+  rating?: number | null;
+  notes?: string | null;
+  favorited?: boolean | null;
+}
+
+export interface ListAssetsParams {
+  search?: string;
+  tags?: string;
+  rating?: number;
+  has_step?: "image" | "mesh" | "rigging" | "animation";
+  favorited?: boolean;
+  source?: string;
+  sort?: "created_desc" | "created_asc" | "name" | "rating";
 }
 
 export interface ExportEntry {
@@ -78,12 +105,33 @@ export interface ExportListItem {
 }
 
 export async function listAssets(
-  options?: { includeDeleted?: boolean }
+  params?: ListAssetsParams & { includeDeleted?: boolean }
 ): Promise<AssetListItem[]> {
-  const params = options?.includeDeleted
-    ? { include_deleted: "true" }
-    : undefined;
-  const { data } = await apiClient.get<AssetListItem[]>("/assets", { params });
+  const p = params ?? {};
+  const { includeDeleted, ...rest } = p;
+  const queryParams = {
+    ...rest,
+    ...(includeDeleted ? { include_deleted: "true" } : {}),
+  };
+  const { data } = await apiClient.get<AssetListItem[]>("/assets", {
+    params: queryParams,
+  });
+  return data;
+}
+
+export async function getAssetTags(): Promise<{ tags: string[] }> {
+  const { data } = await apiClient.get<{ tags: string[] }>("/assets/tags");
+  return data;
+}
+
+export async function patchAssetMeta(
+  assetId: string,
+  meta: AssetMetaUpdate
+): Promise<{ message: string }> {
+  const { data } = await apiClient.patch<{ message: string }>(
+    `/assets/${assetId}/meta`,
+    meta
+  );
   return data;
 }
 
