@@ -197,3 +197,89 @@ def test_compute_execution_plan_start_from_step(
 def test_delete_preset_invalid_id(tmp_storage_paths):
     """delete_preset mit ungültiger ID gibt False."""
     assert preset_service.delete_preset("not-a-uuid") is False
+
+
+def test_compute_execution_plan_all_steps_skipped(
+    tmp_storage_paths, tmp_assets_dir, tmp_presets_dir
+):
+    """Asset hat bereits alle Preset-Steps — alle werden übersprungen."""
+    asset_id = str(uuid.uuid4())
+    _create_asset_with_meta(
+        tmp_assets_dir,
+        asset_id,
+        steps={
+            "mesh": {"file": "mesh.glb", "provider_key": "trellis2"},
+            "rigging": {"file": "mesh_rigged.glb", "provider_key": "unirig"},
+        },
+    )
+    (tmp_assets_dir / asset_id / "mesh.glb").write_bytes(b"glTF")
+    (tmp_assets_dir / asset_id / "mesh_rigged.glb").write_bytes(b"glTF")
+
+    preset = preset_service.create_preset(
+        "Test",
+        "",
+        [
+            {"step": "mesh", "provider": "trellis2", "params": {}},
+            {"step": "rigging", "provider": "unirig", "params": {}},
+        ],
+    )
+
+    plan, applicable, skipped = preset_service.compute_execution_plan(
+        preset["id"], asset_id
+    )
+    assert skipped == 2
+    assert applicable == 0
+    assert all(p.status == "skipped" for p in plan)
+
+
+def test_update_preset_invalid_id(tmp_storage_paths):
+    """update_preset mit ungültiger ID gibt None."""
+    assert preset_service.update_preset("not-a-uuid", name="X") is None
+
+
+def test_update_preset_not_found(tmp_storage_paths):
+    """update_preset mit nicht existierender ID gibt None."""
+    assert (
+        preset_service.update_preset(
+            "00000000-0000-0000-0000-000000000000", name="X"
+        )
+        is None
+    )
+
+
+def test_get_preset_invalid_id(tmp_storage_paths):
+    """get_preset mit ungültiger ID gibt None."""
+    assert preset_service.get_preset("not-a-uuid") is None
+
+
+def test_list_presets_skips_invalid_json(tmp_storage_paths, tmp_presets_dir):
+    """list_presets überspringt Presets mit ungültigem JSON."""
+    preset_service.create_preset("Valid", "", [])
+    invalid_id = str(uuid.uuid4())
+    invalid_path = tmp_presets_dir / f"{invalid_id}.json"
+    invalid_path.write_text("{ invalid json }", encoding="utf-8")
+    presets = preset_service.list_presets()
+    assert len(presets) >= 1
+    assert all("name" in p for p in presets)
+
+
+def test_asset_to_preset_steps_with_exports_and_sketchfab(
+    tmp_storage_paths, tmp_assets_dir
+):
+    """asset_to_preset_steps inkludiert exports und sketchfab_upload."""
+    asset_id = str(uuid.uuid4())
+    _create_asset_with_meta(
+        tmp_assets_dir,
+        asset_id,
+        steps={"mesh": {"file": "mesh.glb", "provider_key": "trellis2"}},
+        processing=[],
+        exports=[{"output_file": "export.gltf", "format": "gltf"}],
+        sketchfab_upload={"uid": "abc", "is_private": False},
+    )
+    meta = asset_service.get_asset(asset_id)
+    assert meta is not None
+    steps = preset_service.asset_to_preset_steps(meta)
+    step_types = [s["step"] for s in steps]
+    assert "mesh" in step_types
+    assert "export" in step_types
+    assert "sketchfab_upload" in step_types
