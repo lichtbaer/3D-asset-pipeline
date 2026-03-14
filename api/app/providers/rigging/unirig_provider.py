@@ -47,7 +47,7 @@ class UniRigProvider(BaseRiggingProvider):
                 if item and isinstance(item, str) and (
                     item.endswith(".glb") or item.endswith(".obj")
                 ):
-                    return item
+                    return str(item)
             if result and result[0]:
                 return str(result[0])
             return None

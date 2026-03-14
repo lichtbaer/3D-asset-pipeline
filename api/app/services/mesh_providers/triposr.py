@@ -4,12 +4,11 @@ TripoSR Mesh-Provider via Hugging Face Space.
 import asyncio
 import logging
 import os
-import shutil
 from pathlib import Path
+from typing import Any
 
 from gradio_client import Client, handle_file
 
-from app.config.storage import MESH_STORAGE_PATH
 from app.services.mesh_providers.base import MeshProvider
 
 logger = logging.getLogger(__name__)
@@ -22,10 +21,10 @@ class TripoSRProvider(MeshProvider):
     provider_key = "triposr"
     display_name = "TripoSR"
 
-    def default_params(self) -> dict:
+    def default_params(self) -> dict[str, Any]:
         return {"mc_resolution": 256}
 
-    def param_schema(self) -> dict:
+    def param_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -61,13 +60,13 @@ class TripoSRProvider(MeshProvider):
                 if item and isinstance(item, str) and (
                     item.endswith(".glb") or item.endswith(".obj")
                 ):
-                    return item
+                    return str(item)
             if result and result[0]:
                 return str(result[0])
             return None
         return str(result) if result else None
 
-    async def generate(self, image_path: str, params: dict) -> str:
+    async def generate(self, image_path: str, params: dict[str, Any]) -> str:
         mc_resolution = params.get(
             "mc_resolution", self.default_params()["mc_resolution"]
         )

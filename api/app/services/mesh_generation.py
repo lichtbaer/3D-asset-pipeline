@@ -8,7 +8,7 @@ import os
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Awaitable, Callable
+from typing import Any, Awaitable, Callable
 
 import httpx
 
@@ -31,7 +31,7 @@ async def run_mesh_generation(
     job_id: str,
     source_image_url: str,
     provider_key: str,
-    params: dict,
+    params: dict[str, Any],
     update_job_callback: UpdateMeshJobCallback,
 ) -> None:
     """
@@ -194,7 +194,7 @@ async def run_mesh_generation_with_auto_bgremoval(
     job_id: str,
     source_image_url: str,
     provider_key: str,
-    params: dict,
+    params: dict[str, Any],
     auto_bgremoval: bool,
     bgremoval_provider_key: str,
     update_job_callback: UpdateMeshJobCallback,

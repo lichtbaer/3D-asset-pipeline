@@ -1,6 +1,7 @@
 """Abstrakte Basisklasse für Background-Removal-Provider."""
 
 from abc import ABC, abstractmethod
+from typing import Any
 
 
 class BgRemovalProvider(ABC):
@@ -25,12 +26,12 @@ class BgRemovalProvider(ABC):
         """
         ...
 
-    def default_params(self) -> dict:
+    def default_params(self) -> dict[str, Any]:
         """Provider-spezifische Standard-Parameter (optional)."""
         return {}
 
     @abstractmethod
-    def param_schema(self) -> dict:
+    def param_schema(self) -> dict[str, Any]:
         """
         JSON Schema für provider-spezifische Parameter.
         Wird an Frontend für dynamisches Formular zurückgegeben.

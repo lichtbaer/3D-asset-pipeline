@@ -4,7 +4,7 @@ import asyncio
 import logging
 import os
 import tempfile
-from pathlib import Path
+from typing import Any
 
 import httpx
 
@@ -26,7 +26,7 @@ class RembgLocalProvider(BgRemovalProvider):
     provider_key = "rembg-local"
     display_name = "rembg (lokal)"
 
-    def param_schema(self) -> dict:
+    def param_schema(self) -> dict[str, Any]:
         return PARAM_SCHEMA.copy()
 
     async def remove_background(
@@ -77,4 +77,4 @@ class RembgLocalProvider(BgRemovalProvider):
         with open(input_path, "rb") as f:
             input_data = f.read()
         output_data = remove(input_data)
-        return output_data
+        return bytes(output_data)

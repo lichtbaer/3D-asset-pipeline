@@ -2,6 +2,7 @@
 Abstrakte Basisklasse für Mesh-Provider.
 """
 from abc import ABC, abstractmethod
+from typing import Any
 
 
 class MeshProvider(ABC):
@@ -14,7 +15,7 @@ class MeshProvider(ABC):
     async def generate(
         self,
         image_path: str,  # lokaler Pfad zum heruntergeladenen Bild
-        params: dict,  # provider-spezifische Parameter
+        params: dict[str, Any],  # provider-spezifische Parameter
     ) -> str:
         """
         Generiert ein 3D-Mesh aus dem Bild.
@@ -23,12 +24,12 @@ class MeshProvider(ABC):
         ...
 
     @abstractmethod
-    def default_params(self) -> dict:
+    def default_params(self) -> dict[str, Any]:
         """Provider-spezifische Standard-Parameter."""
         ...
 
     @abstractmethod
-    def param_schema(self) -> dict:
+    def param_schema(self) -> dict[str, Any]:
         """
         JSON Schema für provider-spezifische Parameter.
         Wird an Frontend für dynamisches Formular zurückgegeben.

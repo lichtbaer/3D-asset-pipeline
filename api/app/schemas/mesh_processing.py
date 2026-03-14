@@ -1,6 +1,7 @@
 """Pydantic-Schemas für Mesh-Processing-API."""
 
 from enum import Enum
+from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -70,7 +71,7 @@ class ProcessingResult(BaseModel):
     """Response für simplify/repair."""
 
     output_file: str
-    processing: dict = Field(
+    processing: dict[str, Any] = Field(
         description="Eintrag für metadata.json processing-Array"
     )
 

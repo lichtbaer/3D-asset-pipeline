@@ -6,6 +6,7 @@ Alle Operationen sind nicht-destruktiv — das Original mesh.glb wird nie übers
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import open3d as o3d
@@ -77,7 +78,7 @@ def analyze(asset_id: str, source_file: str) -> MeshAnalysis:
 
 def simplify(
     asset_id: str, source_file: str, target_faces: int
-) -> tuple[str, dict]:
+) -> tuple[str, dict[str, Any]]:
     """
     Vereinfacht Mesh auf target_faces Dreiecke.
     Speichert mesh_simplified_{target_faces}.glb, gibt Filename zurück.
@@ -117,7 +118,7 @@ def simplify(
 
 def repair(
     asset_id: str, source_file: str, operations: list[RepairOperation]
-) -> tuple[str, dict]:
+) -> tuple[str, dict[str, Any]]:
     """
     Repariert Mesh mit ausgewählten Operationen.
     Speichert mesh_repaired.glb, gibt Filename zurück.
@@ -184,7 +185,7 @@ def clip_floor(
     asset_id: str,
     source_file: str,
     y_threshold: float | None = None,
-) -> tuple[str, dict]:
+) -> tuple[str, dict[str, Any]]:
     """
     Schneidet alles unterhalb eines Y-Schwellwerts ab.
     y_threshold=None → Auto-Detect: untere 5% der Bounding Box.
@@ -249,7 +250,7 @@ def remove_small_components(
     asset_id: str,
     source_file: str,
     min_component_ratio: float = 0.05,
-) -> tuple[str, dict]:
+) -> tuple[str, dict[str, Any]]:
     """
     Entfernt kleine, nicht verbundene Komponenten.
     Komponenten kleiner als min_component_ratio * Hauptmesh werden entfernt.

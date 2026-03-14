@@ -1328,7 +1328,7 @@ export function PipelinePage() {
                 <ProcessingResultsList
                   assetId={urlAssetId}
                   processing={urlAsset.processing}
-                  onUseForRigging={(url, _assetId) => {
+                  onUseForRigging={(url) => {
                     setRiggingSourceGlbUrl(url);
                     setSearchParams((prev) => {
                       const next = new URLSearchParams(prev);

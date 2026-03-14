@@ -3,7 +3,6 @@ Orchestrierung der Rigging-Generierung: Download, Provider-Aufruf, Speicherung.
 """
 import asyncio
 import logging
-from pathlib import Path
 from typing import Awaitable, Callable
 
 from app.config.storage import MESH_STORAGE_PATH

@@ -19,5 +19,11 @@ export default defineConfig([
       ecmaVersion: 2020,
       globals: globals.browser,
     },
+    rules: {
+      // set-state-in-effect: Viele Komponenten syncen State aus Props/URL – pragmatisch deaktiviert
+      'react-hooks/set-state-in-effect': 'off',
+      // PipelineStore exportiert Provider + Hook – Fast Refresh Einschränkung akzeptiert
+      'react-refresh/only-export-components': 'warn',
+    },
   },
 ])

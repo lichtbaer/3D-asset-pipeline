@@ -36,10 +36,10 @@ def _build_registry() -> dict[str, BaseRiggingProvider]:
     # UniRig Lokal (nur wenn CUDA + Checkpoint vorhanden)
     try:
         from app.providers.rigging.unirig_local import (
+            UniRigLocalProvider,
             _checkpoints_exist,
             _cuda_available,
             _repo_ready,
-            UniRigLocalProvider,
         )
 
         if not _cuda_available():

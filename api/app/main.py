@@ -1,20 +1,8 @@
-import os
-from pathlib import Path
-
-from fastapi import FastAPI, Depends, Request
-
-from app.logging_config import setup_logging
-
-setup_logging()
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-
-from app.core.rate_limit import limiter
-from app.core.security import verify_api_key
-from app.database import check_db_connection
-from app.routers import agents, generation
 
 from app.config.storage import (
     ANIMATION_STORAGE_PATH,
@@ -24,7 +12,14 @@ from app.config.storage import (
     MESH_STORAGE_PATH,
     PRESETS_STORAGE_PATH,
 )
-from app.routers import assets, presets, sketchfab, storage
+from app.core.config import settings as app_settings
+from app.core.rate_limit import limiter
+from app.core.security import verify_api_key
+from app.database import check_db_connection
+from app.logging_config import setup_logging
+from app.routers import agents, assets, generation, presets, sketchfab, storage
+
+setup_logging()
 
 MESH_STORAGE_PATH.mkdir(parents=True, exist_ok=True)
 PRESETS_STORAGE_PATH.mkdir(parents=True, exist_ok=True)
@@ -60,8 +55,6 @@ app.mount(
     StaticFiles(directory=str(IMAGE_STORAGE_PATH)),
     name="images",
 )
-
-from app.core.config import settings as app_settings
 
 _cors_origins = [o.strip() for o in app_settings.ALLOWED_ORIGINS.split(",") if o.strip()]
 
@@ -100,7 +93,7 @@ app.add_middleware(SecurityHeadersMiddleware)
 
 
 @app.get("/health")
-async def health():
+async def health() -> dict[str, str]:
     db_connected = await check_db_connection()
     return {
         "status": "ok",

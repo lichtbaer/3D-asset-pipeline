@@ -4,7 +4,6 @@ Orchestrierung der Animation-Generierung: Provider-Aufruf, Speicherung.
 import asyncio
 import logging
 import os
-from pathlib import Path
 from typing import Awaitable, Callable
 
 from app.config.storage import ANIMATION_STORAGE_PATH

@@ -10,7 +10,7 @@ import zipfile
 from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import httpx
 import trimesh
@@ -256,7 +256,7 @@ class SketchfabService:
                     headers=self._headers,
                 )
                 if resp.status_code == 200:
-                    return resp.json()
+                    return cast(dict[str, Any], resp.json())
         except Exception as e:
             logger.debug("Sketchfab Model-Info nicht abrufbar: %s", e)
         return None

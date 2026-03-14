@@ -2,25 +2,27 @@
 
 import asyncio
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic_ai import BinaryContent
 
-from app.core.rate_limit import limiter
-
+from app.agents.chat_agent import ChatResponse as ChatResponseModel
+from app.agents.chat_agent import get_chat_agent
 from app.agents.models import (
     AgentError,
-    QualityAssessment,
     PromptSuggestion,
+    QualityAssessment,
     TagSuggestion,
     WorkflowRecommendation,
 )
-from app.agents.chat_agent import ChatResponse as ChatResponseModel, get_chat_agent
 from app.agents.prompt_agent import get_prompt_agent
 from app.agents.quality_agent import get_quality_agent
 from app.agents.tagging_agent import get_tagging_agent
 from app.agents.workflow_agent import get_workflow_agent
 from app.core.config import settings
+from app.core.errors import APIError, raise_api_error
+from app.core.rate_limit import limiter
 from app.schemas.agents import (
     ChatRequest,
     PromptOptimizeRequest,
@@ -45,11 +47,15 @@ def _agent_not_available_error(agent: str) -> AgentError:
 
 
 def _raise_503(agent: str) -> None:
-    """Wirft 503 mit strukturiertem AgentError."""
+    """Wirft 503 mit strukturiertem APIError."""
     err = _agent_not_available_error(agent)
     raise HTTPException(
         status_code=503,
-        detail=err.model_dump(),
+        detail=APIError(
+            error=err.message,
+            detail=err.message,
+            code="AGENT_NOT_AVAILABLE",
+        ).model_dump(),
     )
 
 
@@ -83,26 +89,16 @@ async def optimize_prompt(
     try:
         result = await agent.run(_build_prompt_message(body))
     except Exception as e:
-        raise HTTPException(
-            status_code=502,
-            detail={
-                "agent": "prompt",
-                "error_type": "model_error",
-                "message": str(e),
-                "fallback_available": False,
-            },
-        ) from e
+        raise_api_error(
+            502,
+            "Modell-Fehler",
+            detail=str(e),
+            code="MODEL_ERROR",
+            chain=e,
+        )
     output = result.output
     if output is None:
-        raise HTTPException(
-            status_code=502,
-            detail={
-                "agent": "prompt",
-                "error_type": "model_error",
-                "message": "Agent returned no output",
-                "fallback_available": False,
-            },
-        )
+        raise_api_error(502, "Agent returned no output", code="MODEL_ERROR")
     return output
 
 
@@ -150,7 +146,7 @@ async def suggest_tags(
         _raise_503("tagging")
     meta = asset_service.get_asset(body.asset_id)
     if not meta:
-        raise HTTPException(404, detail="Asset nicht gefunden")
+        raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
     pipeline_steps = body.pipeline_steps or list(meta.steps.keys())
     prompt = body.prompt
     if not prompt:
@@ -167,7 +163,7 @@ async def suggest_tags(
             include_image_analysis=body.include_image_analysis,
         )
     )
-    run_input: list[object] = [message]
+    run_input: list[str | BinaryContent] = [message]
     if body.include_image_analysis:
         img_path, media_type = _get_preview_image_path(body.asset_id)
         if img_path and media_type:
@@ -177,26 +173,10 @@ async def suggest_tags(
     try:
         result = await agent.run(run_input)
     except Exception as e:
-        raise HTTPException(
-            status_code=502,
-            detail={
-                "agent": "tagging",
-                "error_type": "model_error",
-                "message": str(e),
-                "fallback_available": False,
-            },
-        ) from e
+        raise_api_error(502, "Modell-Fehler", detail=str(e), code="MODEL_ERROR", chain=e)
     output = result.output
     if output is None:
-        raise HTTPException(
-            status_code=502,
-            detail={
-                "agent": "tagging",
-                "error_type": "model_error",
-                "message": "Agent returned no output",
-                "fallback_available": False,
-            },
-        )
+        raise_api_error(502, "Agent returned no output", code="MODEL_ERROR")
     return output
 
 
@@ -218,7 +198,7 @@ async def _run_quality_assessment_internal(
     include_vision: bool = True,
 ) -> QualityAssessment | None:
     """Interne Quality-Assessment-Logik (für Route und Workflow)."""
-    mesh_analysis_dict: dict | None = None
+    mesh_analysis_dict: dict[str, Any] | None = None
     if include_mesh_analysis:
         try:
             source_file = _get_mesh_source_file(asset_id)
@@ -228,7 +208,7 @@ async def _run_quality_assessment_internal(
             pass
 
     message = _build_quality_prompt(asset_id, mesh_analysis_dict)
-    run_input: list[object] = [message]
+    run_input: list[str | BinaryContent] = [message]
 
     if include_vision:
         img_path, media_type = _get_preview_image_path(asset_id)
@@ -250,7 +230,7 @@ async def _run_quality_assessment_internal(
 
 def _build_quality_prompt(
     asset_id: str,
-    mesh_analysis: dict | None,
+    mesh_analysis: dict[str, Any] | None,
 ) -> str:
     """Baut die User-Nachricht für den Quality-Agenten."""
     parts = [f"Asset-ID: {asset_id}"]
@@ -282,11 +262,12 @@ async def assess_quality(
         _raise_503("quality")
     meta = asset_service.get_asset(body.asset_id)
     if not meta:
-        raise HTTPException(404, detail="Asset nicht gefunden")
+        raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
     if "mesh" not in meta.steps:
-        raise HTTPException(
+        raise_api_error(
             400,
-            detail="Asset hat keinen Mesh-Step (nur Assets mit mesh können bewertet werden)",
+            "Asset hat keinen Mesh-Step (nur Assets mit mesh können bewertet werden)",
+            code="INVALID_ASSET",
         )
 
     try:
@@ -296,33 +277,17 @@ async def assess_quality(
             include_vision=body.include_vision,
         )
     except Exception as e:
-        raise HTTPException(
-            status_code=502,
-            detail={
-                "agent": "quality",
-                "error_type": "model_error",
-                "message": str(e),
-                "fallback_available": False,
-            },
-        ) from e
+        raise_api_error(502, "Modell-Fehler", detail=str(e), code="MODEL_ERROR", chain=e)
 
     if output is None:
-        raise HTTPException(
-            status_code=502,
-            detail={
-                "agent": "quality",
-                "error_type": "model_error",
-                "message": "Agent returned no output",
-                "fallback_available": False,
-            },
-        )
+        raise_api_error(502, "Agent returned no output", code="MODEL_ERROR")
 
     return output
 
 
 def _build_workflow_prompt(
     asset_id: str,
-    mesh_analysis: dict | None,
+    mesh_analysis: dict[str, Any] | None,
     pipeline_steps: list[str],
     quality_assessment: QualityAssessment | None,
     intention: str | None,
@@ -367,7 +332,7 @@ async def recommend_workflow(
         _raise_503("workflow")
     meta = asset_service.get_asset(body.asset_id)
     if not meta:
-        raise HTTPException(404, detail="Asset nicht gefunden")
+        raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
 
     pipeline_steps = list(meta.steps.keys())
     quality = body.quality_assessment
@@ -404,34 +369,18 @@ async def recommend_workflow(
     try:
         result = await agent.run(message)
     except Exception as e:
-        raise HTTPException(
-            status_code=502,
-            detail={
-                "agent": "workflow",
-                "error_type": "model_error",
-                "message": str(e),
-                "fallback_available": False,
-            },
-        ) from e
+        raise_api_error(502, "Modell-Fehler", detail=str(e), code="MODEL_ERROR", chain=e)
 
     output = result.output
     if output is None:
-        raise HTTPException(
-            status_code=502,
-            detail={
-                "agent": "workflow",
-                "error_type": "model_error",
-                "message": "Agent returned no output",
-                "fallback_available": False,
-            },
-        )
+        raise_api_error(502, "Agent returned no output", code="MODEL_ERROR")
 
     return output
 
 
-def _build_chat_context(body: ChatRequest) -> dict:
+def _build_chat_context(body: ChatRequest) -> dict[str, Any]:
     """Baut den Kontext für den Chat-Agenten (History + Asset)."""
-    ctx: dict = {
+    ctx: dict[str, Any] = {
         "message": body.message,
         "history": [
             {"role": m.role, "content": m.content, "timestamp": m.timestamp}
@@ -456,7 +405,7 @@ def _build_chat_context(body: ChatRequest) -> dict:
     return ctx
 
 
-def _build_chat_user_message(ctx: dict) -> str:
+def _build_chat_user_message(ctx: dict[str, Any]) -> str:
     """Formatiert die User-Nachricht mit Kontext für den Agenten."""
     parts: list[str] = []
     if ctx.get("asset_context"):
@@ -493,24 +442,8 @@ async def chat(request: Request, body: ChatRequest) -> ChatResponseModel:
     try:
         result = await agent.run(user_message)
     except Exception as e:
-        raise HTTPException(
-            status_code=502,
-            detail={
-                "agent": "chat",
-                "error_type": "model_error",
-                "message": str(e),
-                "fallback_available": False,
-            },
-        ) from e
+        raise_api_error(502, "Modell-Fehler", detail=str(e), code="MODEL_ERROR", chain=e)
     output = result.output
     if output is None:
-        raise HTTPException(
-            status_code=502,
-            detail={
-                "agent": "chat",
-                "error_type": "model_error",
-                "message": "Agent returned no output",
-                "fallback_available": False,
-            },
-        )
+        raise_api_error(502, "Agent returned no output", code="MODEL_ERROR")
     return output

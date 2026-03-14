@@ -16,7 +16,6 @@ export function getRouteForStep(
   item: ExecutionPlanItem
 ): { path: string; tab?: TabId } {
   const step = item.step;
-  const assetId = ""; // Wird vom Aufrufer ergänzt
 
   const pipelineSteps: Record<string, TabId> = {
     image: "image",

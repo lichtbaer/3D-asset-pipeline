@@ -18,7 +18,6 @@ import httpx
 from app.config.storage import (
     ASSETS_STORAGE_PATH,
     BGREMOVAL_STORAGE_PATH,
-    MESH_STORAGE_PATH,
 )
 
 logger = logging.getLogger(__name__)
@@ -463,15 +462,15 @@ def delete_step(
     Wenn force=False und abhängige Steps existieren: gibt requires_confirmation zurück.
     Wenn cascade=True: löscht auch abhängige Steps.
     """
-    VALID_STEPS = {"image", "bgremoval", "mesh", "rigging", "animation"}
-    if step_name not in VALID_STEPS:
+    valid_steps = {"image", "bgremoval", "mesh", "rigging", "animation"}
+    if step_name not in valid_steps:
         raise ValueError(f"Ungültiger Step: {step_name}")
 
     meta = get_asset(asset_id)
     if not meta:
         raise FileNotFoundError(f"Asset {asset_id} nicht gefunden")
 
-    existing = {s for s in VALID_STEPS if s in meta.steps and meta.steps[s]}
+    existing = {s for s in valid_steps if s in meta.steps and meta.steps[s]}
     dependent = get_dependent_steps(step_name, existing)
 
     if not force and dependent and not cascade:

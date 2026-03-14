@@ -4,7 +4,6 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
-
 # Valide Issue-Typen für Qualitätsbewertung
 QualityIssueType = Literal[
     "floor_artifact",

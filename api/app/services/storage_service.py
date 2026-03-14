@@ -4,6 +4,7 @@ Storage-Statistik und Papierkorb-Purge.
 
 import logging
 from pathlib import Path
+from typing import Any
 
 from app.config.storage import ASSETS_STORAGE_PATH
 from app.services import asset_service
@@ -64,7 +65,6 @@ def _get_asset_breakdown(asset_id: str) -> dict[str, int]:
                 breakdown["images"] += f.stat().st_size
 
     # Mesh-Dateien: mesh.glb, mesh_original.*, mesh_simplified_*.glb, mesh_repaired, mesh_clipped, mesh_cleaned
-    mesh_files = {"mesh.glb", "mesh_original.glb", "mesh_original.obj", "mesh_original.stl", "mesh_original.ply"}
     for f in asset_path.iterdir():
         if f.is_file():
             name = f.name.lower()
@@ -96,7 +96,7 @@ def _get_asset_breakdown(asset_id: str) -> dict[str, int]:
     return breakdown
 
 
-def compute_storage_stats() -> dict:
+def compute_storage_stats() -> dict[str, Any]:
     """
     Berechnet Storage-Statistik über alle Assets.
     Berücksichtigt soft-deleted Assets für deleted_count und deleted_size_bytes.

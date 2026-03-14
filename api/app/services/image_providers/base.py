@@ -1,6 +1,7 @@
 """Abstrakte Basisklasse für Image-Provider."""
 
 from abc import ABC, abstractmethod
+from typing import Any
 
 
 class ImageProvider(ABC):
@@ -13,7 +14,7 @@ class ImageProvider(ABC):
     async def generate(
         self,
         prompt: str,
-        params: dict,
+        params: dict[str, Any],
     ) -> str:
         """
         Generiert ein Bild und gibt die URL zurück.
@@ -28,12 +29,12 @@ class ImageProvider(ABC):
         ...
 
     @abstractmethod
-    def default_params(self) -> dict:
+    def default_params(self) -> dict[str, Any]:
         """Liefert die Standard-Parameter für diesen Provider."""
         ...
 
     @abstractmethod
-    def param_schema(self) -> dict:
+    def param_schema(self) -> dict[str, Any]:
         """
         JSON Schema für provider-spezifische Parameter.
         Wird an Frontend für dynamisches Formular zurückgegeben.
