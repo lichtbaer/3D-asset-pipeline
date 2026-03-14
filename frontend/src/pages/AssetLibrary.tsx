@@ -14,7 +14,11 @@ import { AssetUploadZone } from "../components/assets/AssetUploadZone.js";
 import { SketchfabImportModal } from "../components/assets/SketchfabImportModal.js";
 import { DeleteAssetDialog } from "../components/assets/DeleteAssetDialog.js";
 import { TrashActionsDialog } from "../components/assets/TrashActionsDialog.js";
+import { AssetPickerModal } from "../components/assets/AssetPickerModal.js";
+import { ApplyPresetModal } from "../components/presets/ApplyPresetModal.js";
+import { getUrlForFirstApplicableStep } from "../utils/presetNavigation.js";
 import { useDebounce } from "../hooks/useDebounce.js";
+import { usePipelineStore } from "../store/PipelineStore.js";
 import type {
   AssetListItem,
   ListAssetsParams,
@@ -254,11 +258,16 @@ export function AssetLibrary() {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
+  const { setActiveAssetId } = usePipelineStore();
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [lastUploadedAssetId, setLastUploadedAssetId] = useState<
     string | null
   >(null);
   const [showSketchfabImport, setShowSketchfabImport] = useState(false);
+  const [showApplyPreset, setShowApplyPreset] = useState(false);
+  const [applyPresetAssetId, setApplyPresetAssetId] = useState<string | null>(
+    null
+  );
   const [showTrash, setShowTrash] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -293,6 +302,8 @@ export function AssetLibrary() {
     queryFn: getSketchfabStatus,
   });
 
+  const assetIdFromUrl = new URLSearchParams(location.search).get("assetId");
+
   useEffect(() => {
     const state = location.state as { importedAssetId?: string } | null;
     if (state?.importedAssetId) {
@@ -300,6 +311,12 @@ export function AssetLibrary() {
       navigate(location.pathname, { replace: true, state: {} });
     }
   }, [location.state, location.pathname, navigate]);
+
+  useEffect(() => {
+    if (assetIdFromUrl) {
+      setSelectedAssetId(assetIdFromUrl);
+    }
+  }, [assetIdFromUrl]);
 
   const listParams = useMemo(
     () => ({
@@ -472,6 +489,16 @@ export function AssetLibrary() {
               Von Sketchfab importieren
             </button>
           )}
+          <button
+            type="button"
+            className="btn btn--outline"
+            onClick={() => setShowApplyPreset(true)}
+          >
+            ⚡ Preset anwenden
+          </button>
+          <Link to="/presets" className="asset-library__link">
+            Presets
+          </Link>
           <Link to="/storage" className="asset-library__link">
             Speicher
           </Link>
@@ -792,6 +819,42 @@ export function AssetLibrary() {
             />
           </div>
         </div>
+      )}
+
+      {showApplyPreset && (
+        <>
+          {!applyPresetAssetId ? (
+            <AssetPickerModal
+              isOpen={true}
+              onClose={() => {
+                setShowApplyPreset(false);
+                setApplyPresetAssetId(null);
+              }}
+              onSelect={(asset) => {
+                setApplyPresetAssetId(asset.asset_id);
+              }}
+              filter="has_mesh"
+            />
+          ) : (
+            <ApplyPresetModal
+              assetId={applyPresetAssetId}
+              onClose={() => {
+                setShowApplyPreset(false);
+                setApplyPresetAssetId(null);
+              }}
+              onExecutePlan={(plan) => {
+                setActiveAssetId(plan.asset_id);
+                setApplyPresetAssetId(null);
+                setShowApplyPreset(false);
+                const url = getUrlForFirstApplicableStep(
+                  plan.execution_plan,
+                  plan.asset_id
+                );
+                navigate(url);
+              }}
+            />
+          )}
+        </>
       )}
     </main>
   );
