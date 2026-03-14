@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect, useMemo } from "react";
+import { useCallback, useState, useEffect, useMemo, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
@@ -80,6 +80,8 @@ import { getAssetFileUrl } from "../api/assets.js";
 import { getMeshSources } from "../api/meshProcessing.js";
 import { MeshProcessingPanel } from "../components/assets/MeshProcessingPanel.js";
 import { AssetPickerModal } from "../components/assets/AssetPickerModal.js";
+import { useToast } from "../components/ui/ToastContext.js";
+import { PipelineStepper, type PipelineStep } from "../components/ui/PipelineStepper.js";
 import "./ImageGenerationPage.css";
 import "./PipelinePage.css";
 
@@ -180,6 +182,8 @@ export function PipelinePage() {
   );
 
   const { assetId: urlAssetId, asset: urlAsset } = useAssetFromUrl();
+  const { addToast } = useToast();
+  const prevJobStatuses = useRef(new Map<string, string>());
 
   const clearAssetFromUrl = useCallback(() => {
     setSearchParams((prev) => {
@@ -254,7 +258,6 @@ export function PipelinePage() {
   // URL-Parameter: ?tab=X&source=URL oder ?tab=X&assetId=ID
   useEffect(() => {
     const source = searchParams.get("source");
-    const assetId = searchParams.get("assetId");
     const tab = searchParams.get("tab");
 
     if (source && tab === "mesh") {
@@ -376,7 +379,13 @@ export function PipelinePage() {
           : entry
       )
     );
-  }, []);
+    const prevStatus = prevJobStatuses.current.get(job.job_id);
+    if (prevStatus !== job.status) {
+      prevJobStatuses.current.set(job.job_id, job.status);
+      if (job.status === "done") addToast("Bildgenerierung abgeschlossen!", "success");
+      if (job.status === "failed") addToast("Bildgenerierung fehlgeschlagen.", "error");
+    }
+  }, [addToast]);
 
   const handleImageRetrySuccess = useCallback((newJobId: string) => {
     setCurrentImageJobId(newJobId);
@@ -439,7 +448,13 @@ export function PipelinePage() {
         entry.job_id === job.job_id ? meshJobToHistoryEntry(job) : entry
       )
     );
-  }, []);
+    const prevStatus = prevJobStatuses.current.get(job.job_id);
+    if (prevStatus !== job.status) {
+      prevJobStatuses.current.set(job.job_id, job.status);
+      if (job.status === "done") addToast("Mesh-Generierung abgeschlossen!", "success");
+      if (job.status === "failed") addToast("Mesh-Generierung fehlgeschlagen.", "error");
+    }
+  }, [addToast]);
 
   const handleMeshRetrySuccess = useCallback((newJobId: string) => {
     setCurrentMeshJobId(newJobId);
@@ -508,7 +523,13 @@ export function PipelinePage() {
           : entry
       )
     );
-  }, []);
+    const prevStatus = prevJobStatuses.current.get(job.job_id);
+    if (prevStatus !== job.status) {
+      prevJobStatuses.current.set(job.job_id, job.status);
+      if (job.status === "done") addToast("Freistellung abgeschlossen!", "success");
+      if (job.status === "failed") addToast("Freistellung fehlgeschlagen.", "error");
+    }
+  }, [addToast]);
 
   const handleBgRemovalRetrySuccess = useCallback((newJobId: string) => {
     setCurrentBgRemovalJobId(newJobId);
@@ -592,7 +613,13 @@ export function PipelinePage() {
           : entry
       )
     );
-  }, []);
+    const prevStatus = prevJobStatuses.current.get(job.job_id);
+    if (prevStatus !== job.status) {
+      prevJobStatuses.current.set(job.job_id, job.status);
+      if (job.status === "done") addToast("Rigging abgeschlossen!", "success");
+      if (job.status === "failed") addToast("Rigging fehlgeschlagen.", "error");
+    }
+  }, [addToast]);
 
   const handleRiggingRetrySuccess = useCallback((newJobId: string) => {
     setCurrentRiggingJobId(newJobId);
@@ -686,7 +713,13 @@ export function PipelinePage() {
           : entry
       )
     );
-  }, []);
+    const prevStatus = prevJobStatuses.current.get(job.job_id);
+    if (prevStatus !== job.status) {
+      prevJobStatuses.current.set(job.job_id, job.status);
+      if (job.status === "done") addToast("Animation abgeschlossen!", "success");
+      if (job.status === "failed") addToast("Animation fehlgeschlagen.", "error");
+    }
+  }, [addToast]);
 
   const handleAnimationRetrySuccess = useCallback((newJobId: string) => {
     setCurrentAnimationJobId(newJobId);
@@ -882,64 +915,27 @@ export function PipelinePage() {
     [meshProviders]
   );
 
+  const stepCompletion = {
+    image: !!urlAsset?.steps?.image?.file,
+    bgremoval: !!urlAsset?.steps?.bgremoval?.file,
+    mesh: !!urlAsset?.steps?.mesh?.file,
+    rigging: !!urlAsset?.steps?.rigging?.file,
+    animation: !!urlAsset?.steps?.animation?.file,
+  };
+
+  const pipelineSteps: PipelineStep[] = [
+    { id: "image", label: "Bild", completed: stepCompletion.image, active: activeTab === "image", disabled: false },
+    { id: "bgremoval", label: "Freistellung", completed: stepCompletion.bgremoval, active: activeTab === "bgremoval", disabled: false },
+    { id: "mesh", label: "Mesh", completed: stepCompletion.mesh, active: activeTab === "mesh" || activeTab === "mesh-processing", disabled: false,
+      subSteps: [{ id: "mesh-processing", label: "Processing", completed: false, active: activeTab === "mesh-processing", disabled: !stepCompletion.mesh }]
+    },
+    { id: "rigging", label: "Rigging", completed: stepCompletion.rigging, active: activeTab === "rigging", disabled: false },
+    { id: "animation", label: "Animation", completed: stepCompletion.animation, active: activeTab === "animation", disabled: false },
+  ];
+
   return (
     <main className="pipeline-page">
-      <nav className="pipeline-tabs" role="tablist">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeTab === "image"}
-          className={`pipeline-tabs__tab ${activeTab === "image" ? "pipeline-tabs__tab--active" : ""}`}
-          onClick={() => setActiveTab("image")}
-        >
-          Bildgenerierung
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeTab === "bgremoval"}
-          className={`pipeline-tabs__tab ${activeTab === "bgremoval" ? "pipeline-tabs__tab--active" : ""}`}
-          onClick={() => setActiveTab("bgremoval")}
-        >
-          Freistellung
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeTab === "mesh"}
-          className={`pipeline-tabs__tab ${activeTab === "mesh" ? "pipeline-tabs__tab--active" : ""}`}
-          onClick={() => setActiveTab("mesh")}
-        >
-          Mesh-Generierung
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeTab === "rigging"}
-          className={`pipeline-tabs__tab ${activeTab === "rigging" ? "pipeline-tabs__tab--active" : ""}`}
-          onClick={() => setActiveTab("rigging")}
-        >
-          Rigging
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeTab === "animation"}
-          className={`pipeline-tabs__tab ${activeTab === "animation" ? "pipeline-tabs__tab--active" : ""}`}
-          onClick={() => setActiveTab("animation")}
-        >
-          Animation
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeTab === "mesh-processing"}
-          className={`pipeline-tabs__tab ${activeTab === "mesh-processing" ? "pipeline-tabs__tab--active" : ""}`}
-          onClick={() => setActiveTab("mesh-processing")}
-        >
-          Mesh-Processing
-        </button>
-      </nav>
+      <PipelineStepper steps={pipelineSteps} onStepClick={(id) => setActiveTab(id as TabId)} />
 
       {activeTab === "image" && (
         <div className="pipeline-tab-content" role="tabpanel">

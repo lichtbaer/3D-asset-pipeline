@@ -1,6 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import type { MeshProvider } from "../../api/mesh.js";
 import type { BgRemovalProvider } from "../../api/bgremoval.js";
+import { InlineError } from "../../components/ui/InlineError.js";
+import { Tooltip } from "../../components/ui/Tooltip.js";
+import { useFormValidation } from "../../hooks/useFormValidation.js";
 
 interface ParamSchemaProperty {
   type: string;
@@ -91,6 +94,11 @@ export function MeshForm({
   const [autoBgRemoval, setAutoBgRemoval] = useState(false);
   const [bgRemovalProviderKey, setBgRemovalProviderKey] = useState("");
 
+  const validationRules = useMemo(() => ({
+    sourceImageUrl: { validate: (v: string) => v.trim().length > 0, message: "Quellbild-URL ist erforderlich." },
+  }), []);
+  const { touchField, getError, handleSubmitAttempt } = useFormValidation(validationRules);
+
   const selectedProvider = providers.find((p) => p.key === providerKey) ?? providers[0];
   const effectiveProviderKey = providerKey || (selectedProvider?.key ?? "");
   const selectedBgRemovalProvider =
@@ -114,6 +122,7 @@ export function MeshForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    handleSubmitAttempt();
     if (!sourceImageUrl.trim() || !effectiveProviderKey) return;
     const req: {
       source_image_url: string;
@@ -139,15 +148,18 @@ export function MeshForm({
 
   return (
     <form onSubmit={handleSubmit} className="mesh-form prompt-form">
-      <div className="form-group">
+      <div className={`form-group${getError("sourceImageUrl", sourceImageUrl) ? " form-group--error" : ""}`}>
         <label htmlFor="source-image-url">Quellbild-URL</label>
         <input
           id="source-image-url"
           type="url"
           value={sourceImageUrl}
           onChange={(e) => onSourceImageUrlChange(e.target.value)}
+          onBlur={() => touchField("sourceImageUrl")}
           placeholder="https://..."
+          aria-describedby="sourceImageUrl-error"
         />
+        <InlineError message={getError("sourceImageUrl", sourceImageUrl)} id="sourceImageUrl-error" />
       </div>
 
       {sourceImageUrl.trim() && (
@@ -221,9 +233,17 @@ export function MeshForm({
         </div>
       )}
 
-      <button type="submit" disabled={disabled || !isValid || providersLoading}>
-        Mesh generieren
-      </button>
+      {(disabled || !isValid || providersLoading) && !isValid ? (
+        <Tooltip text="Bitte alle Pflichtfelder korrekt ausfüllen.">
+          <button type="submit" disabled={disabled || !isValid || providersLoading}>
+            Mesh generieren
+          </button>
+        </Tooltip>
+      ) : (
+        <button type="submit" disabled={disabled || providersLoading}>
+          Mesh generieren
+        </button>
+      )}
     </form>
   );
 }

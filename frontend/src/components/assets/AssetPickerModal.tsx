@@ -1,6 +1,10 @@
+import { useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { listAssets } from "../../api/assets.js";
 import type { AssetListItem } from "../../api/assets.js";
+import { useFocusTrap } from "../../hooks/useFocusTrap.js";
+import { useEscapeKey } from "../../hooks/useEscapeKey.js";
+import { useBodyScrollLock } from "../../hooks/useBodyScrollLock.js";
 
 function formatDate(iso: string): string {
   try {
@@ -54,11 +58,17 @@ export function AssetPickerModal({
   onSelect,
   filter,
 }: AssetPickerModalProps) {
+  const modalRef = useRef<HTMLDivElement>(null);
+
   const { data: assets, isLoading } = useQuery({
     queryKey: ["assets"],
     queryFn: () => listAssets(),
     enabled: isOpen,
   });
+
+  useFocusTrap(modalRef, isOpen);
+  useEscapeKey(onClose, isOpen);
+  useBodyScrollLock(isOpen);
 
   const filteredAssets = assets ? filterAssets(assets, filter) : [];
   const baseUrl =
@@ -67,14 +77,14 @@ export function AssetPickerModal({
   if (!isOpen) return null;
 
   return (
-    <div className="asset-modal" role="dialog" aria-modal="true">
+    <div className="asset-modal" role="dialog" aria-modal="true" ref={modalRef} aria-labelledby="asset-picker-title">
       <div className="asset-modal__backdrop" onClick={onClose} />
       <div
         className="asset-modal__content asset-picker-modal"
         onClick={(e) => e.stopPropagation()}
       >
         <header className="asset-modal__header">
-          <h2>Aus Bibliothek laden</h2>
+          <h2 id="asset-picker-title">Aus Bibliothek laden</h2>
           <button
             type="button"
             className="asset-modal__close"
