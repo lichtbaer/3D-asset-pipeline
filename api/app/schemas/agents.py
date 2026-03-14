@@ -1,8 +1,8 @@
 """Request-Schemas für Agent-Endpunkte (Details in PURZEL-037 bis 040)."""
 
-from typing import Any
-
 from pydantic import BaseModel, Field
+
+from app.agents.models import QualityAssessment
 
 
 class PromptOptimizeRequest(BaseModel):
@@ -45,12 +45,26 @@ class TagsSuggestRequest(BaseModel):
 class QualityAssessRequest(BaseModel):
     """Request für Qualitätsbewertung (PURZEL-039)."""
 
-    mesh_url: str | None = Field(default=None, description="URL zum Mesh oder Asset")
-    context: str | None = Field(default=None, description="Zusätzlicher Kontext")
+    asset_id: str = Field(..., description="Asset-ID")
+    include_mesh_analysis: bool = Field(
+        default=True,
+        description="Analyse-Kennzahlen aus /process/analyze laden",
+    )
+    include_vision: bool = Field(
+        default=True,
+        description="Vorschau-Bild analysieren (image oder bgremoval)",
+    )
 
 
 class WorkflowRecommendRequest(BaseModel):
     """Request für Workflow-Empfehlung (PURZEL-040)."""
 
-    current_step: str = Field(..., description="Aktueller Workflow-Schritt")
-    context: dict[str, Any] | None = Field(default=None, description="Pipeline-Kontext")
+    asset_id: str = Field(..., description="Asset-ID")
+    intention: str | None = Field(
+        default=None,
+        description="Nutzer-Intention: rig, print, animate, sketchfab",
+    )
+    quality_assessment: QualityAssessment | None = Field(
+        default=None,
+        description="Optional vorgeladene Qualitätsbewertung",
+    )

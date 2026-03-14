@@ -677,7 +677,8 @@
 
 .asset-modal__files h3,
 .asset-modal__meta h3,
-.asset-modal__actions h3 {
+.asset-modal__actions h3,
+.quality-analysis h3 {
   font-size: var(--font-size-base);
   margin: 0 0 0.75rem;
 }
@@ -955,6 +956,104 @@
 }
 
 /* asset-modal__action-btn uses .btn .btn--outline in TSX */
+
+/* Quality Analysis Panel */
+.quality-analysis {
+  margin-bottom: var(--space-xl);
+  padding: var(--space-md);
+  background: var(--border);
+  border-radius: var(--radius-md);
+}
+
+.quality-analysis h3 {
+  margin-bottom: var(--space-md);
+}
+
+.quality-analysis__trigger {
+  margin-bottom: var(--space-sm);
+}
+
+.quality-analysis__results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.quality-analysis__score {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.quality-analysis__score-label {
+  font-weight: 600;
+}
+
+.quality-analysis__score-stars {
+  color: var(--accent);
+  letter-spacing: 0.05em;
+}
+
+.quality-analysis__score-value {
+  font-size: var(--font-size-sm);
+  color: var(--text);
+}
+
+.quality-analysis__issues {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.quality-analysis__issue {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  padding: var(--space-xs) 0;
+  font-size: var(--font-size-sm);
+}
+
+.quality-analysis__issue--high {
+  color: var(--error, #c00);
+}
+
+.quality-analysis__issue--medium {
+  color: var(--warning, #a60);
+}
+
+.quality-analysis__issue-icon {
+  flex-shrink: 0;
+}
+
+.quality-analysis__rigging {
+  font-size: var(--font-size-sm);
+}
+
+.quality-analysis__actions h4,
+.quality-analysis__next-step h4 {
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--space-xs);
+}
+
+.quality-analysis__action-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) 0;
+  font-size: var(--font-size-sm);
+}
+
+.quality-analysis__action-num {
+  font-weight: 600;
+  min-width: 1.2em;
+}
+
+.quality-analysis__warnings {
+  list-style: disc;
+  padding-left: var(--space-lg);
+  font-size: var(--font-size-sm);
+  color: var(--warning, #a60);
+}
 
 .asset-modal__all-done {
   font-size: var(--font-size-sm);
