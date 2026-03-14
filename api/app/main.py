@@ -18,10 +18,12 @@ from app.config.storage import (
     BGREMOVAL_STORAGE_PATH,
     IMAGE_STORAGE_PATH,
     MESH_STORAGE_PATH,
+    PRESETS_STORAGE_PATH,
 )
-from app.routers import assets, sketchfab, storage
+from app.routers import assets, presets, sketchfab, storage
 
 MESH_STORAGE_PATH.mkdir(parents=True, exist_ok=True)
+PRESETS_STORAGE_PATH.mkdir(parents=True, exist_ok=True)
 BGREMOVAL_STORAGE_PATH.mkdir(parents=True, exist_ok=True)
 ASSETS_STORAGE_PATH.mkdir(parents=True, exist_ok=True)
 ANIMATION_STORAGE_PATH.mkdir(parents=True, exist_ok=True)
@@ -31,6 +33,7 @@ app = FastAPI(title="Purzel ML Asset Pipeline API")
 app.include_router(agents.router)
 app.include_router(generation.router)
 app.include_router(assets.router)
+app.include_router(presets.router)
 app.include_router(sketchfab.router)
 app.include_router(storage.router)
 app.mount("/static/meshes", StaticFiles(directory=str(MESH_STORAGE_PATH)), name="meshes")

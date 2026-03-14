@@ -20,6 +20,9 @@ import {
 import { ExportPanel } from "./ExportPanel.js";
 import { SketchfabPanel } from "./SketchfabPanel.js";
 import { QualityAnalysisPanel } from "./QualityAnalysisPanel.js";
+import { SavePresetModal } from "../presets/SavePresetModal.js";
+import { ApplyPresetModal } from "../presets/ApplyPresetModal.js";
+import { getUrlForFirstApplicableStep } from "../../utils/presetNavigation.js";
 
 function formatDate(iso: string): string {
   try {
@@ -82,6 +85,8 @@ export function AssetDetailModal({
     useState(initialShowTagSuggestions);
   const [notesInput, setNotesInput] = useState("");
   const [nameInput, setNameInput] = useState("");
+  const [showSavePreset, setShowSavePreset] = useState(false);
+  const [showApplyPreset, setShowApplyPreset] = useState(false);
   const lastSyncedAssetIdRef = useRef<string | null>(null);
 
   useFocusTrap(modalRef, true);
@@ -550,6 +555,23 @@ export function AssetDetailModal({
           )}
         </section>
 
+        <section className="asset-modal__preset-actions">
+          <button
+            type="button"
+            className="btn btn--outline"
+            onClick={() => setShowSavePreset(true)}
+          >
+            💾 Als Preset speichern
+          </button>
+          <button
+            type="button"
+            className="btn btn--outline"
+            onClick={() => setShowApplyPreset(true)}
+          >
+            ⚡ Preset anwenden
+          </button>
+        </section>
+
         <section className="asset-modal__actions">
           <h3>Pipeline-Weiterführung</h3>
           <div className="asset-modal__action-buttons">
@@ -645,6 +667,31 @@ export function AssetDetailModal({
           </div>
         </section>
       </div>
+
+      {showSavePreset && (
+        <SavePresetModal
+          assetId={assetId}
+          onClose={() => setShowSavePreset(false)}
+          onSuccess={() => {
+            void queryClient.invalidateQueries({ queryKey: ["presets"] });
+          }}
+        />
+      )}
+      {showApplyPreset && (
+        <ApplyPresetModal
+          assetId={assetId}
+          onClose={() => setShowApplyPreset(false)}
+          onExecutePlan={(plan) => {
+            setActiveAssetId(plan.asset_id);
+            onClose();
+            const url = getUrlForFirstApplicableStep(
+              plan.execution_plan,
+              plan.asset_id
+            );
+            navigate(url);
+          }}
+        />
+      )}
     </div>
   );
 }

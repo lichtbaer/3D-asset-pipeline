@@ -28,6 +28,14 @@ export function Layout() {
         >
           Speicher
         </NavLink>
+        <NavLink
+          to="/presets"
+          className={({ isActive }) =>
+            `main-nav__link ${isActive ? "main-nav__link--active" : ""}`
+          }
+        >
+          Presets
+        </NavLink>
       </nav>
       <Outlet />
     </>
