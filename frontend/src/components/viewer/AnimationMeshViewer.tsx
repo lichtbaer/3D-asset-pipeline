@@ -238,7 +238,7 @@ export function AnimationMeshViewer({
     if (selectedClip && clipNames.includes(selectedClip)) {
       playAction(selectedClip);
     }
-  }, [selectedClip, playAction]);
+  }, [selectedClip, clipNames, playAction]);
 
   const handlePlay = () => {
     const mixer = mixerRef.current;

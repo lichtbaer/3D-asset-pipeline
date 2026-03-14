@@ -52,7 +52,8 @@ describe("useChat", () => {
     });
     expect(result.current.messages).toEqual([]);
     const stored = sessionStorage.getItem(STORAGE_KEY);
-    expect(result.current.messages).toEqual([]);
+    expect(stored).toBeTruthy();
+    expect(JSON.parse(stored!)).toEqual([]);
   });
 
   it("ignoriert leere Nachrichten", async () => {

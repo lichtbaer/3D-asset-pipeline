@@ -281,7 +281,7 @@ export function PipelinePage() {
       setAnimationSourceGlbUrl(source);
       setActiveTab("animation");
     }
-  }, [searchParams]);
+  }, [searchParams, setActiveTab]);
 
   // URL assetId: Asset laden und Source-URLs setzen
   useEffect(() => {
