@@ -277,3 +277,30 @@ export async function deleteAssetBatch(
 export async function restoreAsset(assetId: string): Promise<void> {
   await apiClient.post(`/assets/${assetId}/restore`);
 }
+
+export async function deleteAssetFile(
+  assetId: string,
+  filename: string
+): Promise<void> {
+  await apiClient.delete(`/assets/${assetId}/files/${encodeURIComponent(filename)}`);
+}
+
+export interface StepDeleteResponse {
+  requires_confirmation: boolean;
+  affected_steps: string[];
+  message: string;
+}
+
+export async function deleteAssetStep(
+  assetId: string,
+  stepName: string,
+  options?: { cascade?: boolean; force?: boolean }
+): Promise<StepDeleteResponse> {
+  const params = new URLSearchParams();
+  if (options?.cascade) params.set("cascade", "true");
+  if (options?.force) params.set("force", "true");
+  const { data } = await apiClient.delete<StepDeleteResponse>(
+    `/assets/${assetId}/steps/${stepName}?${params.toString()}`
+  );
+  return data;
+}

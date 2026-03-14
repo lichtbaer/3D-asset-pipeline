@@ -1310,6 +1310,144 @@
   display: flex;
   gap: var(--space-sm);
   align-items: center;
+  flex-wrap: wrap;
+}
+
+.mesh-processing__delete-confirm {
+  display: inline-flex;
+  gap: var(--space-sm);
+  align-items: center;
+}
+
+.mesh-processing__delete-text {
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+}
+
+.mesh-processing__delete-btn {
+  padding: var(--space-xs);
+}
+
+.export-panel__export-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.export-panel__delete-confirm {
+  display: inline-flex;
+  gap: var(--space-sm);
+}
+
+.export-panel__delete-btn {
+  padding: var(--space-xs);
+}
+
+.image-processing-list {
+  margin-top: var(--space-lg);
+}
+
+.image-processing-list h4 {
+  margin: 0 0 var(--space-sm);
+}
+
+.image-processing-list__items {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+}
+
+.image-processing-list__item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-xs);
+}
+
+.image-processing-list__thumb {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+}
+
+.image-processing-list__name {
+  font-size: var(--font-size-sm);
+}
+
+.image-processing-list__delete-confirm {
+  display: inline-flex;
+  gap: var(--space-sm);
+}
+
+.image-processing-list__delete-btn {
+  padding: var(--space-xs);
+}
+
+.asset-modal__step-block {
+  position: relative;
+}
+
+.asset-modal__step-delete {
+  margin-top: var(--space-sm);
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.asset-modal__step-delete:hover {
+  color: var(--error, #c00);
+}
+
+.asset-modal__overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  padding: var(--space-md);
+}
+
+.asset-modal__step-delete-dialog {
+  background: var(--bg);
+  border-radius: var(--radius-xl);
+  padding: var(--space-xl);
+  max-width: 420px;
+  box-shadow: var(--shadow-lg);
+}
+
+.asset-modal__step-delete-dialog h3 {
+  margin: 0 0 var(--space-md);
+  font-size: var(--font-size-lg);
+}
+
+.asset-modal__step-delete-dialog p {
+  margin: 0 0 var(--space-sm);
+  color: var(--text);
+}
+
+.asset-modal__step-delete-warning {
+  margin-top: var(--space-md) !important;
+  font-size: var(--font-size-sm);
+  color: var(--warning, #a60);
+}
+
+.asset-modal__step-delete-actions {
+  display: flex;
+  gap: var(--space-sm);
+  justify-content: flex-end;
+  margin-top: var(--space-lg);
 }
 
 /* Asset Picker Modal */
