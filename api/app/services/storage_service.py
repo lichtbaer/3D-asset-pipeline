@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from app.config.storage import ASSETS_STORAGE_PATH
+from app.core.asset_paths import AssetPaths
 from app.services import asset_service
 
 logger = logging.getLogger(__name__)
@@ -45,8 +46,8 @@ def _get_asset_breakdown(asset_id: str) -> dict[str, int]:
     meta = asset_service.get_asset(asset_id)
     if not meta:
         return {}
-    asset_path = asset_service.get_asset_dir(asset_id)
-    if not asset_path.exists():
+    paths = AssetPaths(asset_id)
+    if not paths.base.exists():
         return {}
 
     breakdown: dict[str, int] = {
@@ -60,12 +61,12 @@ def _get_asset_breakdown(asset_id: str) -> dict[str, int]:
     # Image-Dateien (image, bgremoval steps)
     for step in ("image", "bgremoval"):
         if step in meta.steps and meta.steps[step].get("file"):
-            f = asset_path / meta.steps[step]["file"]
+            f = paths.base / meta.steps[step]["file"]
             if f.is_file():
                 breakdown["images"] += f.stat().st_size
 
     # Mesh-Dateien: mesh.glb, mesh_original.*, mesh_simplified_*.glb, mesh_repaired, mesh_clipped, mesh_cleaned
-    for f in asset_path.iterdir():
+    for f in paths.base.iterdir():
         if f.is_file():
             name = f.name.lower()
             if name == "mesh.glb" or name.startswith("mesh_simplified") or name in ("mesh_repaired.glb", "mesh_clipped.glb", "mesh_cleaned.glb"):
@@ -75,13 +76,13 @@ def _get_asset_breakdown(asset_id: str) -> dict[str, int]:
 
     # Rigging: mesh_rigged.glb
     if "rigging" in meta.steps and meta.steps["rigging"].get("file"):
-        f = asset_path / meta.steps["rigging"]["file"]
+        f = paths.base / meta.steps["rigging"]["file"]
         if f.is_file():
             breakdown["rigs"] += f.stat().st_size
 
     # Animation: mesh_animated.glb, mesh_animated.fbx
     if "animation" in meta.steps and meta.steps["animation"].get("file"):
-        f = asset_path / meta.steps["animation"]["file"]
+        f = paths.base / meta.steps["animation"]["file"]
         if f.is_file():
             breakdown["animations"] += f.stat().st_size
 
@@ -89,7 +90,7 @@ def _get_asset_breakdown(asset_id: str) -> dict[str, int]:
     for exp in meta.exports or []:
         out_file = exp.get("output_file") or exp.get("filename")
         if out_file:
-            f = asset_path / out_file
+            f = paths.base / out_file
             if f.is_file():
                 breakdown["exports"] += f.stat().st_size
 

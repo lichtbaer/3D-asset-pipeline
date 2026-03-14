@@ -5,7 +5,7 @@ from pathlib import Path
 
 from fastapi import HTTPException
 
-from app.config.storage import ASSETS_STORAGE_PATH
+from app.core.asset_paths import AssetPaths
 
 
 def safe_asset_path(asset_id: str, filename: str) -> Path:
@@ -16,8 +16,9 @@ def safe_asset_path(asset_id: str, filename: str) -> Path:
     """
     if not re.fullmatch(r"[0-9a-f-]{36}", asset_id):
         raise HTTPException(status_code=400, detail="Invalid asset_id")
-    base = (ASSETS_STORAGE_PATH / asset_id).resolve()
-    target = (base / filename).resolve()
+    paths = AssetPaths(asset_id)
+    base = paths.base.resolve()
+    target = paths.processing_file(filename).resolve()
     try:
         target.relative_to(base)
     except ValueError:

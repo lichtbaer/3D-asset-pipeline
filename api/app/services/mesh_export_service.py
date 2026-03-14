@@ -3,7 +3,6 @@ Mesh-Export-Service: STL, OBJ, PLY, GLTF für 3D-Druck und externe Tools.
 Nutzt Open3D und trimesh — alle Formate nativ unterstützt.
 """
 
-import json
 import logging
 import zipfile
 from datetime import datetime, timezone
@@ -13,7 +12,9 @@ from typing import Any
 import open3d as o3d
 import trimesh
 
+from app.core.asset_paths import AssetPaths
 from app.services import asset_service
+from app.services.metadata_service import get_metadata_service
 
 logger = logging.getLogger(__name__)
 
@@ -102,9 +103,9 @@ def export(
         raise ValueError(f"Format {target_format} nicht unterstützt. Erlaubt: {SUPPORTED_FORMATS}")
 
     source_path = _asset_mesh_path(asset_id, source_file)
-    asset_dir = asset_service.get_asset_dir(asset_id)
+    paths = AssetPaths(asset_id)
     output_filename = _output_filename(source_file, fmt)
-    output_path = asset_dir / output_filename
+    output_path = paths.processing_file(output_filename)
 
     if fmt == "stl":
         file_size = _export_stl(asset_id, source_path, output_path)
@@ -151,15 +152,7 @@ def export(
 
 def _append_export_entry(asset_id: str, entry: dict[str, Any]) -> None:
     """Fügt Export-Eintrag zu metadata.json exports-Array hinzu."""
-    meta_path = asset_service.get_asset_dir(asset_id) / "metadata.json"
-    if not meta_path.exists():
-        raise FileNotFoundError(f"Asset {asset_id} existiert nicht")
-    meta = json.loads(meta_path.read_text(encoding="utf-8"))
-    if "exports" not in meta:
-        meta["exports"] = []
-    meta["exports"].append(entry)
-    meta["updated_at"] = datetime.now(timezone.utc).isoformat()
-    meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    get_metadata_service().add_export_entry(asset_id, entry)
 
 
 def list_exports(asset_id: str) -> list[dict[str, Any]]:

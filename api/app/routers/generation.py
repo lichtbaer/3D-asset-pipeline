@@ -1,6 +1,5 @@
 import os
 import re
-from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID
 
@@ -9,7 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import raise_api_error
-from app.database import async_session_factory, get_session
+from app.database import get_session
 from app.models import GenerationJob
 from app.providers.animation import (
     get_animation_provider,
@@ -50,7 +49,6 @@ from app.schemas.generation import (
     RiggingProviderInfo,
     RiggingProvidersResponse,
 )
-from app.services import asset_service
 from app.services.animation_generation import run_animation
 from app.services.bgremoval import run_bgremoval
 from app.services.bgremoval_providers import (
@@ -61,6 +59,7 @@ from app.services.bgremoval_providers import (
 )
 from app.services.image_providers import get_provider as get_image_provider
 from app.services.image_providers import list_providers
+from app.services.job_service import get_job_service
 from app.services.mesh_generation import (
     run_mesh_generation,
     run_mesh_generation_with_auto_bgremoval,
@@ -71,6 +70,8 @@ from app.services.picsart import run_image_generation
 from app.services.rigging_generation import run_rigging
 
 router = APIRouter(prefix="/generate", tags=["generation"])
+
+_job_svc = get_job_service()
 
 
 def _extract_asset_id_from_url(url: str) -> UUID | None:
@@ -84,106 +85,6 @@ def _extract_asset_id_from_url(url: str) -> UUID | None:
     return None
 
 
-async def _persist_job_completion(job_id: str) -> None:
-    """Persistiert abgeschlossenen Job in Asset-Ordner."""
-    async with async_session_factory() as session:
-        result = await session.execute(
-            select(GenerationJob).where(GenerationJob.id == UUID(job_id))
-        )
-        job = result.scalar_one_or_none()
-        if not job or job.status != "done":
-            return
-
-        # Asset-ID ermitteln: job.asset_id, source_job_id oder aus source_image_url
-        asset_id_str: str | None = str(job.asset_id) if job.asset_id else None
-        if not asset_id_str and job.source_job_id:
-            src = await session.execute(
-                select(GenerationJob).where(GenerationJob.id == job.source_job_id)
-            )
-            src_job = src.scalar_one_or_none()
-            if src_job and src_job.asset_id:
-                asset_id_str = str(src_job.asset_id)
-        if not asset_id_str and job.source_image_url:
-            aid = _extract_asset_id_from_url(job.source_image_url)
-            if aid:
-                asset_id_str = str(aid)
-
-        asset_id = asset_service.get_or_create_asset_id(asset_id_str)
-
-        if job.asset_id != UUID(asset_id):
-            job.asset_id = UUID(asset_id)
-            await session.commit()
-
-        if job.job_type == "image" and job.result_url:
-            await asset_service.persist_image_job(
-                str(job.id),
-                asset_id,
-                job.provider_key,
-                job.prompt,
-                job.result_url,
-            )
-        elif job.job_type == "bgremoval" and (job.result_url or job.bgremoval_result_url):
-            url = job.bgremoval_result_url or job.result_url or ""
-            source_file = "image_original.png"
-            if job.source_image_url and "/assets/" in job.source_image_url:
-                # Quelle war Asset-Datei
-                pass  # source_file bleibt image_original.png
-            await asset_service.persist_bgremoval_job(
-                str(job.id),
-                asset_id,
-                job.provider_key or job.bgremoval_provider_key or "",
-                source_file,
-                url,
-            )
-        elif job.job_type == "mesh" and job.glb_file_path:
-            # Bei auto_bgremoval zuerst BgRemoval-Step persistieren
-            if job.bgremoval_result_url:
-                await asset_service.persist_bgremoval_job(
-                    str(job.id),
-                    asset_id,
-                    job.bgremoval_provider_key or "",
-                    "image_original.png",
-                    job.bgremoval_result_url,
-                )
-            source_file = "image_bgremoved.png" if job.bgremoval_result_url else "image_original.png"
-            await asset_service.persist_mesh_job(
-                str(job.id),
-                asset_id,
-                job.provider_key or "",
-                source_file,
-                job.glb_file_path,
-            )
-        elif job.job_type == "rigging" and job.glb_file_path:
-            await asset_service.persist_rigging_job(
-                str(job.id),
-                asset_id,
-                job.provider_key or "",
-                "mesh.glb",
-                job.glb_file_path,
-            )
-        elif job.job_type == "animation" and job.glb_file_path:
-            source_file = "mesh.glb"
-            if job.source_image_url and "/files/" in (job.source_image_url or ""):
-                parts = (job.source_image_url or "").rstrip("/").split("/")
-                if parts:
-                    source_file = parts[-1] or "mesh.glb"
-            anim_path = Path(job.glb_file_path)
-            if not anim_path.exists():
-                return
-            animated_bytes = anim_path.read_bytes()
-            ext = anim_path.suffix.lstrip(".") or "glb"
-            filename = f"mesh_animated.{ext}"
-            await asset_service.persist_animation_job(
-                str(job.id),
-                asset_id,
-                job.provider_key or "",
-                job.prompt or "",
-                source_file,
-                animated_bytes,
-                filename=filename,
-            )
-
-
 async def _update_job(
     job_id: str,
     status: str,
@@ -192,25 +93,18 @@ async def _update_job(
     error_type: str | None = None,
     error_detail: str | None = None,
 ) -> None:
-    async with async_session_factory() as session:
-        result = await session.execute(
-            select(GenerationJob).where(GenerationJob.id == UUID(job_id))
+    """Delegiert an JobService für Image-Jobs."""
+    if status == "processing":
+        await _job_svc.start(job_id)
+    elif status == "done":
+        await _job_svc.complete(job_id, result_url=result_url)
+    elif status == "failed":
+        await _job_svc.fail(
+            job_id,
+            error_msg or "Unknown error",
+            error_type=error_type,
+            error_detail=error_detail,
         )
-        job = result.scalar_one_or_none()
-        if job:
-            job.status = status
-            job.updated_at = datetime.now(timezone.utc)
-            if result_url is not None:
-                job.result_url = result_url
-            if error_msg is not None:
-                job.error_msg = error_msg
-            if error_type is not None:
-                job.error_type = error_type
-            if error_detail is not None:
-                job.error_detail = error_detail
-            await session.commit()
-    if status == "done":
-        await _persist_job_completion(job_id)
 
 
 async def _update_glb_job(
@@ -221,29 +115,20 @@ async def _update_glb_job(
     error_type: str | None = None,
     error_detail: str | None = None,
 ) -> None:
-    """Generischer Update-Handler für Jobs mit glb_file_path (Mesh, Rigging, Animation)."""
-    async with async_session_factory() as session:
-        result = await session.execute(
-            select(GenerationJob).where(GenerationJob.id == UUID(job_id))
+    """Delegiert an JobService für Mesh/Rigging/Animation-Jobs."""
+    if status == "processing":
+        await _job_svc.start(job_id)
+    elif status == "done":
+        await _job_svc.complete(job_id, glb_file_path=glb_file_path)
+    elif status == "failed":
+        await _job_svc.fail(
+            job_id,
+            error_msg or "Unknown error",
+            error_type=error_type,
+            error_detail=error_detail,
         )
-        job = result.scalar_one_or_none()
-        if job:
-            job.status = status
-            job.updated_at = datetime.now(timezone.utc)
-            if glb_file_path is not None:
-                job.glb_file_path = glb_file_path
-            if error_msg is not None:
-                job.error_msg = error_msg
-            if error_type is not None:
-                job.error_type = error_type
-            if error_detail is not None:
-                job.error_detail = error_detail
-            await session.commit()
-    if status == "done":
-        await _persist_job_completion(job_id)
 
 
-# Aliase für bestehende Aufrufstellen, delegieren an _update_glb_job
 _update_mesh_job = _update_glb_job
 _update_rigging_job = _update_glb_job
 
@@ -251,16 +136,10 @@ _update_rigging_job = _update_glb_job
 async def _update_mesh_job_bgremoval(
     job_id: str, bgremoval_provider_key: str, bgremoval_result_url: str
 ) -> None:
-    async with async_session_factory() as session:
-        result = await session.execute(
-            select(GenerationJob).where(GenerationJob.id == UUID(job_id))
-        )
-        job = result.scalar_one_or_none()
-        if job:
-            job.bgremoval_provider_key = bgremoval_provider_key
-            job.bgremoval_result_url = bgremoval_result_url
-            job.updated_at = datetime.now(timezone.utc)
-            await session.commit()
+    """Delegiert an JobService für BgRemoval-Felder bei Mesh-Jobs."""
+    await _job_svc.update_bgremoval_fields(
+        job_id, bgremoval_provider_key, bgremoval_result_url
+    )
 
 
 async def _update_bgremoval_job(
@@ -271,26 +150,22 @@ async def _update_bgremoval_job(
     error_type: str | None = None,
     error_detail: str | None = None,
 ) -> None:
-    async with async_session_factory() as session:
-        result = await session.execute(
-            select(GenerationJob).where(GenerationJob.id == UUID(job_id))
+    """Delegiert an JobService für BgRemoval-Jobs."""
+    if status == "processing":
+        await _job_svc.start(job_id)
+    elif status == "done":
+        await _job_svc.complete(
+            job_id,
+            result_url=result_url,
+            bgremoval_result_url=result_url,
         )
-        job = result.scalar_one_or_none()
-        if job:
-            job.status = status
-            job.updated_at = datetime.now(timezone.utc)
-            if result_url is not None:
-                job.result_url = result_url
-                job.bgremoval_result_url = result_url
-            if error_msg is not None:
-                job.error_msg = error_msg
-            if error_type is not None:
-                job.error_type = error_type
-            if error_detail is not None:
-                job.error_detail = error_detail
-            await session.commit()
-    if status == "done":
-        await _persist_job_completion(job_id)
+    elif status == "failed":
+        await _job_svc.fail(
+            job_id,
+            error_msg or "Unknown error",
+            error_type=error_type,
+            error_detail=error_detail,
+        )
 
 
 @router.get("/image/providers", response_model=ImageProvidersResponse)
