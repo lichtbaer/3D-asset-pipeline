@@ -2,6 +2,7 @@
 
 import logging
 import os
+from typing import Any
 
 import httpx
 
@@ -25,7 +26,7 @@ class PicsArtBgRemovalProvider(BgRemovalProvider):
     provider_key = "picsart"
     display_name = "PicsArt Remove Background"
 
-    def param_schema(self) -> dict:
+    def param_schema(self) -> dict[str, Any]:
         return PARAM_SCHEMA.copy()
 
     async def remove_background(
@@ -92,4 +93,4 @@ class PicsArtBgRemovalProvider(BgRemovalProvider):
                 raise RuntimeError(
                     "PicsArt Remove Background: Keine result_url in Response"
                 )
-            return result_url
+            return str(result_url)

@@ -2,6 +2,8 @@
 
 from datetime import datetime
 
+from typing import Any
+
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -53,16 +55,16 @@ class AssetDetailResponse(BaseModel):
     asset_id: str
     created_at: str
     updated_at: str
-    steps: dict[str, dict] = Field(default_factory=dict)
-    processing: list[dict] = Field(
+    steps: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    processing: list[dict[str, Any]] = Field(
         default_factory=list,
         description="Mesh-Processing-Einträge (simplify, repair)",
     )
-    image_processing: list[dict] = Field(
+    image_processing: list[dict[str, Any]] = Field(
         default_factory=list,
         description="Bild-Nachbearbeitung (crop, resize, center, pad_square)",
     )
-    texture_baking: list[dict] = Field(
+    texture_baking: list[dict[str, Any]] = Field(
         default_factory=list,
         description="Texture-Baking-Einträge (source, target, output_file)",
     )
@@ -72,7 +74,7 @@ class AssetDetailResponse(BaseModel):
     sketchfab_url: str | None = None
     sketchfab_author: str | None = None
     downloaded_at: str | None = None
-    exports: list[dict] = Field(
+    exports: list[dict[str, Any]] = Field(
         default_factory=list,
         description="Export-Einträge (STL, OBJ, PLY, GLTF)",
     )

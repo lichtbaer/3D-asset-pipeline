@@ -64,7 +64,7 @@ class PicsArtImageProvider(ImageProvider):
         self.display_name = display_name
         self.air_urn = air_urn
 
-    def default_params(self) -> dict:
+    def default_params(self) -> dict[str, Any]:
         return {
             "width": 1024,
             "height": 1024,
@@ -72,10 +72,10 @@ class PicsArtImageProvider(ImageProvider):
             "count": 1,
         }
 
-    def param_schema(self) -> dict:
+    def param_schema(self) -> dict[str, Any]:
         return DEFAULT_PARAM_SCHEMA.copy()
 
-    async def generate(self, prompt: str, params: dict) -> str:
+    async def generate(self, prompt: str, params: dict[str, Any]) -> str:
         """
         Führt die Bildgenerierung via PicsArt API aus.
         Gibt die URL des generierten Bildes zurück.
@@ -196,21 +196,21 @@ async def _poll_for_result(
     return None
 
 
-def _extract_result_url(data: dict) -> str | None:
+def _extract_result_url(data: dict[str, Any]) -> str | None:
     """Extrahiert die Bild-URL aus der PicsArt-Response."""
     if "result_url" in data and data["result_url"]:
-        return data["result_url"]
+        return str(data["result_url"])
     if "url" in data and data["url"]:
-        return data["url"]
+        return str(data["url"])
     if "image_url" in data and data["image_url"]:
-        return data["image_url"]
+        return str(data["image_url"])
     # PicsArt GenAI: {"data": [{"id": "...", "url": "..."}], "status": "success"}
     if "data" in data and isinstance(data["data"], list) and len(data["data"]) > 0:
         item = data["data"][0]
         if isinstance(item, dict):
             u = item.get("url") or item.get("result_url") or item.get("image_url")
             if u:
-                return u
+                return str(u)
         if isinstance(item, str):
             return item
     if "images" in data and isinstance(data["images"], list) and len(data["images"]) > 0:

@@ -1,5 +1,7 @@
 """Pydantic-Schemas für Pipeline-Presets."""
 
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -14,7 +16,7 @@ class PresetStep(BaseModel):
         default=None,
         description="Provider-Key (für image, bgremoval, mesh, rigging, animation)",
     )
-    params: dict = Field(default_factory=dict, description="Step-spezifische Parameter")
+    params: dict[str, Any] = Field(default_factory=dict, description="Step-spezifische Parameter")
 
 
 class PresetCreate(BaseModel):
@@ -58,7 +60,7 @@ class ExecutionPlanItem(BaseModel):
     step_index: int
     step: str
     provider: str | None
-    params: dict
+    params: dict[str, Any]
     status: str = Field(
         ...,
         description="skipped | applicable",

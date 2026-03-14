@@ -4,6 +4,7 @@ import asyncio
 import time
 import uuid
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Query, UploadFile
 
@@ -67,10 +68,10 @@ from app.exceptions import (
 router = APIRouter(prefix="/assets", tags=["assets"])
 
 # In-Memory Job-Store für Texture-Baking (pending/processing/done/failed)
-_texture_bake_jobs: dict[str, dict] = {}
+_texture_bake_jobs: dict[str, dict[str, Any]] = {}
 
 
-def _step_to_info(step_data: dict) -> dict:
+def _step_to_info(step_data: dict[str, Any]) -> dict[str, Any]:
     """Konvertiert Step-Dict zu AssetStepInfo-kompatiblem Dict."""
     return {
         "job_id": str(step_data.get("job_id", "")),
@@ -154,7 +155,7 @@ async def list_assets(
 
 
 def _to_sketchfab_upload_info(
-    d: dict | None,
+    d: dict[str, Any] | None,
 ) -> SketchfabUploadInfo | None:
     """Konvertiert sketchfab_upload-Dict zu Schema."""
     if not d or not isinstance(d, dict):

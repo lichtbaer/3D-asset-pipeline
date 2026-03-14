@@ -951,7 +951,7 @@ async def create_animation(
         body.source_glb_url,
         body.motion_prompt,
         body.provider_key,
-        asset_id,
+        str(asset_id) if asset_id else None,
         _update_mesh_job,
     )
 
@@ -1143,7 +1143,7 @@ async def retry_animation_job(
         source_glb_url,
         job.prompt or "",
         job.provider_key or "hy-motion",
-        job.asset_id,
+        str(job.asset_id) if job.asset_id else None,
         _update_mesh_job,
     )
 

@@ -11,6 +11,7 @@ import httpx
 
 from app.config.storage import BGREMOVAL_STORAGE_PATH
 from app.services.bgremoval_providers.base import BgRemovalProvider
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ class BiRefNetHfProvider(BgRemovalProvider):
     provider_key = "birefnet-hf"
     display_name = "BiRefNet (HF Space)"
 
-    def param_schema(self) -> dict:
+    def param_schema(self) -> dict[str, Any]:
         return PARAM_SCHEMA.copy()
 
     async def remove_background(
@@ -106,13 +107,13 @@ class BiRefNetHfProvider(BgRemovalProvider):
         if result is None:
             return None
         if isinstance(result, dict) and "path" in result:
-            return result["path"]
+            return str(result["path"])
         if isinstance(result, str) and result:
             return result
         if isinstance(result, (list, tuple)) and result:
             item = result[0]
             if isinstance(item, dict) and "path" in item:
-                return item["path"]
+                return str(item["path"])
             if isinstance(item, str):
                 return item
         return str(result) if result else None

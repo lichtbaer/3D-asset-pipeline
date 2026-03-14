@@ -10,7 +10,7 @@ import re
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from app.config.storage import PRESETS_STORAGE_PATH
 from app.schemas.preset import ExecutionPlanItem, PresetStep
@@ -75,10 +75,10 @@ def get_preset(preset_id: str) -> dict[str, Any] | None:
     path = _preset_path(preset_id)
     if not path.exists():
         return None
-    return json.loads(path.read_text(encoding="utf-8"))
+    return cast(dict[str, Any], json.loads(path.read_text(encoding="utf-8")))
 
 
-def create_preset(name: str, description: str, steps: list[dict]) -> dict[str, Any]:
+def create_preset(name: str, description: str, steps: list[dict[str, Any]]) -> dict[str, Any]:
     """Erstellt neues Preset als JSON-File."""
     PRESETS_STORAGE_PATH.mkdir(parents=True, exist_ok=True)
     preset_id = str(uuid.uuid4())
@@ -101,7 +101,7 @@ def update_preset(
     preset_id: str,
     name: str | None = None,
     description: str | None = None,
-    steps: list[dict] | None = None,
+    steps: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any] | None:
     """Aktualisiert Preset. Gibt aktualisiertes Preset zurück oder None."""
     if not _validate_preset_id(preset_id):
@@ -109,7 +109,9 @@ def update_preset(
     path = _preset_path(preset_id)
     if not path.exists():
         return None
-    data = json.loads(path.read_text(encoding="utf-8"))
+    data: dict[str, Any] = cast(
+        dict[str, Any], json.loads(path.read_text(encoding="utf-8"))
+    )
     if name is not None:
         data["name"] = name
     if description is not None:
@@ -137,7 +139,7 @@ def delete_preset(preset_id: str) -> bool:
 def _asset_has_step(meta: asset_service.AssetMetadata, step_type: str) -> bool:
     """Prüft ob Asset den Step bereits hat."""
     if step_type in ASSET_STEP_KEYS:
-        return step_type in meta.steps and meta.steps[step_type].get("file")
+        return bool(step_type in meta.steps and meta.steps[step_type].get("file"))
     if step_type == "export":
         return len(meta.exports) > 0
     if step_type == "sketchfab_upload":
@@ -151,7 +153,7 @@ def _asset_has_step(meta: asset_service.AssetMetadata, step_type: str) -> bool:
 
 def _step_matches_asset(
     meta: asset_service.AssetMetadata,
-    preset_step: dict,
+    preset_step: dict[str, Any],
     step_type: str,
 ) -> bool:
     """
@@ -196,7 +198,7 @@ def compute_execution_plan(
     if not meta:
         raise FileNotFoundError(f"Asset {asset_id} nicht gefunden")
 
-    steps: list[dict] = preset.get("steps", [])
+    steps: list[dict[str, Any]] = preset.get("steps", [])
     plan: list[ExecutionPlanItem] = []
     applicable = 0
     skipped = 0
@@ -250,12 +252,12 @@ def compute_execution_plan(
     return plan, applicable, skipped
 
 
-def asset_to_preset_steps(meta: asset_service.AssetMetadata) -> list[dict]:
+def asset_to_preset_steps(meta: asset_service.AssetMetadata) -> list[dict[str, Any]]:
     """
     Konvertiert Asset-Zustand in Preset-Steps.
     Liest steps, processing, exports, sketchfab_upload.
     """
-    result: list[dict] = []
+    result: list[dict[str, Any]] = []
 
     # image
     if "image" in meta.steps and meta.steps["image"].get("file"):

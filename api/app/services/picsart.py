@@ -1,7 +1,7 @@
 """PicsArt Bildgenerierung — nutzt Image-Provider-Abstraktion."""
 
 import logging
-from typing import Awaitable, Callable
+from typing import Any, Awaitable, Callable
 
 from app.logging_utils import log_job_error
 from app.services.image_providers import get_provider
@@ -16,7 +16,7 @@ async def run_image_generation(
     job_id: str,
     prompt: str,
     provider_key: str,
-    params: dict,
+    params: dict[str, Any],
     update_job_callback: UpdateJobCallback,
 ) -> None:
     """

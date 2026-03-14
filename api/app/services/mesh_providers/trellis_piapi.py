@@ -8,6 +8,7 @@ import base64
 import logging
 import os
 from pathlib import Path
+from typing import Any
 
 import httpx
 
@@ -27,12 +28,12 @@ class TrellisPiAPIProvider(MeshProvider):
     provider_key = "trellis-piapi"
     display_name = "TRELLIS (PiAPI)"
 
-    def default_params(self) -> dict:
+    def default_params(self) -> dict[str, Any]:
         return {
             "seed": 0,
         }
 
-    def param_schema(self) -> dict:
+    def param_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -52,7 +53,7 @@ class TrellisPiAPIProvider(MeshProvider):
         with open(image_path, "rb") as f:
             return base64.b64encode(f.read()).decode("ascii")
 
-    async def generate(self, image_path: str, params: dict) -> str:
+    async def generate(self, image_path: str, params: dict[str, Any]) -> str:
         api_key = _get_piapi_api_key()
         merged = {**self.default_params(), **params}
         seed = merged.get("seed", 0)
@@ -148,7 +149,7 @@ class TrellisPiAPIProvider(MeshProvider):
                 )
 
             # 4. GLB herunterladen
-            dl_resp = await client.get(glb_url)
+            dl_resp = await client.get(str(glb_url))
             dl_resp.raise_for_status()
             glb_bytes = dl_resp.content
 

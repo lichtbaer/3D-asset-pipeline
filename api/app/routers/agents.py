@@ -2,6 +2,7 @@
 
 import asyncio
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic_ai import BinaryContent
@@ -159,7 +160,7 @@ async def suggest_tags(body: TagsSuggestRequest) -> TagSuggestion:
             include_image_analysis=body.include_image_analysis,
         )
     )
-    run_input: list[object] = [message]
+    run_input: list[str | BinaryContent] = [message]
     if body.include_image_analysis:
         img_path, media_type = _get_preview_image_path(body.asset_id)
         if img_path and media_type:
@@ -210,7 +211,7 @@ async def _run_quality_assessment_internal(
     include_vision: bool = True,
 ) -> QualityAssessment | None:
     """Interne Quality-Assessment-Logik (für Route und Workflow)."""
-    mesh_analysis_dict: dict | None = None
+    mesh_analysis_dict: dict[str, Any] | None = None
     if include_mesh_analysis:
         try:
             source_file = _get_mesh_source_file(asset_id)
@@ -220,7 +221,7 @@ async def _run_quality_assessment_internal(
             pass
 
     message = _build_quality_prompt(asset_id, mesh_analysis_dict)
-    run_input: list[object] = [message]
+    run_input: list[str | BinaryContent] = [message]
 
     if include_vision:
         img_path, media_type = _get_preview_image_path(asset_id)
@@ -242,7 +243,7 @@ async def _run_quality_assessment_internal(
 
 def _build_quality_prompt(
     asset_id: str,
-    mesh_analysis: dict | None,
+    mesh_analysis: dict[str, Any] | None,
 ) -> str:
     """Baut die User-Nachricht für den Quality-Agenten."""
     parts = [f"Asset-ID: {asset_id}"]
@@ -311,7 +312,7 @@ async def assess_quality(body: QualityAssessRequest) -> QualityAssessment:
 
 def _build_workflow_prompt(
     asset_id: str,
-    mesh_analysis: dict | None,
+    mesh_analysis: dict[str, Any] | None,
     pipeline_steps: list[str],
     quality_assessment: QualityAssessment | None,
     intention: str | None,
@@ -415,9 +416,9 @@ async def recommend_workflow(body: WorkflowRecommendRequest) -> WorkflowRecommen
     return output
 
 
-def _build_chat_context(body: ChatRequest) -> dict:
+def _build_chat_context(body: ChatRequest) -> dict[str, Any]:
     """Baut den Kontext für den Chat-Agenten (History + Asset)."""
-    ctx: dict = {
+    ctx: dict[str, Any] = {
         "message": body.message,
         "history": [
             {"role": m.role, "content": m.content, "timestamp": m.timestamp}
@@ -442,7 +443,7 @@ def _build_chat_context(body: ChatRequest) -> dict:
     return ctx
 
 
-def _build_chat_user_message(ctx: dict) -> str:
+def _build_chat_user_message(ctx: dict[str, Any]) -> str:
     """Formatiert die User-Nachricht mit Kontext für den Agenten."""
     parts: list[str] = []
     if ctx.get("asset_context"):

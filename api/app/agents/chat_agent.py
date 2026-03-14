@@ -1,8 +1,9 @@
 """Chat-Agent: Freies Gespräch mit Kontext zu Assets und Pipeline."""
 
+from typing import Any, Literal
+
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
-from typing import Literal
 
 from app.agents.base import get_model
 
@@ -24,7 +25,7 @@ class ChatAction(BaseModel):
         "assess_quality",
         "open_tab",
     ]
-    params: dict
+    params: dict[str, Any]
 
 
 class ChatResponse(BaseModel):
@@ -47,10 +48,10 @@ class ChatResponse(BaseModel):
     )
 
 
-_CHAT_AGENT: Agent[dict, ChatResponse] | None = None
+_CHAT_AGENT: Agent[dict[str, Any], ChatResponse] | None = None
 
 
-def get_chat_agent() -> Agent[dict, ChatResponse]:
+def get_chat_agent() -> Agent[dict[str, Any], ChatResponse]:
     """Lazy-Initialisierung des Chat-Agenten (erfordert ANTHROPIC_API_KEY)."""
     global _CHAT_AGENT
     if _CHAT_AGENT is None:

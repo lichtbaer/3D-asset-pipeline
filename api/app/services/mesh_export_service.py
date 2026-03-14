@@ -8,6 +8,7 @@ import logging
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 import open3d as o3d
 import trimesh
@@ -91,7 +92,7 @@ def export(
     asset_id: str,
     source_file: str,
     target_format: str,
-) -> dict:
+) -> dict[str, Any]:
     """
     Exportiert Mesh in Zielformat.
     Returns: {output_file, format, file_size_bytes, download_url}
@@ -148,7 +149,7 @@ def export(
     }
 
 
-def _append_export_entry(asset_id: str, entry: dict) -> None:
+def _append_export_entry(asset_id: str, entry: dict[str, Any]) -> None:
     """Fügt Export-Eintrag zu metadata.json exports-Array hinzu."""
     meta_path = asset_service.get_asset_dir(asset_id) / "metadata.json"
     if not meta_path.exists():
@@ -161,7 +162,7 @@ def _append_export_entry(asset_id: str, entry: dict) -> None:
     meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
 
 
-def list_exports(asset_id: str) -> list[dict]:
+def list_exports(asset_id: str) -> list[dict[str, Any]]:
     """Listet alle in metadata.json dokumentierten Exports."""
     meta = asset_service.get_asset(asset_id)
     if not meta:

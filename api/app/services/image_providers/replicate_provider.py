@@ -22,7 +22,7 @@ AVAILABLE_MODELS: list[tuple[str, str]] = [
 
 DEFAULT_MODEL = "black-forest-labs/flux-schnell"
 
-PARAM_SCHEMA: dict = {
+PARAM_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
         "model": {
@@ -51,7 +51,7 @@ class ReplicateImageProvider(ImageProvider):
                 "REPLICATE_API_TOKEN nicht konfiguriert — replicate Provider nicht verfügbar"
             )
 
-    def default_params(self) -> dict:
+    def default_params(self) -> dict[str, Any]:
         return {
             "model": DEFAULT_MODEL,
             "width": 1024,
@@ -59,10 +59,10 @@ class ReplicateImageProvider(ImageProvider):
             "negative_prompt": None,
         }
 
-    def param_schema(self) -> dict:
+    def param_schema(self) -> dict[str, Any]:
         return PARAM_SCHEMA.copy()
 
-    async def generate(self, prompt: str, params: dict) -> str:
+    async def generate(self, prompt: str, params: dict[str, Any]) -> str:
         """
         Generiert ein Bild via Replicate API.
 

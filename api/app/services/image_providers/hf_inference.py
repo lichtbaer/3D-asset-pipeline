@@ -5,6 +5,9 @@ import io
 import logging
 import os
 import uuid
+from typing import Any
+
+from PIL import Image
 
 from app.config.storage import IMAGE_STORAGE_PATH
 from app.exceptions import (
@@ -25,7 +28,7 @@ AVAILABLE_MODELS: list[tuple[str, str]] = [
 
 DEFAULT_MODEL = "black-forest-labs/FLUX.1-schnell"
 
-PARAM_SCHEMA: dict = {
+PARAM_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
         "model": {
@@ -58,7 +61,7 @@ class HFInferenceImageProvider(ImageProvider):
 
         self._client = InferenceClient(token=token)
 
-    def default_params(self) -> dict:
+    def default_params(self) -> dict[str, Any]:
         return {
             "model": DEFAULT_MODEL,
             "width": 1024,
@@ -66,10 +69,10 @@ class HFInferenceImageProvider(ImageProvider):
             "negative_prompt": None,
         }
 
-    def param_schema(self) -> dict:
+    def param_schema(self) -> dict[str, Any]:
         return PARAM_SCHEMA.copy()
 
-    async def generate(self, prompt: str, params: dict) -> str:
+    async def generate(self, prompt: str, params: dict[str, Any]) -> str:
         """
         Generiert ein Bild via HF Inference API.
 
@@ -117,7 +120,7 @@ class HFInferenceImageProvider(ImageProvider):
         negative_prompt: str | None,
         width: int,
         height: int,
-    ) -> object:
+    ) -> Image.Image:
         """
         Synchroner HF Inference API-Aufruf.
         Wird via asyncio.to_thread() aufgerufen um Event-Loop nicht zu blockieren.

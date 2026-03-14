@@ -28,7 +28,7 @@ SKIN_CKPT = "skin/articulation-xl/model.ckpt"
 def _cuda_available() -> bool:
     """Prüft ob CUDA verfügbar ist."""
     try:
-        import torch  # type: ignore[import-not-found]
+        import torch
         return bool(torch.cuda.is_available())
     except ImportError:
         return False

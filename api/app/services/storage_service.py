@@ -4,8 +4,10 @@ Storage-Statistik und Papierkorb-Purge.
 
 import logging
 from pathlib import Path
+from typing import Any
 
 from app.config.storage import ASSETS_STORAGE_PATH
+
 from app.services import asset_service
 
 logger = logging.getLogger(__name__)
@@ -96,7 +98,7 @@ def _get_asset_breakdown(asset_id: str) -> dict[str, int]:
     return breakdown
 
 
-def compute_storage_stats() -> dict:
+def compute_storage_stats() -> dict[str, Any]:
     """
     Berechnet Storage-Statistik über alle Assets.
     Berücksichtigt soft-deleted Assets für deleted_count und deleted_size_bytes.

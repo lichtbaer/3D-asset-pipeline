@@ -1,6 +1,7 @@
 """Preset-API: Pipeline-Presets verwalten und anwenden."""
 
 import asyncio
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
@@ -17,7 +18,7 @@ from app.services import preset_service
 router = APIRouter(prefix="/presets", tags=["presets"])
 
 
-def _to_response(data: dict) -> PresetResponse:
+def _to_response(data: dict[str, Any]) -> PresetResponse:
     return PresetResponse(
         id=data["id"],
         name=data["name"],
