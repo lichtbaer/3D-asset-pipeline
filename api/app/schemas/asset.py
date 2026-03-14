@@ -62,6 +62,10 @@ class AssetDetailResponse(BaseModel):
         default_factory=list,
         description="Bild-Nachbearbeitung (crop, resize, center, pad_square)",
     )
+    texture_baking: list[dict] = Field(
+        default_factory=list,
+        description="Texture-Baking-Einträge (source, target, output_file)",
+    )
     sketchfab_upload: SketchfabUploadInfo | None = None
     source: str | None = None
     sketchfab_uid: str | None = None
