@@ -20,6 +20,13 @@ from app.schemas.asset import (
     SketchfabUploadInfo,
     UploadAssetResponse,
 )
+from app.schemas.image_processing import (
+    CenterRequest,
+    CropRequest,
+    ImageProcessingResponse,
+    PadSquareRequest,
+    ResizeRequest,
+)
 from app.schemas.mesh_processing import (
     ClipFloorRequest,
     MeshAnalysis,
@@ -28,6 +35,12 @@ from app.schemas.mesh_processing import (
     SimplifyRequest,
 )
 from app.services import asset_service
+from app.services.image_processing_service import (
+    center_subject,
+    crop as image_crop,
+    pad_to_square,
+    resize as image_resize,
+)
 from app.services.mesh_export_service import export as mesh_export, list_exports
 from app.services.mesh_processing_service import (
     analyze as mesh_analyze,
@@ -256,6 +269,7 @@ async def get_asset(asset_id: str):
         updated_at=meta.updated_at,
         steps=meta.steps,
         processing=meta.processing,
+        image_processing=meta.image_processing,
         sketchfab_upload=_to_sketchfab_upload_info(meta.sketchfab_upload),
         source=meta.source,
         sketchfab_uid=meta.sketchfab_uid,
@@ -277,6 +291,135 @@ async def process_sources(asset_id: str):
     if not asset_service.get_asset(asset_id):
         raise HTTPException(404, detail="Asset nicht gefunden")
     return {"sources": asset_service.list_mesh_files(asset_id)}
+
+
+# --- Bild-Nachbearbeitung (Crop, Resize, Center, Pad-Square) ---
+
+
+@router.get("/{asset_id}/image/sources")
+async def image_sources(asset_id: str):
+    """Liste verfügbarer Bild-Dateien im Asset (PNG, JPG, WebP)."""
+    if not asset_service.get_asset(asset_id):
+        raise HTTPException(404, detail="Asset nicht gefunden")
+    return {"sources": asset_service.list_image_files(asset_id)}
+
+
+@router.get("/{asset_id}/image/preview/{filename}")
+async def image_preview(asset_id: str, filename: str):
+    """Vorschau einer Bild-Datei (Alias für /files/{filename})."""
+    path = asset_service.get_file_path(asset_id, filename)
+    if not path:
+        raise HTTPException(404, detail="Datei nicht gefunden")
+    suffix = Path(filename).suffix.lower()
+    media_types: dict[str, str] = {
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".webp": "image/webp",
+    }
+    media_type = media_types.get(suffix, "image/png")
+    return FileResponse(path, media_type=media_type)
+
+
+@router.post("/{asset_id}/image/crop", response_model=ImageProcessingResponse)
+async def post_image_crop(asset_id: str, body: CropRequest):
+    """Bild zuschneiden. Speichert image_cropped.png."""
+    if not asset_service.get_asset(asset_id):
+        raise HTTPException(404, detail="Asset nicht gefunden")
+    try:
+        output_file, width, height, file_size = await asyncio.to_thread(
+            image_crop,
+            asset_id,
+            body.source_file,
+            body.x,
+            body.y,
+            body.width,
+            body.height,
+        )
+        return ImageProcessingResponse(
+            output_file=output_file,
+            width=width,
+            height=height,
+            file_size_bytes=file_size,
+        )
+    except FileNotFoundError as e:
+        raise HTTPException(404, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(400, detail=str(e)) from e
+
+
+@router.post("/{asset_id}/image/resize", response_model=ImageProcessingResponse)
+async def post_image_resize(asset_id: str, body: ResizeRequest):
+    """Bild skalieren. Speichert image_resized.png."""
+    if not asset_service.get_asset(asset_id):
+        raise HTTPException(404, detail="Asset nicht gefunden")
+    try:
+        output_file, width, height, file_size = await asyncio.to_thread(
+            image_resize,
+            asset_id,
+            body.source_file,
+            body.width,
+            body.height,
+            body.maintain_aspect,
+        )
+        return ImageProcessingResponse(
+            output_file=output_file,
+            width=width,
+            height=height,
+            file_size_bytes=file_size,
+        )
+    except FileNotFoundError as e:
+        raise HTTPException(404, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(400, detail=str(e)) from e
+
+
+@router.post("/{asset_id}/image/center", response_model=ImageProcessingResponse)
+async def post_image_center(asset_id: str, body: CenterRequest):
+    """Subjekt zentrieren (transparenter Hintergrund). Speichert image_centered.png."""
+    if not asset_service.get_asset(asset_id):
+        raise HTTPException(404, detail="Asset nicht gefunden")
+    try:
+        output_file, width, height, file_size = await asyncio.to_thread(
+            center_subject,
+            asset_id,
+            body.source_file,
+            body.padding,
+        )
+        return ImageProcessingResponse(
+            output_file=output_file,
+            width=width,
+            height=height,
+            file_size_bytes=file_size,
+        )
+    except FileNotFoundError as e:
+        raise HTTPException(404, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(400, detail=str(e)) from e
+
+
+@router.post("/{asset_id}/image/pad-square", response_model=ImageProcessingResponse)
+async def post_image_pad_square(asset_id: str, body: PadSquareRequest):
+    """Bild quadratisch machen (Padding). Speichert image_squared.png."""
+    if not asset_service.get_asset(asset_id):
+        raise HTTPException(404, detail="Asset nicht gefunden")
+    try:
+        output_file, width, height, file_size = await asyncio.to_thread(
+            pad_to_square,
+            asset_id,
+            body.source_file,
+            body.background,
+        )
+        return ImageProcessingResponse(
+            output_file=output_file,
+            width=width,
+            height=height,
+            file_size_bytes=file_size,
+        )
+    except FileNotFoundError as e:
+        raise HTTPException(404, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(400, detail=str(e)) from e
 
 
 @router.get("/{asset_id}/process/analyze", response_model=MeshAnalysis)
