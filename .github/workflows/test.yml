@@ -31,15 +31,19 @@ jobs:
           PRESETS_STORAGE_PATH: /tmp/purzel-test/presets
         run: |
           mkdir -p /tmp/purzel-test/logs /tmp/purzel-test/assets /tmp/purzel-test/presets
-          pytest tests/ --cov=app --cov-report=term-missing --cov-fail-under=60
+          pytest tests/ --cov=app --cov-report=term-missing --cov-fail-under=70
 
       - name: Run mypy
         run: python -m mypy app --strict
-        continue-on-error: true
 
       - name: Run ruff
         run: python -m ruff check app
-        continue-on-error: true
+
+      - name: Run pip-audit
+        run: |
+          mkdir -p ../docs
+          python -m pip_audit -l --format=json -o ../docs/pip-audit-results.json
+          python -m pip_audit -l
 
   frontend:
     runs-on: ubuntu-latest

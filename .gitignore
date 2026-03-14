@@ -18,6 +18,8 @@ ENV/
 node_modules/
 dist/
 .npm
+coverage/
+docs/pip-audit-results.json
 
 # IDE
 .idea/

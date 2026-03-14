@@ -61,7 +61,9 @@ def test_delete_original_file_403(client: TestClient, sample_asset: str):
     """
     r = client.delete(f"/assets/{sample_asset}/files/mesh.glb")
     assert r.status_code == 403
-    assert "Original" in r.json().get("detail", "")
+    detail = r.json().get("detail", "")
+    msg = detail.get("detail", detail) if isinstance(detail, dict) else detail
+    assert "Original" in str(msg)
 
 
 def test_step_delete_warns_on_dependencies(

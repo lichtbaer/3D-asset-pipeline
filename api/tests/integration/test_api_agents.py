@@ -31,7 +31,10 @@ def test_agent_returns_503_without_api_key(client: TestClient, monkeypatch):
     assert r.status_code == 503
     detail = r.json().get("detail", {})
     if isinstance(detail, dict):
-        assert detail.get("error_type") == "not_available"
+        # APIError-Format: code "AGENT_NOT_AVAILABLE" oder "not_available" in message
+        assert detail.get("code") == "AGENT_NOT_AVAILABLE" or "not_available" in str(
+            detail.get("error", "")
+        )
     else:
         assert "not_available" in str(detail)
 
