@@ -13,6 +13,9 @@ interface PipelineStoreContextValue {
   setPendingRiggingGlbUrl: (url: string | null) => void;
   pendingAnimationGlbUrl: string | null;
   setPendingAnimationGlbUrl: (url: string | null) => void;
+  /** Vom Chat: Prompt in Bild-Tab übernehmen */
+  pendingPromptFromChat: string | null;
+  setPendingPromptFromChat: (v: string | null) => void;
 }
 
 const PipelineStoreContext = createContext<PipelineStoreContextValue | null>(
@@ -27,6 +30,9 @@ export function PipelineStoreProvider({ children }: { children: ReactNode }) {
   const [pendingAnimationGlbUrl, setPendingAnimationGlbUrlState] = useState<
     string | null
   >(null);
+  const [pendingPromptFromChat, setPendingPromptFromChatState] = useState<
+    string | null
+  >(null);
 
   const setActiveAssetId = useCallback((id: string | null) => {
     setActiveAssetIdState(id);
@@ -36,6 +42,9 @@ export function PipelineStoreProvider({ children }: { children: ReactNode }) {
   }, []);
   const setPendingAnimationGlbUrl = useCallback((url: string | null) => {
     setPendingAnimationGlbUrlState(url);
+  }, []);
+  const setPendingPromptFromChat = useCallback((v: string | null) => {
+    setPendingPromptFromChatState(v);
   }, []);
 
   return (
@@ -47,6 +56,8 @@ export function PipelineStoreProvider({ children }: { children: ReactNode }) {
         setPendingRiggingGlbUrl,
         pendingAnimationGlbUrl,
         setPendingAnimationGlbUrl,
+        pendingPromptFromChat,
+        setPendingPromptFromChat,
       }}
     >
       {children}

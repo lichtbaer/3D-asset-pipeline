@@ -1,4 +1,4 @@
-"""Agent-API: Prompt-Assistent, Auto-Tagging, Qualitätsbewertung, Workflow-Empfehlung."""
+"""Agent-API: Prompt-Assistent, Auto-Tagging, Qualitätsbewertung, Workflow-Empfehlung, Chat."""
 
 import asyncio
 from pathlib import Path
@@ -13,12 +13,14 @@ from app.agents.models import (
     TagSuggestion,
     WorkflowRecommendation,
 )
+from app.agents.chat_agent import ChatResponse as ChatResponseModel, get_chat_agent
 from app.agents.prompt_agent import get_prompt_agent
 from app.agents.quality_agent import get_quality_agent
 from app.agents.tagging_agent import get_tagging_agent
 from app.agents.workflow_agent import get_workflow_agent
 from app.core.config import settings
 from app.schemas.agents import (
+    ChatRequest,
     PromptOptimizeRequest,
     QualityAssessRequest,
     TagsSuggestRequest,
@@ -410,4 +412,90 @@ async def recommend_workflow(body: WorkflowRecommendRequest) -> WorkflowRecommen
             },
         )
 
+    return output
+
+
+def _build_chat_context(body: ChatRequest) -> dict:
+    """Baut den Kontext für den Chat-Agenten (History + Asset)."""
+    ctx: dict = {
+        "message": body.message,
+        "history": [
+            {"role": m.role, "content": m.content, "timestamp": m.timestamp}
+            for m in body.history[-body.max_history :]
+        ],
+    }
+    if body.asset_id:
+        meta = asset_service.get_asset(body.asset_id)
+        if meta:
+            steps_summary = ", ".join(
+                f"{s} ✓" if meta.steps.get(s, {}).get("file") else f"{s} —"
+                for s in ("image", "bgremoval", "mesh", "rigging", "animation")
+            )
+            ctx["asset_context"] = {
+                "asset_id": body.asset_id,
+                "name": meta.name or f"Asset {body.asset_id[:8]}…",
+                "steps": steps_summary,
+                "steps_detail": dict(meta.steps),
+            }
+        else:
+            ctx["asset_context"] = {"asset_id": body.asset_id, "name": None}
+    return ctx
+
+
+def _build_chat_user_message(ctx: dict) -> str:
+    """Formatiert die User-Nachricht mit Kontext für den Agenten."""
+    parts: list[str] = []
+    if ctx.get("asset_context"):
+        ac = ctx["asset_context"]
+        parts.append(f"[Asset-Kontext: {ac.get('name', ac['asset_id'])}]")
+        if ac.get("steps"):
+            parts.append(f"Pipeline-Stand: {ac['steps']}")
+        parts.append("")
+    parts.append(ctx["message"])
+    if ctx.get("history"):
+        parts.append("")
+        parts.append("[Konversations-Historie zur Einordnung:]")
+        for h in ctx["history"]:
+            role = "User" if h["role"] == "user" else "Assistant"
+            parts.append(f"{role}: {h['content']}")
+    return "\n".join(parts)
+
+
+@router.post(
+    "/chat",
+    response_model=ChatResponseModel,
+    responses={
+        503: {"description": "Agent not available", "model": AgentError},
+    },
+)
+async def chat(body: ChatRequest) -> ChatResponseModel:
+    """Freies Chat mit KI-Assistent (Asset-Kontext optional)."""
+    if not settings.agent_available:
+        _raise_503("chat")
+    ctx = _build_chat_context(body)
+    user_message = _build_chat_user_message(ctx)
+    agent = get_chat_agent()
+    try:
+        result = await agent.run(user_message)
+    except Exception as e:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "agent": "chat",
+                "error_type": "model_error",
+                "message": str(e),
+                "fallback_available": False,
+            },
+        ) from e
+    output = result.output
+    if output is None:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "agent": "chat",
+                "error_type": "model_error",
+                "message": "Agent returned no output",
+                "fallback_available": False,
+            },
+        )
     return output
