@@ -13,6 +13,10 @@ export interface AssetListItem {
   updated_at: string;
   steps: Record<string, AssetStepInfo>;
   thumbnail_url: string | null;
+  name?: string | null;
+  tags?: string[];
+  rating?: number | null;
+  favorited?: boolean;
 }
 
 export interface ProcessingEntry {
@@ -44,6 +48,29 @@ export interface AssetDetail {
   sketchfab_author?: string | null;
   downloaded_at?: string | null;
   exports?: ExportEntry[];
+  name?: string | null;
+  tags?: string[];
+  rating?: number | null;
+  notes?: string | null;
+  favorited?: boolean;
+}
+
+export interface AssetMetaUpdate {
+  name?: string | null;
+  tags?: string[];
+  rating?: number | null;
+  notes?: string | null;
+  favorited?: boolean | null;
+}
+
+export interface ListAssetsParams {
+  search?: string;
+  tags?: string;
+  rating?: number;
+  has_step?: "image" | "mesh" | "rigging" | "animation";
+  favorited?: boolean;
+  source?: string;
+  sort?: "created_desc" | "created_asc" | "name" | "rating";
 }
 
 export interface ExportEntry {
@@ -75,8 +102,28 @@ export interface ExportListItem {
   download_url: string;
 }
 
-export async function listAssets(): Promise<AssetListItem[]> {
-  const { data } = await apiClient.get<AssetListItem[]>("/assets");
+export async function listAssets(
+  params?: ListAssetsParams
+): Promise<AssetListItem[]> {
+  const { data } = await apiClient.get<AssetListItem[]>("/assets", {
+    params: params ?? {},
+  });
+  return data;
+}
+
+export async function getAssetTags(): Promise<{ tags: string[] }> {
+  const { data } = await apiClient.get<{ tags: string[] }>("/assets/tags");
+  return data;
+}
+
+export async function patchAssetMeta(
+  assetId: string,
+  meta: AssetMetaUpdate
+): Promise<{ message: string }> {
+  const { data } = await apiClient.patch<{ message: string }>(
+    `/assets/${assetId}/meta`,
+    meta
+  );
   return data;
 }
 

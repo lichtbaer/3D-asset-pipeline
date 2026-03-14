@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class AssetStepInfo(BaseModel):
@@ -22,6 +22,10 @@ class AssetListItem(BaseModel):
     updated_at: datetime | str
     steps: dict[str, AssetStepInfo] = Field(default_factory=dict)
     thumbnail_url: str | None = None  # Erste Bild-URL falls vorhanden
+    name: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    rating: int | None = None
+    favorited: bool = False
 
 
 class SketchfabUploadInfo(BaseModel):
@@ -55,6 +59,28 @@ class AssetDetailResponse(BaseModel):
         default_factory=list,
         description="Export-Einträge (STL, OBJ, PLY, GLTF)",
     )
+    name: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    rating: int | None = None
+    notes: str | None = None
+    favorited: bool = False
+
+
+class AssetMetaUpdateRequest(BaseModel):
+    """PATCH-Body für /assets/{asset_id}/meta."""
+
+    name: str | None = None
+    tags: list[str] | None = None
+    rating: int | None = None
+    notes: str | None = None
+    favorited: bool | None = None
+
+    @field_validator("rating")
+    @classmethod
+    def rating_range(cls, v: int | None) -> int | None:
+        if v is not None and (v < 1 or v > 5):
+            raise ValueError("rating muss zwischen 1 und 5 liegen")
+        return v
 
 
 class ExportRequest(BaseModel):

@@ -1,7 +1,12 @@
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getAsset, getAssetFileUrl } from "../../api/assets.js";
+import {
+  getAsset,
+  getAssetFileUrl,
+  getAssetTags,
+  patchAssetMeta,
+} from "../../api/assets.js";
 import { usePipelineStore } from "../../store/PipelineStore.js";
 import { useFocusTrap } from "../../hooks/useFocusTrap.js";
 import { useEscapeKey } from "../../hooks/useEscapeKey.js";
@@ -38,9 +43,14 @@ interface AssetStepData {
 interface AssetDetailModalProps {
   assetId: string;
   onClose: () => void;
+  onAssetUpdate?: () => void;
 }
 
-export function AssetDetailModal({ assetId, onClose }: AssetDetailModalProps) {
+export function AssetDetailModal({
+  assetId,
+  onClose,
+  onAssetUpdate,
+}: AssetDetailModalProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { setActiveAssetId } = usePipelineStore();
@@ -52,6 +62,18 @@ export function AssetDetailModal({ assetId, onClose }: AssetDetailModalProps) {
     queryFn: () => getAsset(assetId),
     enabled: !!assetId,
   });
+
+  const { data: allTags } = useQuery({
+    queryKey: ["asset-tags"],
+    queryFn: getAssetTags,
+    enabled: !!assetId && !!data,
+  });
+
+  const [tagInput, setTagInput] = useState("");
+  const [showTagSuggestions, setShowTagSuggestions] = useState(false);
+  const [notesInput, setNotesInput] = useState("");
+  const [nameInput, setNameInput] = useState("");
+  const lastSyncedAssetIdRef = useRef<string | null>(null);
 
   useFocusTrap(modalRef, true);
   useEscapeKey(onClose);
@@ -70,6 +92,58 @@ export function AssetDetailModal({ assetId, onClose }: AssetDetailModalProps) {
   const handleUseForRigging = (url: string, assetIdForJob: string) => {
     handleAction("rigging", url, assetIdForJob);
   };
+
+  const saveMeta = async (updates: {
+    name?: string | null;
+    tags?: string[];
+    rating?: number | null;
+    notes?: string | null;
+    favorited?: boolean | null;
+  }) => {
+    try {
+      await patchAssetMeta(assetId, updates);
+      void queryClient.invalidateQueries({ queryKey: ["asset", assetId] });
+      onAssetUpdate?.();
+    } catch {
+      // Fehler ignorieren
+    }
+  };
+
+  const currentTags = data?.tags ?? [];
+  const tagSuggestions = (allTags?.tags ?? []).filter(
+    (t) =>
+      t.toLowerCase().includes(tagInput.toLowerCase().trim()) &&
+      !currentTags.includes(t)
+  );
+
+  const addTag = (tag: string) => {
+    const t = tag.trim();
+    if (t && !currentTags.includes(t)) {
+      void saveMeta({ tags: [...currentTags, t] });
+      setTagInput("");
+      setShowTagSuggestions(false);
+    }
+  };
+
+  const removeTag = (tag: string) => {
+    void saveMeta({ tags: currentTags.filter((x) => x !== tag) });
+  };
+
+  useEffect(() => {
+    lastSyncedAssetIdRef.current = null;
+  }, [assetId]);
+
+  useEffect(() => {
+    if (
+      data &&
+      data.asset_id === assetId &&
+      lastSyncedAssetIdRef.current !== assetId
+    ) {
+      lastSyncedAssetIdRef.current = assetId;
+      setNotesInput(data.notes ?? "");
+      setNameInput(data.name ?? "");
+    }
+  }, [assetId, data]);
 
   if (!assetId) return null;
 
@@ -150,7 +224,9 @@ export function AssetDetailModal({ assetId, onClose }: AssetDetailModalProps) {
       <div className="asset-modal__backdrop" onClick={onClose} />
       <div className="asset-modal__content" onClick={(e) => e.stopPropagation()}>
         <header className="asset-modal__header">
-          <h2 id="asset-detail-title">Asset {data.asset_id.slice(0, 8)}…</h2>
+          <h2 id="asset-detail-title">
+            {data.name ?? `Asset ${data.asset_id.slice(0, 8)}…`}
+          </h2>
           <button
             type="button"
             className="asset-modal__close"
@@ -274,6 +350,126 @@ export function AssetDetailModal({ assetId, onClose }: AssetDetailModalProps) {
             )}
           </>
         )}
+
+        <section className="asset-modal__verwaltung">
+          <h3>Verwaltung</h3>
+          <div className="asset-modal__verwaltung-name">
+            <label className="asset-modal__verwaltung-label" htmlFor="asset-name">
+              Name:
+            </label>
+            <input
+              id="asset-name"
+              type="text"
+              className="asset-modal__name-input"
+              placeholder="Asset-Name..."
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
+              onBlur={(e) => {
+                const v = e.target.value.trim() || null;
+                void saveMeta({ name: v });
+              }}
+            />
+          </div>
+          <div className="asset-modal__verwaltung-tags">
+            <label className="asset-modal__verwaltung-label">Tags:</label>
+            <div className="asset-modal__tag-chips">
+              {currentTags.map((t) => (
+                <span key={t} className="asset-modal__tag-chip">
+                  {t}{" "}
+                  <button
+                    type="button"
+                    onClick={() => removeTag(t)}
+                    aria-label={`Tag ${t} entfernen`}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+            <div className="asset-modal__tag-input-wrap">
+              <input
+                type="text"
+                className="asset-modal__tag-input"
+                placeholder="+ Tag eingeben..."
+                value={tagInput}
+                onChange={(e) => {
+                  setTagInput(e.target.value);
+                  setShowTagSuggestions(true);
+                }}
+                onFocus={() => setShowTagSuggestions(true)}
+                onBlur={() =>
+                  setTimeout(() => setShowTagSuggestions(false), 150)
+                }
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    const v = tagInput.trim();
+                    if (v) addTag(v);
+                    else if (tagSuggestions[0]) addTag(tagSuggestions[0]);
+                  }
+                }}
+              />
+              {showTagSuggestions && tagSuggestions.length > 0 && (
+                <ul className="asset-modal__tag-suggestions">
+                  {tagSuggestions.slice(0, 8).map((t) => (
+                    <li key={t}>
+                      <button
+                        type="button"
+                        onClick={() => addTag(t)}
+                      >
+                        {t}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+          <div className="asset-modal__verwaltung-rating">
+            <label className="asset-modal__verwaltung-label">Rating:</label>
+            <span className="asset-modal__stars">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <button
+                  key={i}
+                  type="button"
+                  className="asset-modal__star"
+                  onClick={() => void saveMeta({ rating: i })}
+                  aria-label={`${i} Sterne`}
+                >
+                  {i <= (data.rating ?? 0) ? "★" : "☆"}
+                </button>
+              ))}
+            </span>
+          </div>
+          <div className="asset-modal__verwaltung-notes">
+            <label className="asset-modal__verwaltung-label" htmlFor="asset-notes">
+              Notiz:
+            </label>
+            <textarea
+              id="asset-notes"
+              className="asset-modal__notes-input"
+              placeholder="Notizen zum Asset..."
+              value={notesInput}
+              onChange={(e) => setNotesInput(e.target.value)}
+              onBlur={(e) => {
+                const v = e.target.value.trim();
+                void saveMeta({ notes: v || null });
+              }}
+            />
+          </div>
+          <div className="asset-modal__verwaltung-favorit">
+            <button
+              type="button"
+              className={`asset-modal__favorit-btn ${
+                data.favorited ? "asset-modal__favorit-btn--on" : ""
+              }`}
+              onClick={() =>
+                void saveMeta({ favorited: !(data.favorited ?? false) })
+              }
+            >
+              {data.favorited ? "♥ Als Favorit markiert" : "♡ Als Favorit markieren"}
+            </button>
+          </div>
+        </section>
 
         <section className="asset-modal__meta">
           <h3>Metadaten</h3>
