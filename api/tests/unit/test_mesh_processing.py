@@ -95,3 +95,22 @@ def test_remove_small_components_creates_new_file(sample_asset: str, tmp_storage
     assert original_path.read_bytes() == original_content
     assert output_file == "mesh_cleaned.glb"
     assert (asset_dir / output_file).exists()
+
+
+def test_clip_floor_auto_detect(sample_asset: str, tmp_storage_paths):
+    """clip_floor mit y_threshold=None nutzt Auto-Detect (untere 5%)."""
+    from app.services import asset_service
+
+    output_file, result = mesh_processing_service.clip_floor(
+        sample_asset, "mesh.glb", y_threshold=None
+    )
+    assert "mesh_clipped.glb" in output_file
+    assert result.get("y_threshold_used") is not None
+    assert (asset_service.get_asset_dir(sample_asset) / output_file).exists()
+
+
+def test_analyze_returns_is_watertight_and_manifold(sample_asset: str, tmp_storage_paths):
+    """analyze liefert is_watertight und is_manifold."""
+    result = mesh_processing_service.analyze(sample_asset, "mesh.glb")
+    assert isinstance(result.is_watertight, bool)
+    assert isinstance(result.is_manifold, bool)
