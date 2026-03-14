@@ -1,10 +1,10 @@
 """
 Asset-Persistenz: Ordnerstruktur mit Metadaten für alle Pipeline-Outputs.
 Jeder generierte Output wird auf dem Filesystem abgelegt.
+Nutzt AssetPaths und MetadataService für zentralisierte Pfad- und Metadata-Logik.
 """
 
 import asyncio
-import json
 import logging
 import re
 import shutil
@@ -19,6 +19,8 @@ from app.config.storage import (
     ASSETS_STORAGE_PATH,
     BGREMOVAL_STORAGE_PATH,
 )
+from app.core.asset_paths import AssetPaths
+from app.services.metadata_service import get_metadata_service
 
 logger = logging.getLogger(__name__)
 
@@ -111,21 +113,13 @@ class AssetMetadata:
         return out
 
 
-def _asset_dir(asset_id: str) -> Path:
-    return ASSETS_STORAGE_PATH / asset_id
-
-
-def _metadata_path(asset_id: str) -> Path:
-    return _asset_dir(asset_id) / "metadata.json"
-
-
 def create_asset() -> str:
     """
     Legt Ordner + leere metadata.json an, gibt asset_id zurück.
     """
     asset_id = str(uuid.uuid4())
-    asset_path = _asset_dir(asset_id)
-    asset_path.mkdir(parents=True, exist_ok=True)
+    paths = AssetPaths(asset_id)
+    paths.base.mkdir(parents=True, exist_ok=True)
 
     now = datetime.now(timezone.utc).isoformat()
     metadata = {
@@ -134,9 +128,7 @@ def create_asset() -> str:
         "updated_at": now,
         "steps": {},
     }
-    _metadata_path(asset_id).write_text(
-        json.dumps(metadata, indent=2), encoding="utf-8"
-    )
+    get_metadata_service().write(asset_id, metadata)
     return asset_id
 
 
@@ -152,32 +144,25 @@ async def update_step(
     data enthält: job_id, provider_key, prompt/negative_prompt/source_file, etc.
     Verwendet asyncio.to_thread, um blockierendes File-I/O aus dem Event-Loop auszulagern.
     """
-    asset_path = _asset_dir(asset_id)
-    if not asset_path.exists():
+    paths = AssetPaths(asset_id)
+    if not paths.base.exists():
         raise FileNotFoundError(f"Asset {asset_id} existiert nicht")
 
     if file_bytes is not None and filename:
-        target = asset_path / filename
+        target = paths.processing_file(filename)
         await asyncio.to_thread(target.write_bytes, file_bytes)
         data["file"] = filename
 
-    meta_path = _metadata_path(asset_id)
-
-    def _update_meta() -> None:
-        meta = json.loads(meta_path.read_text(encoding="utf-8"))
-        meta["steps"][step] = data
-        meta["updated_at"] = datetime.now(timezone.utc).isoformat()
-        meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
-
-    await asyncio.to_thread(_update_meta)
+    await asyncio.to_thread(
+        get_metadata_service().mark_step_done, asset_id, step, data
+    )
 
 
 def get_asset(asset_id: str) -> AssetMetadata | None:
     """Liest metadata.json, gibt None wenn nicht vorhanden."""
-    meta_path = _metadata_path(asset_id)
-    if not meta_path.exists():
+    data = get_metadata_service().read(asset_id)
+    if not data:
         return None
-    data = json.loads(meta_path.read_text(encoding="utf-8"))
     return AssetMetadata(
         asset_id=data["asset_id"],
         created_at=data["created_at"],
@@ -320,22 +305,19 @@ def update_asset_meta(
     favorited: bool | None = None,
 ) -> None:
     """Aktualisiert Meta-Felder (Name, Tags, Rating, Notes, Favorit). Partial update."""
-    meta_path = _metadata_path(asset_id)
-    if not meta_path.exists():
-        raise FileNotFoundError(f"Asset {asset_id} existiert nicht")
-    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    fields: dict[str, Any] = {}
     if name is not None:
-        meta["name"] = name
+        fields["name"] = name
     if tags is not None:
-        meta["tags"] = tags
+        fields["tags"] = tags
     if rating is not None:
-        meta["rating"] = rating
+        fields["rating"] = rating
     if notes is not None:
-        meta["notes"] = notes
+        fields["notes"] = notes
     if favorited is not None:
-        meta["favorited"] = favorited
-    meta["updated_at"] = datetime.now(timezone.utc).isoformat()
-    meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+        fields["favorited"] = favorited
+    if fields:
+        get_metadata_service().update(asset_id, **fields)
 
 
 # Original-Files, die nicht via DELETE /files/{filename} löschbar sind
@@ -394,8 +376,9 @@ def delete_asset_file(asset_id: str, filename: str) -> bool:
     if not path:
         raise FileNotFoundError(f"Datei {filename} nicht in Asset {asset_id}")
 
-    meta_path = _metadata_path(asset_id)
-    meta_dict = json.loads(meta_path.read_text(encoding="utf-8"))
+    meta_dict = get_metadata_service().read(asset_id)
+    if not meta_dict:
+        raise FileNotFoundError(f"Asset {asset_id} nicht gefunden")
     changed = False
 
     # Processing-Einträge entfernen
@@ -445,7 +428,7 @@ def delete_asset_file(asset_id: str, filename: str) -> bool:
 
     if changed:
         meta_dict["updated_at"] = datetime.now(timezone.utc).isoformat()
-        meta_path.write_text(json.dumps(meta_dict, indent=2), encoding="utf-8")
+        get_metadata_service().write(asset_id, meta_dict)
 
     logger.info("Asset %s: Datei %s gelöscht", asset_id, filename)
     return True
@@ -485,9 +468,10 @@ def delete_step(
     if cascade:
         steps_to_delete = [step_name] + dependent
 
-    meta_path = _metadata_path(asset_id)
-    meta_dict = json.loads(meta_path.read_text(encoding="utf-8"))
-    asset_path = _asset_dir(asset_id)
+    meta_dict = get_metadata_service().read(asset_id)
+    if not meta_dict:
+        raise FileNotFoundError(f"Asset {asset_id} nicht gefunden")
+    asset_path = AssetPaths(asset_id).base
 
     for step in steps_to_delete:
         if step not in meta_dict.get("steps", {}):
@@ -501,7 +485,7 @@ def delete_step(
         del meta_dict["steps"][step]
 
     meta_dict["updated_at"] = datetime.now(timezone.utc).isoformat()
-    meta_path.write_text(json.dumps(meta_dict, indent=2), encoding="utf-8")
+    get_metadata_service().write(asset_id, meta_dict)
     logger.info("Asset %s: Steps %s gelöscht", asset_id, steps_to_delete)
     return {"requires_confirmation": False, "affected_steps": [], "message": ""}
 
@@ -513,7 +497,7 @@ def get_file_path(asset_id: str, filename: str) -> Path | None:
     """
     if not re.fullmatch(r"[0-9a-f-]{36}", asset_id):
         return None
-    base = _asset_dir(asset_id).resolve()
+    base = AssetPaths(asset_id).base.resolve()
     target = (base / filename).resolve()
     if not target.is_relative_to(base):
         return None
@@ -522,88 +506,59 @@ def get_file_path(asset_id: str, filename: str) -> Path | None:
 
 def get_asset_dir(asset_id: str) -> Path:
     """Asset-Ordner-Pfad. Erstellt nicht automatisch."""
-    return _asset_dir(asset_id)
+    return AssetPaths(asset_id).base
 
 
 def write_asset_file(asset_id: str, filename: str, data: bytes) -> None:
     """Schreibt Datei in Asset-Ordner."""
-    asset_path = _asset_dir(asset_id)
-    if not asset_path.exists():
+    paths = AssetPaths(asset_id)
+    if not paths.base.exists():
         raise FileNotFoundError(f"Asset {asset_id} existiert nicht")
-    (asset_path / filename).write_bytes(data)
+    paths.processing_file(filename).write_bytes(data)
 
 
 def list_mesh_files(asset_id: str) -> list[str]:
     """Listet alle GLB-Dateien im Asset-Ordner (für Mesh-Processing-Quelle)."""
-    asset_path = _asset_dir(asset_id)
-    if not asset_path.exists():
+    paths = AssetPaths(asset_id)
+    if not paths.base.exists():
         return []
     return sorted(
-        f.name for f in asset_path.iterdir()
+        f.name
+        for f in paths.base.iterdir()
         if f.is_file() and f.suffix.lower() == ".glb"
     )
 
 
 def append_processing_entry(asset_id: str, entry: dict[str, Any]) -> None:
     """Fügt Eintrag zum processing-Array in metadata.json hinzu."""
-    meta_path = _metadata_path(asset_id)
-    if not meta_path.exists():
-        raise FileNotFoundError(f"Asset {asset_id} existiert nicht")
-    meta = json.loads(meta_path.read_text(encoding="utf-8"))
-    if "processing" not in meta:
-        meta["processing"] = []
-    meta["processing"].append(entry)
-    meta["updated_at"] = datetime.now(timezone.utc).isoformat()
-    meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    get_metadata_service().add_processing_entry(asset_id, entry)
 
 
 def append_image_processing_entry(asset_id: str, entry: dict[str, Any]) -> None:
     """Fügt Eintrag zum image_processing-Array in metadata.json hinzu."""
-    meta_path = _metadata_path(asset_id)
-    if not meta_path.exists():
-        raise FileNotFoundError(f"Asset {asset_id} existiert nicht")
-    meta = json.loads(meta_path.read_text(encoding="utf-8"))
-    if "image_processing" not in meta:
-        meta["image_processing"] = []
-    meta["image_processing"].append(entry)
-    meta["updated_at"] = datetime.now(timezone.utc).isoformat()
-    meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    get_metadata_service().add_image_processing_entry(asset_id, entry)
 
 
 def append_texture_baking_entry(asset_id: str, entry: dict[str, Any]) -> None:
     """Fügt Eintrag zum texture_baking-Array in metadata.json hinzu."""
-    meta_path = _metadata_path(asset_id)
-    if not meta_path.exists():
-        raise FileNotFoundError(f"Asset {asset_id} existiert nicht")
-    meta = json.loads(meta_path.read_text(encoding="utf-8"))
-    if "texture_baking" not in meta:
-        meta["texture_baking"] = []
-    meta["texture_baking"].append(entry)
-    meta["updated_at"] = datetime.now(timezone.utc).isoformat()
-    meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    get_metadata_service().add_texture_baking_entry(asset_id, entry)
 
 
 def list_image_files(asset_id: str) -> list[str]:
     """Listet alle Bild-Dateien im Asset-Ordner (PNG, JPG, WebP)."""
-    asset_path = _asset_dir(asset_id)
-    if not asset_path.exists():
+    paths = AssetPaths(asset_id)
+    if not paths.base.exists():
         return []
     return sorted(
         f.name
-        for f in asset_path.iterdir()
+        for f in paths.base.iterdir()
         if f.is_file() and f.suffix.lower() in (".png", ".jpg", ".jpeg", ".webp")
     )
 
 
 def update_metadata_fields(asset_id: str, fields: dict[str, Any]) -> None:
     """Aktualisiert Top-Level-Felder in metadata.json (z.B. sketchfab_upload, source)."""
-    meta_path = _metadata_path(asset_id)
-    if not meta_path.exists():
-        raise FileNotFoundError(f"Asset {asset_id} existiert nicht")
-    meta = json.loads(meta_path.read_text(encoding="utf-8"))
-    meta.update(fields)
-    meta["updated_at"] = datetime.now(timezone.utc).isoformat()
-    meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    get_metadata_service().update(asset_id, **fields)
 
 
 async def _download_bytes(url: str) -> bytes:
@@ -836,11 +791,10 @@ def restore_asset(asset_id: str) -> bool:
         return False
     if not meta.deleted_at:
         return True  # Bereits aktiv
-    meta_path = _metadata_path(asset_id)
-    meta_dict = json.loads(meta_path.read_text(encoding="utf-8"))
+    meta_dict = get_metadata_service().read(asset_id)
     meta_dict.pop("deleted_at", None)
     meta_dict["updated_at"] = datetime.now(timezone.utc).isoformat()
-    meta_path.write_text(json.dumps(meta_dict, indent=2), encoding="utf-8")
+    get_metadata_service().write(asset_id, meta_dict)
     logger.info("Asset %s wiederhergestellt", asset_id)
     return True
 
@@ -854,7 +808,7 @@ def delete_asset(asset_id: str, permanent: bool = False) -> bool:
     """
     if not re.fullmatch(r"[0-9a-f-]{36}", asset_id):
         return False
-    asset_path = _asset_dir(asset_id)
+    asset_path = AssetPaths(asset_id).base
     if not asset_path.exists():
         return False
     if permanent:
@@ -882,12 +836,12 @@ def create_asset_from_image_upload(
     Speichert Bild als image_original.{ext}, metadata mit source: upload.
     """
     asset_id = create_asset()
-    asset_path = _asset_dir(asset_id)
+    paths = AssetPaths(asset_id)
     ext = Path(filename).suffix.lower() or ".png"
     if ext not in (".jpg", ".jpeg", ".png", ".webp"):
         ext = ".png"
     target_filename = f"image_original{ext}"
-    (asset_path / target_filename).write_bytes(file_bytes)
+    paths.processing_file(target_filename).write_bytes(file_bytes)
 
     display_name = name or Path(filename).stem
     now = datetime.now(timezone.utc).isoformat()
@@ -902,14 +856,13 @@ def create_asset_from_image_upload(
         "name": display_name,
     }
 
-    meta_path = _metadata_path(asset_id)
-    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    meta = get_metadata_service().read(asset_id)
     meta["steps"]["image"] = step_data
     meta["source"] = "upload"
     meta["original_filename"] = filename
     meta["uploaded_at"] = now
     meta["updated_at"] = now
-    meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    get_metadata_service().write(asset_id, meta)
     return asset_id
 
 
@@ -931,13 +884,13 @@ def create_asset_from_mesh_upload(
     import trimesh
 
     asset_id = create_asset()
-    asset_path = _asset_dir(asset_id)
+    paths = AssetPaths(asset_id)
     ext = Path(filename).suffix.lower()
 
     # Original behalten
     original_ext = ext or ".glb"
     original_filename = f"mesh_original{original_ext}"
-    (asset_path / original_filename).write_bytes(file_bytes)
+    paths.processing_file(original_filename).write_bytes(file_bytes)
 
     # Temp-Verzeichnis für Laden (OBJ braucht ggf. MTL im selben Ordner)
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -968,14 +921,14 @@ def create_asset_from_mesh_upload(
             meshes = list(scene.geometry.values())
             if not meshes:
                 raise ValueError("3D-Modell enthält keine Meshes")
-            mesh = trimesh.util.concatenate(meshes)
+                mesh = trimesh.util.concatenate(meshes)
         elif isinstance(scene, trimesh.Trimesh):
             mesh = scene
         else:
             raise ValueError("Unbekanntes 3D-Format")
 
         glb_bytes = mesh.export(file_type="glb")
-        (asset_path / "mesh.glb").write_bytes(glb_bytes)
+        paths.mesh.write_bytes(glb_bytes)
 
     display_name = name or Path(filename).stem
     now = datetime.now(timezone.utc).isoformat()
@@ -992,13 +945,12 @@ def create_asset_from_mesh_upload(
         "name": display_name,
     }
 
-    meta_path = _metadata_path(asset_id)
-    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    meta = get_metadata_service().read(asset_id)
     meta["steps"]["mesh"] = step_data
     meta["source"] = "upload"
     meta["original_filename"] = filename
     meta["original_format"] = original_format
     meta["uploaded_at"] = now
     meta["updated_at"] = now
-    meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    get_metadata_service().write(asset_id, meta)
     return asset_id

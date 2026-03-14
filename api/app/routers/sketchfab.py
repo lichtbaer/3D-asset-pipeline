@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import raise_api_error
 from app.core.path_security import safe_asset_path
-from app.database import async_session_factory, get_session
+from app.database import get_session
 from app.models import GenerationJob
 from app.schemas.sketchfab import (
     SketchfabImportRequest,
@@ -24,6 +24,8 @@ from app.schemas.sketchfab import (
     SketchfabUploadStatusResponse,
 )
 from app.services import asset_service
+from app.services.job_service import get_job_service
+from app.services.metadata_service import get_metadata_service
 from app.services.sketchfab_service import SketchfabService, SketchfabUploadResult
 
 router = APIRouter(tags=["sketchfab"])
@@ -130,24 +132,17 @@ async def _run_sketchfab_upload(
     if not svc:
         return
 
+    job_svc = get_job_service()
+
     async def update_job(
         status: str,
         result_url: str | None = None,
         error_msg: str | None = None,
     ) -> None:
-        async with async_session_factory() as session:
-            result = await session.execute(
-                select(GenerationJob).where(GenerationJob.id == UUID(job_id))
-            )
-            job = result.scalar_one_or_none()
-            if job:
-                job.status = status
-                job.updated_at = datetime.now(timezone.utc)
-                if result_url is not None:
-                    job.result_url = result_url
-                if error_msg is not None:
-                    job.error_msg = error_msg
-                await session.commit()
+        if status == "done":
+            await job_svc.complete(job_id, result_url=result_url)
+        elif status == "failed":
+            await job_svc.fail(job_id, error_msg or "Upload failed")
 
     try:
         result: SketchfabUploadResult = await svc.upload_model(
@@ -208,18 +203,16 @@ async def get_sketchfab_upload_status(
 
     if not job:
         # Prüfen ob bereits in metadata
-        meta_path = asset_service.get_asset_dir(asset_id) / "metadata.json"
-        if meta_path.exists():
-            data = json.loads(meta_path.read_text(encoding="utf-8"))
-            sf = data.get("sketchfab_upload", {})
-            if sf:
-                return SketchfabUploadStatusResponse(
-                    job_id="",
-                    status="done",
-                    sketchfab_uid=sf.get("uid"),
-                    sketchfab_url=sf.get("url"),
-                    embed_url=sf.get("embed_url"),
-                )
+        data = get_metadata_service().read(asset_id)
+        sf = data.get("sketchfab_upload", {})
+        if sf:
+            return SketchfabUploadStatusResponse(
+                job_id="",
+                status="done",
+                sketchfab_uid=sf.get("uid"),
+                sketchfab_url=sf.get("url"),
+                embed_url=sf.get("embed_url"),
+            )
         return SketchfabUploadStatusResponse(
             job_id="", status="none", error_msg="Kein Upload-Job für dieses Asset"
         )
@@ -232,12 +225,10 @@ async def get_sketchfab_upload_status(
         parts = (job.result_url or "").rstrip("/").split("/")
         if parts:
             sketchfab_uid = parts[-1]
-        meta_path = asset_service.get_asset_dir(asset_id) / "metadata.json"
-        if meta_path.exists():
-            data = json.loads(meta_path.read_text(encoding="utf-8"))
-            sf = data.get("sketchfab_upload", {})
-            if sf:
-                embed_url = sf.get("embed_url")
+        data = get_metadata_service().read(asset_id)
+        sf = data.get("sketchfab_upload", {})
+        if sf:
+            embed_url = sf.get("embed_url")
 
     return SketchfabUploadStatusResponse(
         job_id=str(job.id),
