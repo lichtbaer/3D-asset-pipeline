@@ -5,6 +5,7 @@ Nutzt AssetPaths und MetadataService für zentralisierte Pfad- und Metadata-Logi
 """
 
 import asyncio
+import json
 import logging
 import re
 import shutil
@@ -927,8 +928,13 @@ def create_asset_from_mesh_upload(
         else:
             raise ValueError("Unbekanntes 3D-Format")
 
-        glb_bytes = mesh.export(file_type="glb")
-        paths.mesh.write_bytes(glb_bytes)
+        glb_data = mesh.export(file_type="glb")
+        if isinstance(glb_data, dict):
+            paths.mesh.write_bytes(json.dumps(glb_data).encode("utf-8"))
+        elif isinstance(glb_data, str):
+            paths.mesh.write_bytes(glb_data.encode("utf-8"))
+        else:
+            paths.mesh.write_bytes(glb_data)
 
     display_name = name or Path(filename).stem
     now = datetime.now(timezone.utc).isoformat()
