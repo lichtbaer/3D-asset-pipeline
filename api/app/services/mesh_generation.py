@@ -42,27 +42,6 @@ async def run_mesh_generation(
     provider = get_provider(provider_key)
     merged_params = {**provider.default_params(), **params}
 
-    hf_token = os.getenv("HF_TOKEN")
-    if not hf_token:
-        err = "HF_TOKEN nicht konfiguriert"
-        log_job_error(
-            logger,
-            "Mesh-Generierung: HF_TOKEN fehlt",
-            job_id=job_id,
-            provider_key=provider_key,
-            error_type="ValueError",
-            error_detail=err,
-        )
-        await update_job_callback(
-            job_id,
-            "failed",
-            None,
-            err,
-            error_type="ValueError",
-            error_detail=err,
-        )
-        return
-
     await update_job_callback(job_id, "processing", None, None)
 
     temp_image_path: str | None = None
