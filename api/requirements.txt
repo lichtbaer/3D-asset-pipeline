@@ -16,6 +16,8 @@ huggingface_hub>=0.22.0
 replicate>=0.25.0
 pydantic-ai>=0.0.36
 anthropic>=0.30.0
+slowapi>=0.1.9
+pip-audit>=2.7
 
 # Test & Lint dependencies
 pytest>=8.0
