@@ -19,6 +19,7 @@ import {
 } from "./MeshProcessingPanel.js";
 import { ExportPanel } from "./ExportPanel.js";
 import { SketchfabPanel } from "./SketchfabPanel.js";
+import { QualityAnalysisPanel } from "./QualityAnalysisPanel.js";
 
 function formatDate(iso: string): string {
   try {
@@ -60,6 +61,8 @@ export function AssetDetailModal({
   const { setActiveAssetId } = usePipelineStore();
 
   const modalRef = useRef<HTMLDivElement>(null);
+  const exportSectionRef = useRef<HTMLElement>(null);
+  const sketchfabSectionRef = useRef<HTMLElement>(null);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["asset", assetId],
@@ -341,18 +344,40 @@ export function AssetDetailModal({
 
         {hasMesh && (
           <>
-            <ExportPanel assetId={data.asset_id} />
-            <MeshProcessingPanel assetId={data.asset_id} />
-            <SketchfabPanel
+            <QualityAnalysisPanel
               assetId={data.asset_id}
-              assetName={`Asset ${data.asset_id.slice(0, 8)}`}
-              sketchfabUpload={data.sketchfab_upload}
-              onAssetUpdate={() => {
-                void queryClient.invalidateQueries({
-                  queryKey: ["asset", assetId],
-                });
-              }}
+              meshUrl={meshUrl}
+              riggedUrl={riggedUrl}
+              onNavigateToStep={handleAction}
+              onScrollToExport={() =>
+                exportSectionRef.current?.scrollIntoView({
+                  behavior: "smooth",
+                  block: "start",
+                })
+              }
+              onScrollToSketchfab={() =>
+                sketchfabSectionRef.current?.scrollIntoView({
+                  behavior: "smooth",
+                  block: "start",
+                })
+              }
             />
+            <section ref={exportSectionRef}>
+              <ExportPanel assetId={data.asset_id} />
+            </section>
+            <MeshProcessingPanel assetId={data.asset_id} />
+            <section ref={sketchfabSectionRef}>
+              <SketchfabPanel
+                assetId={data.asset_id}
+                assetName={`Asset ${data.asset_id.slice(0, 8)}`}
+                sketchfabUpload={data.sketchfab_upload}
+                onAssetUpdate={() => {
+                  void queryClient.invalidateQueries({
+                    queryKey: ["asset", assetId],
+                  });
+                }}
+              />
+            </section>
             {data.processing && data.processing.length > 0 && (
               <ProcessingResultsList
                 assetId={data.asset_id}
