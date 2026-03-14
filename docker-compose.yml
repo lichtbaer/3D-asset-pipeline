@@ -21,6 +21,12 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     # Optional: GPU für UniRig (Lokal) aktivieren — auskommentiert, Stack läuft ohne GPU
     # deploy:
     #   resources:
@@ -44,6 +50,7 @@ services:
       - U2NET_HOME=/app/storage/rembg_cache
       - UNIRIG_MODEL_PATH=${UNIRIG_MODEL_PATH:-./models/unirig/}
       - UNIRIG_REPO_PATH=${UNIRIG_REPO_PATH:-./unirig/}
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-}
     depends_on:
       db:
         condition: service_healthy
@@ -67,6 +74,25 @@ services:
     networks:
       - purzel-net
     command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+
+  # repo_analyzer Subagent (SMA-176) — GitHub-Repository-Analyse
+  repo-analyzer:
+    build:
+      context: ./subagents/repo_analyzer
+      dockerfile: Dockerfile
+    environment:
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY}
+      - ARIA_API_BASE=http://api:8000
+      - ANALYZER_MODEL=${ANALYZER_MODEL:-claude-haiku-4-5-20251001}
+      - ANALYZER_API_KEY=${ANALYZER_API_KEY:-}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - POLL_INTERVAL=${POLL_INTERVAL:-5}
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - purzel-net
 
   # Blender 4.2 LTS headless – für Rigging-PoC (SMA-172)
   # Leichtgewichtiges Image via Tarball (~400MB vs. blenderkit ~800MB)
