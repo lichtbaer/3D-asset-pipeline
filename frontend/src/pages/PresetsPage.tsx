@@ -45,7 +45,6 @@ function stepLabel(step: PresetStep): string {
 export function PresetsPage() {
   const queryClient = useQueryClient();
   const [editingPreset, setEditingPreset] = useState<Preset | null>(null);
-  const [duplicateSource, setDuplicateSource] = useState<Preset | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Preset | null>(null);
 
   const { data: presets, isLoading } = useQuery({
@@ -65,7 +64,6 @@ export function PresetsPage() {
     mutationFn: createPreset,
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["presets"] });
-      setDuplicateSource(null);
     },
   });
 

@@ -6,6 +6,7 @@ import asyncio
 import logging
 import os
 from pathlib import Path
+from typing import Any
 
 from gradio_client import Client, handle_file
 
@@ -22,7 +23,7 @@ class Trellis2Provider(MeshProvider):
     provider_key = "trellis2"
     display_name = "TRELLIS.2 (Microsoft)"
 
-    def default_params(self) -> dict:
+    def default_params(self) -> dict[str, Any]:
         return {
             "seed": 0,
             "resolution": "1024",
@@ -34,7 +35,7 @@ class Trellis2Provider(MeshProvider):
             "tex_slat_sampling_steps": 12,
         }
 
-    def param_schema(self) -> dict:
+    def param_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -97,7 +98,7 @@ class Trellis2Provider(MeshProvider):
             "required": [],
         }
 
-    def _run_predict(self, image_path: str, params: dict, hf_token: str) -> str | None:
+    def _run_predict(self, image_path: str, params: dict[str, Any], hf_token: str) -> str | None:
         """
         Synchroner Aufruf: /image_to_3d → /extract_glb.
         Gibt den Pfad zur GLB-Datei zurück oder None bei Fehler.
@@ -138,13 +139,13 @@ class Trellis2Provider(MeshProvider):
             for item in result:
                 if item and isinstance(item, str) and Path(item).exists():
                     if item.endswith(".glb") or ".glb" in item:
-                        return item
+                        return str(item)
             if result and result[0]:
                 return str(result[0])
             return None
         return str(result) if result else None
 
-    async def generate(self, image_path: str, params: dict) -> str:
+    async def generate(self, image_path: str, params: dict[str, Any]) -> str:
         hf_token = os.getenv("HF_TOKEN")
         if not hf_token:
             raise ValueError("HF_TOKEN nicht konfiguriert")

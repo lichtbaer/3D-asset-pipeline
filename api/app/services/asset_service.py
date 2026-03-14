@@ -18,7 +18,6 @@ import httpx
 from app.config.storage import (
     ASSETS_STORAGE_PATH,
     BGREMOVAL_STORAGE_PATH,
-    MESH_STORAGE_PATH,
 )
 
 logger = logging.getLogger(__name__)

@@ -4,7 +4,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Response
+
+from app.core.errors import raise_api_error
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -317,7 +319,7 @@ async def create_image_generation(
     try:
         get_image_provider(provider_key)
     except ValueError:
-        raise HTTPException(422, detail=f"Unbekannter provider_key: {provider_key}")
+        raise_api_error(422, f"Unbekannter provider_key: {provider_key}", code="UNKNOWN_PROVIDER")
 
     asset_id: UUID | None = None
     if body.asset_id:
@@ -364,7 +366,7 @@ async def get_image_job_status(
     )
     job = result.scalar_one_or_none()
     if not job:
-        raise HTTPException(404, detail="Job nicht gefunden")
+        raise_api_error(404, "Job nicht gefunden", code="JOB_NOT_FOUND")
 
     provider_key = job.provider_key or job.model_key or ""
     return ImageJobStatusResponse(
@@ -410,9 +412,7 @@ async def create_bgremoval(
     try:
         get_bgremoval_provider(body.provider_key)
     except ValueError:
-        raise HTTPException(
-            422, detail=f"Unbekannter provider_key: {body.provider_key}"
-        )
+        raise_api_error(422, f"Unbekannter provider_key: {body.provider_key}", code="UNKNOWN_PROVIDER")
 
     asset_id: UUID | None = None
     if body.asset_id:
@@ -473,9 +473,9 @@ async def retry_image_job(
     )
     job = result.scalar_one_or_none()
     if not job:
-        raise HTTPException(404, detail="Job nicht gefunden")
+        raise_api_error(404, "Job nicht gefunden", code="JOB_NOT_FOUND")
     if job.status != "failed":
-        raise HTTPException(400, detail="Nur fehlgeschlagene Jobs können erneut versucht werden")
+        raise_api_error(400, "Nur fehlgeschlagene Jobs können erneut versucht werden", code="INVALID_STATE")
 
     provider_key = job.provider_key or job.model_key or ""
     params = {"width": 1024, "height": 1024, "count": 1}
@@ -516,7 +516,7 @@ async def get_bgremoval_job_status(
     )
     job = result.scalar_one_or_none()
     if not job:
-        raise HTTPException(404, detail="Job nicht gefunden")
+        raise_api_error(404, "Job nicht gefunden", code="JOB_NOT_FOUND")
 
     provider_key = job.bgremoval_provider_key or job.provider_key or ""
     return BgRemovalJobStatusResponse(
@@ -550,13 +550,13 @@ async def retry_bgremoval_job(
     )
     job = result.scalar_one_or_none()
     if not job:
-        raise HTTPException(404, detail="Job nicht gefunden")
+        raise_api_error(404, "Job nicht gefunden", code="JOB_NOT_FOUND")
     if job.status != "failed":
-        raise HTTPException(400, detail="Nur fehlgeschlagene Jobs können erneut versucht werden")
+        raise_api_error(400, "Nur fehlgeschlagene Jobs können erneut versucht werden", code="INVALID_STATE")
 
     source_image_url = job.source_image_url or ""
     if not source_image_url:
-        raise HTTPException(400, detail="Quellbild-URL fehlt für Retry")
+        raise_api_error(400, "Quellbild-URL fehlt für Retry", code="MISSING_SOURCE")
 
     provider_key = job.bgremoval_provider_key or job.provider_key or ""
 
@@ -609,7 +609,7 @@ async def create_mesh_generation(
     try:
         get_mesh_provider(body.provider_key)
     except ValueError as e:
-        raise HTTPException(422, detail=str(e))
+        raise_api_error(422, "Validierungsfehler", detail=str(e), code="VALIDATION_ERROR")
 
     # Rückwärtskompatibilität: steps → params für hunyuan3d-2
     params = dict(body.params)
@@ -651,9 +651,10 @@ async def create_mesh_generation(
         try:
             get_bgremoval_provider(body.bgremoval_provider_key)
         except ValueError:
-            raise HTTPException(
+            raise_api_error(
                 422,
-                detail=f"Unbekannter bgremoval provider_key: {body.bgremoval_provider_key}",
+                f"Unbekannter bgremoval provider_key: {body.bgremoval_provider_key}",
+                code="UNKNOWN_PROVIDER",
             )
         background_tasks.add_task(
             run_mesh_generation_with_auto_bgremoval,
@@ -692,7 +693,7 @@ async def get_mesh_job_status(
     )
     job = result.scalar_one_or_none()
     if not job:
-        raise HTTPException(404, detail="Job nicht gefunden")
+        raise_api_error(404, "Job nicht gefunden", code="JOB_NOT_FOUND")
 
     glb_url = None
     if job.status == "done" and job.glb_file_path:
@@ -732,13 +733,13 @@ async def retry_mesh_job(
     )
     job = result.scalar_one_or_none()
     if not job:
-        raise HTTPException(404, detail="Job nicht gefunden")
+        raise_api_error(404, "Job nicht gefunden", code="JOB_NOT_FOUND")
     if job.status != "failed":
-        raise HTTPException(400, detail="Nur fehlgeschlagene Jobs können erneut versucht werden")
+        raise_api_error(400, "Nur fehlgeschlagene Jobs können erneut versucht werden", code="INVALID_STATE")
 
     source_image_url = job.source_image_url or ""
     if not source_image_url:
-        raise HTTPException(400, detail="Quellbild-URL fehlt für Retry")
+        raise_api_error(400, "Quellbild-URL fehlt für Retry", code="MISSING_SOURCE")
 
     provider_key = job.provider_key or "hunyuan3d-2"
     params = get_mesh_provider(provider_key).default_params()
@@ -792,9 +793,7 @@ async def create_rigging(
     try:
         get_rigging_provider(body.provider_key)
     except ValueError:
-        raise HTTPException(
-            422, detail=f"Unbekannter provider_key: {body.provider_key}"
-        )
+        raise_api_error(422, f"Unbekannter provider_key: {body.provider_key}", code="UNKNOWN_PROVIDER")
 
     asset_id: UUID | None = None
     if body.asset_id:
@@ -844,7 +843,7 @@ async def get_rigging_job_status(
     )
     job = result.scalar_one_or_none()
     if not job:
-        raise HTTPException(404, detail="Job nicht gefunden")
+        raise_api_error(404, "Job nicht gefunden", code="JOB_NOT_FOUND")
 
     glb_url = None
     if job.status == "done" and job.glb_file_path:
@@ -887,7 +886,7 @@ async def get_animation_presets(provider_key: str):
     try:
         provider = get_animation_provider(provider_key)
     except ValueError:
-        raise HTTPException(422, detail=f"Unbekannter provider_key: {provider_key}")
+        raise_api_error(422, f"Unbekannter provider_key: {provider_key}", code="UNKNOWN_PROVIDER")
     presets = provider.get_preset_motions()
     return AnimationPresetsResponse(
         presets=[
@@ -908,19 +907,16 @@ async def create_animation(
     session: AsyncSession = Depends(get_session),
 ):
     if not os.getenv("HF_TOKEN"):
-        raise HTTPException(
+        raise_api_error(
             503,
-            detail=(
-                "HF_TOKEN nicht konfiguriert. Animation-Provider (HY-Motion) "
-                "benötigt einen Hugging Face Token. Bitte HF_TOKEN in der Umgebung setzen."
-            ),
+            "HF_TOKEN nicht konfiguriert. Animation-Provider (HY-Motion) "
+            "benötigt einen Hugging Face Token. Bitte HF_TOKEN in der Umgebung setzen.",
+            code="SERVICE_UNAVAILABLE",
         )
     try:
         get_animation_provider(body.provider_key)
     except ValueError:
-        raise HTTPException(
-            422, detail=f"Unbekannter provider_key: {body.provider_key}"
-        )
+        raise_api_error(422, f"Unbekannter provider_key: {body.provider_key}", code="UNKNOWN_PROVIDER")
 
     asset_id: UUID | None = None
     if body.asset_id:
@@ -971,7 +967,7 @@ async def get_animation_job_status(
     )
     job = result.scalar_one_or_none()
     if not job:
-        raise HTTPException(404, detail="Job nicht gefunden")
+        raise_api_error(404, "Job nicht gefunden", code="JOB_NOT_FOUND")
 
     animated_url = None
     if job.status == "done" and job.glb_file_path:
@@ -1112,18 +1108,13 @@ async def retry_animation_job(
     )
     job = result.scalar_one_or_none()
     if not job:
-        raise HTTPException(404, detail="Job nicht gefunden")
+        raise_api_error(404, "Job nicht gefunden", code="JOB_NOT_FOUND")
     if job.status != "failed":
-        raise HTTPException(
-            400,
-            detail="Nur fehlgeschlagene Jobs können erneut versucht werden",
-        )
+        raise_api_error(400, "Nur fehlgeschlagene Jobs können erneut versucht werden", code="INVALID_STATE")
 
     source_glb_url = job.source_image_url or ""
     if not source_glb_url:
-        raise HTTPException(
-            400, detail="Quell-GLB-URL fehlt für Retry"
-        )
+        raise_api_error(400, "Quell-GLB-URL fehlt für Retry", code="MISSING_SOURCE")
 
     new_job = GenerationJob(
         job_type="animation",

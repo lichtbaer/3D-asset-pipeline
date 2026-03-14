@@ -6,7 +6,9 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Form, Query, UploadFile
+
+from app.core.errors import raise_api_error
 
 from app.services import preset_service
 from fastapi.responses import FileResponse
@@ -120,9 +122,9 @@ async def list_assets(
 ):
     """Liste aller Assets mit Filtern und Sortierung."""
     if has_step and has_step not in ("image", "mesh", "rigging", "animation"):
-        raise HTTPException(400, detail="has_step muss image, mesh, rigging oder animation sein")
+        raise_api_error(400, "has_step muss image, mesh, rigging oder animation sein", code="INVALID_PARAM")
     if sort and sort not in ("created_desc", "created_asc", "name", "rating"):
-        raise HTTPException(400, detail="sort muss created_desc, created_asc, name oder rating sein")
+        raise_api_error(400, "sort muss created_desc, created_asc, name oder rating sein", code="INVALID_PARAM")
 
     assets = asset_service.list_assets(
         include_deleted=include_deleted,
@@ -188,15 +190,17 @@ async def upload_image(
     """Bild hochladen (JPG, PNG, WebP, max. 20 MB). Erstellt Asset mit steps.image."""
     ext = Path(file.filename or "").suffix.lower()
     if ext not in IMAGE_EXTENSIONS:
-        raise HTTPException(
+        raise_api_error(
             400,
-            detail=f"Ungültiges Format. Erlaubt: {', '.join(IMAGE_EXTENSIONS)}",
+            f"Ungültiges Format. Erlaubt: {', '.join(IMAGE_EXTENSIONS)}",
+            code="INVALID_FORMAT",
         )
     content = await file.read()
     if len(content) > IMAGE_MAX_BYTES:
-        raise HTTPException(
+        raise_api_error(
             400,
-            detail=f"Datei zu groß. Maximum: {IMAGE_MAX_BYTES // (1024*1024)} MB",
+            f"Datei zu groß. Maximum: {IMAGE_MAX_BYTES // (1024*1024)} MB",
+            code="FILE_TOO_LARGE",
         )
     target_ext = ext if ext in IMAGE_EXTENSIONS else ".png"
     target_filename = f"image_original{target_ext}"
@@ -215,15 +219,17 @@ async def upload_mesh(
     """3D-Modell hochladen (GLB, GLTF, OBJ, PLY, STL, ZIP; max. 100 MB). Konvertiert zu GLB."""
     ext = Path(file.filename or "").suffix.lower()
     if ext not in MESH_EXTENSIONS:
-        raise HTTPException(
+        raise_api_error(
             400,
-            detail=f"Ungültiges Format. Erlaubt: {', '.join(MESH_EXTENSIONS)}",
+            f"Ungültiges Format. Erlaubt: {', '.join(MESH_EXTENSIONS)}",
+            code="INVALID_FORMAT",
         )
     content = await file.read()
     if len(content) > MESH_MAX_BYTES:
-        raise HTTPException(
+        raise_api_error(
             400,
-            detail=f"Datei zu groß. Maximum: {MESH_MAX_BYTES // (1024*1024)} MB",
+            f"Datei zu groß. Maximum: {MESH_MAX_BYTES // (1024*1024)} MB",
+            code="FILE_TOO_LARGE",
         )
     mtl_bytes: bytes | None = None
     mtl_filename: str | None = None
@@ -241,7 +247,7 @@ async def upload_mesh(
             mtl_filename=mtl_filename,
         )
     except ValueError as e:
-        raise HTTPException(400, detail=str(e)) from e
+        raise_api_error(400, "Ungültige Anfrage", detail=str(e), code="BAD_REQUEST", chain=e)
     return UploadAssetResponse(asset_id=asset_id, file="mesh.glb")
 
 
@@ -250,7 +256,7 @@ async def patch_asset_meta(asset_id: str, body: AssetMetaUpdateRequest):
     """Asset-Metadaten aktualisieren (Name, Tags, Rating, Notes, Favorit). Partial update."""
     meta = asset_service.get_asset(asset_id)
     if not meta:
-        raise HTTPException(404, detail="Asset nicht gefunden")
+        raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
     updates: dict[str, object] = {}
     if body.name is not None:
         updates["name"] = body.name
@@ -280,7 +286,7 @@ async def get_asset(asset_id: str):
     """Vollständige metadata.json eines Assets."""
     meta = asset_service.get_asset(asset_id)
     if not meta:
-        raise HTTPException(404, detail="Asset nicht gefunden")
+        raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
     return AssetDetailResponse(
         asset_id=meta.asset_id,
         created_at=meta.created_at,
@@ -309,7 +315,7 @@ async def get_preset_suggestions(asset_id: str):
     """Vorschläge für Preset aus Asset-Zustand (für 'Als Preset speichern')."""
     meta = asset_service.get_asset(asset_id)
     if not meta:
-        raise HTTPException(404, detail="Asset nicht gefunden")
+        raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
     suggested_name = meta.name or f"Preset {asset_id[:8]}"
     steps = await asyncio.to_thread(
         preset_service.asset_to_preset_steps, meta
@@ -321,7 +327,7 @@ async def get_preset_suggestions(asset_id: str):
 async def process_sources(asset_id: str):
     """Liste verfügbarer Mesh-Dateien (GLB) als Quellen für Processing."""
     if not asset_service.get_asset(asset_id):
-        raise HTTPException(404, detail="Asset nicht gefunden")
+        raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
     return {"sources": asset_service.list_mesh_files(asset_id)}
 
 
@@ -332,7 +338,7 @@ async def process_sources(asset_id: str):
 async def image_sources(asset_id: str):
     """Liste verfügbarer Bild-Dateien im Asset (PNG, JPG, WebP)."""
     if not asset_service.get_asset(asset_id):
-        raise HTTPException(404, detail="Asset nicht gefunden")
+        raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
     return {"sources": asset_service.list_image_files(asset_id)}
 
 
@@ -341,7 +347,7 @@ async def image_preview(asset_id: str, filename: str):
     """Vorschau einer Bild-Datei (Alias für /files/{filename})."""
     path = asset_service.get_file_path(asset_id, filename)
     if not path:
-        raise HTTPException(404, detail="Datei nicht gefunden")
+        raise_api_error(404, "Datei nicht gefunden", code="FILE_NOT_FOUND")
     suffix = Path(filename).suffix.lower()
     media_types: dict[str, str] = {
         ".png": "image/png",
@@ -357,7 +363,7 @@ async def image_preview(asset_id: str, filename: str):
 async def post_image_crop(asset_id: str, body: CropRequest):
     """Bild zuschneiden. Speichert image_cropped.png."""
     if not asset_service.get_asset(asset_id):
-        raise HTTPException(404, detail="Asset nicht gefunden")
+        raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
     try:
         output_file, width, height, file_size = await asyncio.to_thread(
             image_crop,
@@ -375,16 +381,16 @@ async def post_image_crop(asset_id: str, body: CropRequest):
             file_size_bytes=file_size,
         )
     except FileNotFoundError as e:
-        raise HTTPException(404, detail=str(e)) from e
+        raise_api_error(404, "Asset nicht gefunden", detail=str(e), code="ASSET_NOT_FOUND", chain=e)
     except ValueError as e:
-        raise HTTPException(400, detail=str(e)) from e
+        raise_api_error(400, "Ungültige Anfrage", detail=str(e), code="BAD_REQUEST", chain=e)
 
 
 @router.post("/{asset_id}/image/resize", response_model=ImageProcessingResponse)
 async def post_image_resize(asset_id: str, body: ResizeRequest):
     """Bild skalieren. Speichert image_resized.png."""
     if not asset_service.get_asset(asset_id):
-        raise HTTPException(404, detail="Asset nicht gefunden")
+        raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
     try:
         output_file, width, height, file_size = await asyncio.to_thread(
             image_resize,
@@ -401,16 +407,16 @@ async def post_image_resize(asset_id: str, body: ResizeRequest):
             file_size_bytes=file_size,
         )
     except FileNotFoundError as e:
-        raise HTTPException(404, detail=str(e)) from e
+        raise_api_error(404, "Asset nicht gefunden", detail=str(e), code="ASSET_NOT_FOUND", chain=e)
     except ValueError as e:
-        raise HTTPException(400, detail=str(e)) from e
+        raise_api_error(400, "Ungültige Anfrage", detail=str(e), code="BAD_REQUEST", chain=e)
 
 
 @router.post("/{asset_id}/image/center", response_model=ImageProcessingResponse)
 async def post_image_center(asset_id: str, body: CenterRequest):
     """Subjekt zentrieren (transparenter Hintergrund). Speichert image_centered.png."""
     if not asset_service.get_asset(asset_id):
-        raise HTTPException(404, detail="Asset nicht gefunden")
+        raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
     try:
         output_file, width, height, file_size = await asyncio.to_thread(
             center_subject,
@@ -425,16 +431,16 @@ async def post_image_center(asset_id: str, body: CenterRequest):
             file_size_bytes=file_size,
         )
     except FileNotFoundError as e:
-        raise HTTPException(404, detail=str(e)) from e
+        raise_api_error(404, "Asset nicht gefunden", detail=str(e), code="ASSET_NOT_FOUND", chain=e)
     except ValueError as e:
-        raise HTTPException(400, detail=str(e)) from e
+        raise_api_error(400, "Ungültige Anfrage", detail=str(e), code="BAD_REQUEST", chain=e)
 
 
 @router.post("/{asset_id}/image/pad-square", response_model=ImageProcessingResponse)
 async def post_image_pad_square(asset_id: str, body: PadSquareRequest):
     """Bild quadratisch machen (Padding). Speichert image_squared.png."""
     if not asset_service.get_asset(asset_id):
-        raise HTTPException(404, detail="Asset nicht gefunden")
+        raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
     try:
         output_file, width, height, file_size = await asyncio.to_thread(
             pad_to_square,
@@ -449,69 +455,69 @@ async def post_image_pad_square(asset_id: str, body: PadSquareRequest):
             file_size_bytes=file_size,
         )
     except FileNotFoundError as e:
-        raise HTTPException(404, detail=str(e)) from e
+        raise_api_error(404, "Asset nicht gefunden", detail=str(e), code="ASSET_NOT_FOUND", chain=e)
     except ValueError as e:
-        raise HTTPException(400, detail=str(e)) from e
+        raise_api_error(400, "Ungültige Anfrage", detail=str(e), code="BAD_REQUEST", chain=e)
 
 
 @router.get("/{asset_id}/process/analyze", response_model=MeshAnalysis)
 async def process_analyze(asset_id: str, source_file: str = "mesh.glb"):
     """Mesh-Kennzahlen analysieren (kein neues File)."""
     if not asset_service.get_asset(asset_id):
-        raise HTTPException(404, detail="Asset nicht gefunden")
+        raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
     try:
         return mesh_analyze(asset_id, source_file)
     except FileNotFoundError as e:
-        raise HTTPException(404, detail=str(e)) from e
+        raise_api_error(404, "Asset nicht gefunden", detail=str(e), code="ASSET_NOT_FOUND", chain=e)
 
 
 @router.post("/{asset_id}/process/simplify")
 async def process_simplify(asset_id: str, body: SimplifyRequest):
     """Mesh vereinfachen, speichert mesh_simplified_{target_faces}.glb."""
     if not asset_service.get_asset(asset_id):
-        raise HTTPException(404, detail="Asset nicht gefunden")
+        raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
     try:
         output_file, entry = mesh_simplify(
             asset_id, body.source_file, body.target_faces
         )
         return {"output_file": output_file, "processing": entry}
     except FileNotFoundError as e:
-        raise HTTPException(404, detail=str(e)) from e
+        raise_api_error(404, "Asset nicht gefunden", detail=str(e), code="ASSET_NOT_FOUND", chain=e)
 
 
 @router.post("/{asset_id}/process/repair")
 async def process_repair(asset_id: str, body: RepairRequest):
     """Mesh reparieren, speichert mesh_repaired.glb."""
     if not asset_service.get_asset(asset_id):
-        raise HTTPException(404, detail="Asset nicht gefunden")
+        raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
     try:
         output_file, entry = mesh_repair(
             asset_id, body.source_file, body.operations
         )
         return {"output_file": output_file, "processing": entry}
     except FileNotFoundError as e:
-        raise HTTPException(404, detail=str(e)) from e
+        raise_api_error(404, "Asset nicht gefunden", detail=str(e), code="ASSET_NOT_FOUND", chain=e)
 
 
 @router.post("/{asset_id}/process/clip-floor")
 async def process_clip_floor(asset_id: str, body: ClipFloorRequest):
     """Boden unterhalb Y-Schwellwert abschneiden, speichert mesh_clipped.glb."""
     if not asset_service.get_asset(asset_id):
-        raise HTTPException(404, detail="Asset nicht gefunden")
+        raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
     try:
         _output_file, result = mesh_clip_floor(
             asset_id, body.source_file, body.y_threshold
         )
         return result
     except FileNotFoundError as e:
-        raise HTTPException(404, detail=str(e)) from e
+        raise_api_error(404, "Asset nicht gefunden", detail=str(e), code="ASSET_NOT_FOUND", chain=e)
 
 
 @router.post("/{asset_id}/process/remove-components")
 async def process_remove_components(asset_id: str, body: RemoveComponentsRequest):
     """Kleine isolierte Komponenten entfernen, speichert mesh_cleaned.glb."""
     if not asset_service.get_asset(asset_id):
-        raise HTTPException(404, detail="Asset nicht gefunden")
+        raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
     try:
         _output_file, result = mesh_remove_components(
             asset_id,
@@ -520,7 +526,7 @@ async def process_remove_components(asset_id: str, body: RemoveComponentsRequest
         )
         return result
     except FileNotFoundError as e:
-        raise HTTPException(404, detail=str(e)) from e
+        raise_api_error(404, "Asset nicht gefunden", detail=str(e), code="ASSET_NOT_FOUND", chain=e)
 
 
 def _run_texture_bake_task(
@@ -588,18 +594,20 @@ async def start_texture_bake(
 ):
     """Startet Texture-Baking-Job. Baking läuft asynchron (30–120s)."""
     if not asset_service.get_asset(asset_id):
-        raise HTTPException(404, detail="Asset nicht gefunden")
+        raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
     source_path = asset_service.get_file_path(asset_id, body.source_mesh)
     target_path = asset_service.get_file_path(asset_id, body.target_mesh)
     if not source_path or not source_path.is_file():
-        raise HTTPException(
+        raise_api_error(
             404,
-            detail=f"Source-Mesh {body.source_mesh} nicht gefunden",
+            f"Source-Mesh {body.source_mesh} nicht gefunden",
+            code="FILE_NOT_FOUND",
         )
     if not target_path or not target_path.is_file():
-        raise HTTPException(
+        raise_api_error(
             404,
-            detail=f"Target-Mesh {body.target_mesh} nicht gefunden",
+            f"Target-Mesh {body.target_mesh} nicht gefunden",
+            code="FILE_NOT_FOUND",
         )
     job_id = str(uuid.uuid4())
     _texture_bake_jobs[job_id] = {
@@ -628,12 +636,12 @@ async def start_texture_bake(
 async def get_texture_bake_status(asset_id: str, job_id: str):
     """Status eines Texture-Baking-Jobs abfragen."""
     if not asset_service.get_asset(asset_id):
-        raise HTTPException(404, detail="Asset nicht gefunden")
+        raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
     if job_id not in _texture_bake_jobs:
-        raise HTTPException(404, detail="Job nicht gefunden")
+        raise_api_error(404, "Job nicht gefunden", code="JOB_NOT_FOUND")
     job = _texture_bake_jobs[job_id]
     if job["asset_id"] != asset_id:
-        raise HTTPException(404, detail="Job gehört nicht zu diesem Asset")
+        raise_api_error(404, "Job gehört nicht zu diesem Asset", code="JOB_MISMATCH")
     return TextureBakeStatusResponse(
         job_id=job_id,
         status=job["status"],
@@ -650,13 +658,13 @@ async def delete_asset_file(asset_id: str, filename: str):
     Original-Files (mesh.glb, image_original.*, image_bgremoved.png) sind nicht löschbar.
     """
     if not asset_service.get_asset(asset_id):
-        raise HTTPException(404, detail="Asset nicht gefunden")
+        raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
     try:
         asset_service.delete_asset_file(asset_id, filename)
     except PermissionError as e:
-        raise HTTPException(403, detail=str(e)) from e
+        raise_api_error(403, "Zugriff verweigert", detail=str(e), code="FORBIDDEN", chain=e)
     except FileNotFoundError as e:
-        raise HTTPException(404, detail=str(e)) from e
+        raise_api_error(404, "Asset nicht gefunden", detail=str(e), code="ASSET_NOT_FOUND", chain=e)
 
 
 @router.get("/{asset_id}/files/{filename}")
@@ -664,7 +672,7 @@ async def get_asset_file(asset_id: str, filename: str):
     """Static-File-Download für Asset-Dateien (Bild, GLB, Export-Formate)."""
     path = asset_service.get_file_path(asset_id, filename)
     if not path:
-        raise HTTPException(404, detail="Datei nicht gefunden")
+        raise_api_error(404, "Datei nicht gefunden", code="FILE_NOT_FOUND")
 
     # Content-Type je nach Extension
     suffix = Path(filename).suffix.lower()
@@ -691,7 +699,7 @@ async def get_asset_file(asset_id: str, filename: str):
 async def export_asset(asset_id: str, body: ExportRequest):
     """Mesh in Zielformat exportieren (STL, OBJ, PLY, GLTF)."""
     if not asset_service.get_asset(asset_id):
-        raise HTTPException(404, detail="Asset nicht gefunden")
+        raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
     try:
         result = await asyncio.to_thread(
             mesh_export,
@@ -701,16 +709,16 @@ async def export_asset(asset_id: str, body: ExportRequest):
         )
         return ExportResponse(**result)
     except FileNotFoundError as e:
-        raise HTTPException(404, detail=str(e)) from e
+        raise_api_error(404, "Asset nicht gefunden", detail=str(e), code="ASSET_NOT_FOUND", chain=e)
     except ValueError as e:
-        raise HTTPException(400, detail=str(e)) from e
+        raise_api_error(400, "Ungültige Anfrage", detail=str(e), code="BAD_REQUEST", chain=e)
 
 
 @router.get("/{asset_id}/exports", response_model=ExportsListResponse)
 async def get_asset_exports(asset_id: str):
     """Liste aller vorhandenen Exports des Assets."""
     if not asset_service.get_asset(asset_id):
-        raise HTTPException(404, detail="Asset nicht gefunden")
+        raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
     exports = list_exports(asset_id)
     return ExportsListResponse(
         exports=[ExportListItem(**e) for e in exports]
@@ -735,7 +743,7 @@ async def delete_assets_batch(body: BatchDeleteRequest):
 async def restore_asset(asset_id: str):
     """Asset aus Papierkorb wiederherstellen."""
     if not asset_service.restore_asset(asset_id):
-        raise HTTPException(404, detail="Asset nicht gefunden oder nicht gelöscht")
+        raise_api_error(404, "Asset nicht gefunden oder nicht gelöscht", code="ASSET_NOT_FOUND")
 
 
 @router.delete("/{asset_id}/steps/{step_name}", status_code=200)
@@ -750,9 +758,9 @@ async def delete_asset_step(
     Mit cascade=true: abhängige Steps ebenfalls löschen.
     """
     if step_name not in ("image", "bgremoval", "mesh", "rigging", "animation"):
-        raise HTTPException(400, detail="Ungültiger Step-Name")
+        raise_api_error(400, "Ungültiger Step-Name", code="INVALID_PARAM")
     if not asset_service.get_asset(asset_id):
-        raise HTTPException(404, detail="Asset nicht gefunden")
+        raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
     try:
         result = asset_service.delete_step(
             asset_id,
@@ -768,9 +776,9 @@ async def delete_asset_step(
             message="",
         )
     except FileNotFoundError as e:
-        raise HTTPException(404, detail=str(e)) from e
+        raise_api_error(404, "Asset nicht gefunden", detail=str(e), code="ASSET_NOT_FOUND", chain=e)
     except ValueError as e:
-        raise HTTPException(400, detail=str(e)) from e
+        raise_api_error(400, "Ungültige Anfrage", detail=str(e), code="BAD_REQUEST", chain=e)
 
 
 @router.delete("/{asset_id}", status_code=204)
@@ -781,7 +789,7 @@ async def delete_asset(asset_id: str, permanent: bool = False):
     """
     deleted = asset_service.delete_asset(asset_id, permanent=permanent)
     if not deleted:
-        raise HTTPException(404, detail="Asset nicht gefunden")
+        raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
 
 
 @router.post("", response_model=CreateAssetResponse)

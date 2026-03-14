@@ -3,8 +3,9 @@
 import asyncio
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 
+from app.core.errors import raise_api_error
 from app.schemas.preset import (
     PresetApplyRequest,
     PresetApplyResponse,
@@ -54,7 +55,7 @@ async def get_preset(preset_id: str):
     """Preset laden."""
     data = await asyncio.to_thread(preset_service.get_preset, preset_id)
     if not data:
-        raise HTTPException(404, detail="Preset nicht gefunden")
+        raise_api_error(404, "Preset nicht gefunden", code="PRESET_NOT_FOUND")
     return _to_response(data)
 
 
@@ -70,7 +71,7 @@ async def update_preset(preset_id: str, body: PresetUpdate):
         steps=steps,
     )
     if not data:
-        raise HTTPException(404, detail="Preset nicht gefunden")
+        raise_api_error(404, "Preset nicht gefunden", code="PRESET_NOT_FOUND")
     return _to_response(data)
 
 
@@ -79,7 +80,7 @@ async def delete_preset(preset_id: str):
     """Preset löschen."""
     deleted = await asyncio.to_thread(preset_service.delete_preset, preset_id)
     if not deleted:
-        raise HTTPException(404, detail="Preset nicht gefunden")
+        raise_api_error(404, "Preset nicht gefunden", code="PRESET_NOT_FOUND")
 
 
 @router.post("/{preset_id}/apply", response_model=PresetApplyResponse)
@@ -96,7 +97,7 @@ async def apply_preset(preset_id: str, body: PresetApplyRequest):
             body.start_from_step,
         )
     except FileNotFoundError as e:
-        raise HTTPException(404, detail=str(e)) from e
+        raise_api_error(404, "Preset oder Asset nicht gefunden", detail=str(e), code="NOT_FOUND", chain=e)
 
     preset = await asyncio.to_thread(preset_service.get_preset, preset_id)
     steps_total = len(preset.get("steps", [])) if preset else 0

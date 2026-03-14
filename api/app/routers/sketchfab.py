@@ -5,8 +5,9 @@ import os
 from datetime import datetime, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends
 
+from app.core.errors import raise_api_error
 from app.database import async_session_factory, get_session
 from app.models import GenerationJob
 from app.schemas.sketchfab import (
@@ -55,26 +56,28 @@ async def upload_to_sketchfab(
     """Startet Upload-Job: Asset zu Sketchfab hochladen."""
     svc = _get_sketchfab_service()
     if not svc:
-        raise HTTPException(
+        raise_api_error(
             503,
-            detail="Sketchfab nicht konfiguriert. SKETCHFAB_API_TOKEN in .env setzen.",
+            "Sketchfab nicht konfiguriert. SKETCHFAB_API_TOKEN in .env setzen.",
+            code="SERVICE_UNAVAILABLE",
         )
 
     meta = asset_service.get_asset(asset_id)
     if not meta:
-        raise HTTPException(404, detail="Asset nicht gefunden")
+        raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
 
     try:
         asset_uuid = UUID(asset_id)
     except ValueError:
-        raise HTTPException(404, detail="Ungültige Asset-ID")
+        raise_api_error(404, "Ungültige Asset-ID", code="INVALID_ASSET_ID")
 
     # Prüfen ob GLB vorhanden
     path = asset_service.get_file_path(asset_id, body.source_file)
     if not path or not path.exists():
-        raise HTTPException(
+        raise_api_error(
             404,
-            detail=f"Datei {body.source_file} nicht im Asset. Verfügbar: {asset_service.list_mesh_files(asset_id)}",
+            f"Datei {body.source_file} nicht im Asset. Verfügbar: {asset_service.list_mesh_files(asset_id)}",
+            code="FILE_NOT_FOUND",
         )
 
     job = GenerationJob(
@@ -120,7 +123,6 @@ async def _run_sketchfab_upload(
     is_private: bool,
 ) -> None:
     """Background-Task: Sketchfab-Upload ausführen und Job-Status aktualisieren."""
-    from datetime import datetime, timezone
 
     svc = _get_sketchfab_service()
     if not svc:
@@ -183,12 +185,12 @@ async def get_sketchfab_upload_status(
     """Upload-Status für das letzte Sketchfab-Upload-Job dieses Assets."""
     meta = asset_service.get_asset(asset_id)
     if not meta:
-        raise HTTPException(404, detail="Asset nicht gefunden")
+        raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
 
     try:
         asset_uuid = UUID(asset_id)
     except ValueError:
-        raise HTTPException(404, detail="Ungültige Asset-ID")
+        raise_api_error(404, "Ungültige Asset-ID", code="INVALID_ASSET_ID")
 
     # Neuester sketchfab_upload Job für dieses Asset
     result = await session.execute(
@@ -253,9 +255,10 @@ async def import_from_sketchfab(body: SketchfabImportRequest):
     """Importiert Modell von Sketchfab als neues Asset."""
     svc = _get_sketchfab_service()
     if not svc:
-        raise HTTPException(
+        raise_api_error(
             503,
-            detail="Sketchfab nicht konfiguriert. SKETCHFAB_API_TOKEN in .env setzen.",
+            "Sketchfab nicht konfiguriert. SKETCHFAB_API_TOKEN in .env setzen.",
+            code="SERVICE_UNAVAILABLE",
         )
 
     try:
@@ -265,11 +268,11 @@ async def import_from_sketchfab(body: SketchfabImportRequest):
         )
         return SketchfabImportResponse(asset_id=asset_id)
     except ValueError as e:
-        raise HTTPException(422, detail=str(e)) from e
+        raise_api_error(422, "Ungültige Anfrage", detail=str(e), code="VALIDATION_ERROR", chain=e)
     except RuntimeError as e:
         if "nicht zum Download freigegeben" in str(e):
-            raise HTTPException(403, detail=str(e)) from e
-        raise HTTPException(502, detail=str(e)) from e
+            raise_api_error(403, "Zugriff verweigert", detail=str(e), code="FORBIDDEN", chain=e)
+        raise_api_error(502, "Sketchfab-Fehler", detail=str(e), code="UPSTREAM_ERROR", chain=e)
 
 
 @router.get("/sketchfab/me/models", response_model=SketchfabMeModelsResponse)
@@ -277,9 +280,10 @@ async def list_my_sketchfab_models():
     """Listet eigene Sketchfab-Modelle mit Thumbnails."""
     svc = _get_sketchfab_service()
     if not svc:
-        raise HTTPException(
+        raise_api_error(
             503,
-            detail="Sketchfab nicht konfiguriert. SKETCHFAB_API_TOKEN in .env setzen.",
+            "Sketchfab nicht konfiguriert. SKETCHFAB_API_TOKEN in .env setzen.",
+            code="SERVICE_UNAVAILABLE",
         )
 
     try:
@@ -300,4 +304,4 @@ async def list_my_sketchfab_models():
             ]
         )
     except RuntimeError as e:
-        raise HTTPException(502, detail=str(e)) from e
+        raise_api_error(502, "Sketchfab-Fehler", detail=str(e), code="UPSTREAM_ERROR", chain=e)

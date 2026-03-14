@@ -16,3 +16,7 @@ huggingface_hub>=0.22.0
 replicate>=0.25.0
 pydantic-ai>=0.0.36
 anthropic>=0.30.0
+
+# Dev/CI (mypy, ruff)
+mypy>=1.13.0
+ruff>=0.8.0

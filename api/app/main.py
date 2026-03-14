@@ -1,16 +1,8 @@
 import os
-from pathlib import Path
 
 from fastapi import FastAPI
-
-from app.logging_config import setup_logging
-
-setup_logging()
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-
-from app.database import check_db_connection
-from app.routers import agents, generation
 
 from app.config.storage import (
     ANIMATION_STORAGE_PATH,
@@ -20,7 +12,11 @@ from app.config.storage import (
     MESH_STORAGE_PATH,
     PRESETS_STORAGE_PATH,
 )
-from app.routers import assets, presets, sketchfab, storage
+from app.database import check_db_connection
+from app.logging_config import setup_logging
+from app.routers import agents, assets, generation, presets, sketchfab, storage
+
+setup_logging()
 
 MESH_STORAGE_PATH.mkdir(parents=True, exist_ok=True)
 PRESETS_STORAGE_PATH.mkdir(parents=True, exist_ok=True)
@@ -66,7 +62,7 @@ app.add_middleware(
 
 
 @app.get("/health")
-async def health():
+async def health() -> dict[str, str]:
     db_connected = await check_db_connection()
     return {
         "status": "ok",

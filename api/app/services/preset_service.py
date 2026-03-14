@@ -3,7 +3,6 @@ Pipeline-Preset-Service: JSON-Files in storage/presets/.
 Presets speichern Workflow-Sequenzen als wiederverwendbare Vorlagen.
 """
 
-import asyncio
 import json
 import logging
 import re
@@ -13,7 +12,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from app.config.storage import PRESETS_STORAGE_PATH
-from app.schemas.preset import ExecutionPlanItem, PresetStep
+from app.schemas.preset import ExecutionPlanItem
 from app.services import asset_service
 
 logger = logging.getLogger(__name__)

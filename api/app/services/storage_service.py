@@ -66,7 +66,6 @@ def _get_asset_breakdown(asset_id: str) -> dict[str, int]:
                 breakdown["images"] += f.stat().st_size
 
     # Mesh-Dateien: mesh.glb, mesh_original.*, mesh_simplified_*.glb, mesh_repaired, mesh_clipped, mesh_cleaned
-    mesh_files = {"mesh.glb", "mesh_original.glb", "mesh_original.obj", "mesh_original.stl", "mesh_original.ply"}
     for f in asset_path.iterdir():
         if f.is_file():
             name = f.name.lower()

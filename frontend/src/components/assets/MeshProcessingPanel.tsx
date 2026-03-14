@@ -14,7 +14,6 @@ import {
   deleteAssetFile,
   startTextureBake,
   getTextureBakeStatus,
-  getAsset,
   type TextureBakingEntry,
 } from "../../api/assets.js";
 import { MeshViewer } from "../viewer/MeshViewer.js";
