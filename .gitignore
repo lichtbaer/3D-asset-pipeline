@@ -5,6 +5,8 @@ storage/
 # Python
 __pycache__/
 *.py[cod]
+.coverage
+.pytest_cache/
 *$py.class
 *.so
 .Python

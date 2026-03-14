@@ -1,0 +1,67 @@
+name: Test
+
+on:
+  push:
+    branches: [main, cursor/*]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run pytest with coverage
+        env:
+          LOG_PATH: /tmp/purzel-test/logs
+          ASSETS_STORAGE_PATH: /tmp/purzel-test/assets
+          PRESETS_STORAGE_PATH: /tmp/purzel-test/presets
+        run: |
+          mkdir -p /tmp/purzel-test/logs /tmp/purzel-test/assets /tmp/purzel-test/presets
+          pytest tests/ --cov=app --cov-report=term-missing --cov-fail-under=60
+
+      - name: Run mypy
+        run: python -m mypy app --strict
+        continue-on-error: true
+
+      - name: Run ruff
+        run: python -m ruff check app
+        continue-on-error: true
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Vitest
+        run: npm run test
+
+      - name: Run ESLint
+        run: npm run lint

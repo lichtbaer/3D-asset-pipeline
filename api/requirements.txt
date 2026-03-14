@@ -18,3 +18,11 @@ pydantic-ai>=0.0.36
 anthropic>=0.30.0
 slowapi>=0.1.9
 pip-audit>=2.7
+
+# Test & Lint dependencies
+pytest>=8.0
+pytest-asyncio>=0.23
+pytest-cov>=5.0
+respx>=0.21
+mypy>=1.0
+ruff>=0.8
