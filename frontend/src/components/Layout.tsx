@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
+import { ChatPanel } from "./chat/ChatPanel.js";
 
 export function Layout() {
   return (
@@ -38,6 +39,7 @@ export function Layout() {
         </NavLink>
       </nav>
       <Outlet />
+      <ChatPanel />
     </>
   );
 }

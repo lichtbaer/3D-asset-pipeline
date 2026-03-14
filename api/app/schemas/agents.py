@@ -1,5 +1,7 @@
 """Request-Schemas für Agent-Endpunkte (Details in PURZEL-037 bis 040)."""
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 from app.agents.models import QualityAssessment
@@ -67,4 +69,32 @@ class WorkflowRecommendRequest(BaseModel):
     quality_assessment: QualityAssessment | None = Field(
         default=None,
         description="Optional vorgeladene Qualitätsbewertung",
+    )
+
+
+class ChatMessageSchema(BaseModel):
+    """Eine Nachricht in der Chat-Historie."""
+
+    role: Literal["user", "assistant"]
+    content: str
+    timestamp: str
+
+
+class ChatRequest(BaseModel):
+    """Request für den Chat-Agenten."""
+
+    message: str = Field(..., min_length=1, description="Nutzer-Nachricht")
+    history: list[ChatMessageSchema] = Field(
+        default_factory=list,
+        description="Letzte N Nachrichten als Kontext",
+    )
+    asset_id: str | None = Field(
+        default=None,
+        description="Optionaler Asset-Kontext",
+    )
+    max_history: int = Field(
+        default=10,
+        ge=0,
+        le=50,
+        description="Wie viele History-Einträge mitgeben",
     )

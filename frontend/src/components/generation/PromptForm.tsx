@@ -1,10 +1,11 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import type { GenerateImageRequest } from "../../api/generation.js";
 import { InlineError } from "../../components/ui/InlineError.js";
 import { CharacterCounter } from "../../components/ui/CharacterCounter.js";
 import { Tooltip } from "../../components/ui/Tooltip.js";
 import { PromptAssistant } from "./PromptAssistant.js";
 import { useFormValidation } from "../../hooks/useFormValidation.js";
+import { usePipelineStore } from "../../store/PipelineStore.js";
 
 const SIZE_OPTIONS = [512, 768, 1024] as const;
 
@@ -21,11 +22,20 @@ export function PromptForm({
   onSubmit,
   disabled,
 }: PromptFormProps) {
+  const { pendingPromptFromChat, setPendingPromptFromChat } =
+    usePipelineStore();
   const [prompt, setPrompt] = useState("");
   const [negativePrompt, setNegativePrompt] = useState("");
   const [modelKey, setModelKey] = useState("");
   const [width, setWidth] = useState(1024);
   const [height, setHeight] = useState(1024);
+
+  useEffect(() => {
+    if (pendingPromptFromChat) {
+      setPrompt(pendingPromptFromChat);
+      setPendingPromptFromChat(null);
+    }
+  }, [pendingPromptFromChat, setPendingPromptFromChat]);
 
   const selectedModel = modelKey || (models[0] ?? "");
 
