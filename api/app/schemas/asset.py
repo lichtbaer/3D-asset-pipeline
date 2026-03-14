@@ -1,7 +1,6 @@
 """Pydantic-Schemas für Asset-API."""
 
 from datetime import datetime
-
 from typing import Any
 
 from pydantic import BaseModel, Field, field_validator

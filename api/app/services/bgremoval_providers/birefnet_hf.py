@@ -6,12 +6,12 @@ import os
 import shutil
 import tempfile
 from pathlib import Path
+from typing import Any
 
 import httpx
 
 from app.config.storage import BGREMOVAL_STORAGE_PATH
 from app.services.bgremoval_providers.base import BgRemovalProvider
-from typing import Any
 
 logger = logging.getLogger(__name__)
 

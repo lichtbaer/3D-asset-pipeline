@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Any
 
 from app.config.storage import ASSETS_STORAGE_PATH
-
 from app.services import asset_service
 
 logger = logging.getLogger(__name__)

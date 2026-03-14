@@ -4,23 +4,25 @@ import asyncio
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic_ai import BinaryContent
 
-from app.core.errors import APIError, raise_api_error
+from app.agents.chat_agent import ChatResponse as ChatResponseModel
+from app.agents.chat_agent import get_chat_agent
 from app.agents.models import (
     AgentError,
-    QualityAssessment,
     PromptSuggestion,
+    QualityAssessment,
     TagSuggestion,
     WorkflowRecommendation,
 )
-from app.agents.chat_agent import ChatResponse as ChatResponseModel, get_chat_agent
 from app.agents.prompt_agent import get_prompt_agent
 from app.agents.quality_agent import get_quality_agent
 from app.agents.tagging_agent import get_tagging_agent
 from app.agents.workflow_agent import get_workflow_agent
 from app.core.config import settings
+from app.core.errors import APIError, raise_api_error
+from app.core.rate_limit import limiter
 from app.schemas.agents import (
     ChatRequest,
     PromptOptimizeRequest,
@@ -76,7 +78,10 @@ def _build_prompt_message(body: PromptOptimizeRequest) -> str:
         503: {"description": "Agent not available", "model": AgentError},
     },
 )
-async def optimize_prompt(body: PromptOptimizeRequest) -> PromptSuggestion:
+@limiter.limit("20/minute")
+async def optimize_prompt(
+    request: Request, body: PromptOptimizeRequest
+) -> PromptSuggestion:
     """Prompt optimieren oder aus Beschreibung generieren (PURZEL-037)."""
     if not settings.agent_available:
         _raise_503("prompt")
@@ -132,7 +137,10 @@ def _get_preview_image_path(asset_id: str) -> tuple[Path | None, str | None]:
         503: {"description": "Agent not available", "model": AgentError},
     },
 )
-async def suggest_tags(body: TagsSuggestRequest) -> TagSuggestion:
+@limiter.limit("20/minute")
+async def suggest_tags(
+    request: Request, body: TagsSuggestRequest
+) -> TagSuggestion:
     """Tags vorschlagen basierend auf Prompt, Dateiname, Pipeline-Stand und optional Bild."""
     if not settings.agent_available:
         _raise_503("tagging")
@@ -245,7 +253,10 @@ def _build_quality_prompt(
         503: {"description": "Agent not available", "model": AgentError},
     },
 )
-async def assess_quality(body: QualityAssessRequest) -> QualityAssessment:
+@limiter.limit("10/minute")
+async def assess_quality(
+    request: Request, body: QualityAssessRequest
+) -> QualityAssessment:
     """Qualität bewerten (PURZEL-039)."""
     if not settings.agent_available:
         _raise_503("quality")
@@ -312,7 +323,10 @@ def _build_workflow_prompt(
         503: {"description": "Agent not available", "model": AgentError},
     },
 )
-async def recommend_workflow(body: WorkflowRecommendRequest) -> WorkflowRecommendation:
+@limiter.limit("10/minute")
+async def recommend_workflow(
+    request: Request, body: WorkflowRecommendRequest
+) -> WorkflowRecommendation:
     """Workflow-Empfehlung (PURZEL-040)."""
     if not settings.agent_available:
         _raise_503("workflow")
@@ -417,7 +431,8 @@ def _build_chat_user_message(ctx: dict[str, Any]) -> str:
         503: {"description": "Agent not available", "model": AgentError},
     },
 )
-async def chat(body: ChatRequest) -> ChatResponseModel:
+@limiter.limit("20/minute")
+async def chat(request: Request, body: ChatRequest) -> ChatResponseModel:
     """Freies Chat mit KI-Assistent (Asset-Kontext optional)."""
     if not settings.agent_available:
         _raise_503("chat")

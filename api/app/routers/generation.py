@@ -5,20 +5,24 @@ from pathlib import Path
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Response
-
-from app.core.errors import raise_api_error
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.errors import raise_api_error
 from app.database import async_session_factory, get_session
 from app.models import GenerationJob
+from app.providers.animation import (
+    get_animation_provider,
+    list_animation_providers,
+)
+from app.providers.rigging import get_rigging_provider, list_rigging_providers
 from app.schemas.generation import (
     AnimationGenerateRequest,
     AnimationGenerateResponse,
     AnimationJobStatusResponse,
+    AnimationPresetsResponse,
     AnimationProviderInfo,
     AnimationProvidersResponse,
-    AnimationPresetsResponse,
     BgRemovalGenerateRequest,
     BgRemovalGenerateResponse,
     BgRemovalJobStatusResponse,
@@ -46,26 +50,25 @@ from app.schemas.generation import (
     RiggingProviderInfo,
     RiggingProvidersResponse,
 )
+from app.services import asset_service
+from app.services.animation_generation import run_animation
 from app.services.bgremoval import run_bgremoval
 from app.services.bgremoval_providers import (
     get_provider as get_bgremoval_provider,
+)
+from app.services.bgremoval_providers import (
     list_providers as list_bgremoval_providers,
 )
-from app.services.image_providers import get_provider as get_image_provider, list_providers
+from app.services.image_providers import get_provider as get_image_provider
+from app.services.image_providers import list_providers
 from app.services.mesh_generation import (
     run_mesh_generation,
     run_mesh_generation_with_auto_bgremoval,
 )
-from app.services.mesh_providers import MESH_PROVIDERS, get_provider as get_mesh_provider
+from app.services.mesh_providers import MESH_PROVIDERS
+from app.services.mesh_providers import get_provider as get_mesh_provider
 from app.services.picsart import run_image_generation
-from app.services import asset_service
-from app.services.animation_generation import run_animation
 from app.services.rigging_generation import run_rigging
-from app.providers.animation import (
-    get_animation_provider,
-    list_animation_providers,
-)
-from app.providers.rigging import get_rigging_provider, list_rigging_providers
 
 router = APIRouter(prefix="/generate", tags=["generation"])
 

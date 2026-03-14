@@ -7,23 +7,27 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, File, Form, Query, UploadFile
-
-from app.core.errors import raise_api_error
-
-from app.services import preset_service
 from fastapi.responses import FileResponse
 
+from app.core.errors import raise_api_error
+from app.core.file_validation import validate_image_upload, validate_mesh_upload
+from app.core.path_security import safe_asset_path
+from app.exceptions import (
+    BlenderNotAvailableError,
+    TextureBakingError,
+    TextureBakingTimeoutError,
+)
 from app.schemas.asset import (
     AssetDetailResponse,
     AssetListItem,
     AssetMetaUpdateRequest,
+    AssetStepInfo,
     BatchDeleteRequest,
     CreateAssetResponse,
     ExportListItem,
     ExportRequest,
     ExportResponse,
     ExportsListResponse,
-    AssetStepInfo,
     SketchfabUploadInfo,
     StepDeleteResponse,
     UploadAssetResponse,
@@ -45,27 +49,35 @@ from app.schemas.mesh_processing import (
     TextureBakeStartResponse,
     TextureBakeStatusResponse,
 )
-from app.services import asset_service
+from app.services import asset_service, preset_service
 from app.services.image_processing_service import (
     center_subject,
-    crop as image_crop,
     pad_to_square,
+)
+from app.services.image_processing_service import (
+    crop as image_crop,
+)
+from app.services.image_processing_service import (
     resize as image_resize,
 )
-from app.services.mesh_export_service import export as mesh_export, list_exports
+from app.services.mesh_export_service import export as mesh_export
+from app.services.mesh_export_service import list_exports
 from app.services.mesh_processing_service import (
     analyze as mesh_analyze,
+)
+from app.services.mesh_processing_service import (
     clip_floor as mesh_clip_floor,
-    repair as mesh_repair,
+)
+from app.services.mesh_processing_service import (
     remove_small_components as mesh_remove_components,
+)
+from app.services.mesh_processing_service import (
+    repair as mesh_repair,
+)
+from app.services.mesh_processing_service import (
     simplify as mesh_simplify,
 )
 from app.services.texture_baking_service import run_bake_sync
-from app.exceptions import (
-    BlenderNotAvailableError,
-    TextureBakingError,
-    TextureBakingTimeoutError,
-)
 
 router = APIRouter(prefix="/assets", tags=["assets"])
 
@@ -176,10 +188,6 @@ def _to_sketchfab_upload_info(
 
 
 # Upload-Endpunkte (vor /{asset_id} definieren)
-IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
-IMAGE_MAX_BYTES = 20 * 1024 * 1024  # 20 MB
-MESH_EXTENSIONS = {".glb", ".gltf", ".obj", ".ply", ".stl", ".zip"}
-MESH_MAX_BYTES = 100 * 1024 * 1024  # 100 MB
 
 
 @router.post("/upload/image", response_model=UploadAssetResponse)
@@ -188,21 +196,9 @@ async def upload_image(
     name: str | None = Form(None),
 ):
     """Bild hochladen (JPG, PNG, WebP, max. 20 MB). Erstellt Asset mit steps.image."""
+    content = await validate_image_upload(file)
     ext = Path(file.filename or "").suffix.lower()
-    if ext not in IMAGE_EXTENSIONS:
-        raise_api_error(
-            400,
-            f"Ungültiges Format. Erlaubt: {', '.join(IMAGE_EXTENSIONS)}",
-            code="INVALID_FORMAT",
-        )
-    content = await file.read()
-    if len(content) > IMAGE_MAX_BYTES:
-        raise_api_error(
-            400,
-            f"Datei zu groß. Maximum: {IMAGE_MAX_BYTES // (1024*1024)} MB",
-            code="FILE_TOO_LARGE",
-        )
-    target_ext = ext if ext in IMAGE_EXTENSIONS else ".png"
+    target_ext = ext if ext in {".jpg", ".jpeg", ".png", ".webp"} else ".png"
     target_filename = f"image_original{target_ext}"
     asset_id = asset_service.create_asset_from_image_upload(
         content, file.filename or "image" + ext, name
@@ -217,20 +213,8 @@ async def upload_mesh(
     mtl_file: UploadFile | None = File(None),
 ):
     """3D-Modell hochladen (GLB, GLTF, OBJ, PLY, STL, ZIP; max. 100 MB). Konvertiert zu GLB."""
+    content = await validate_mesh_upload(file)
     ext = Path(file.filename or "").suffix.lower()
-    if ext not in MESH_EXTENSIONS:
-        raise_api_error(
-            400,
-            f"Ungültiges Format. Erlaubt: {', '.join(MESH_EXTENSIONS)}",
-            code="INVALID_FORMAT",
-        )
-    content = await file.read()
-    if len(content) > MESH_MAX_BYTES:
-        raise_api_error(
-            400,
-            f"Datei zu groß. Maximum: {MESH_MAX_BYTES // (1024*1024)} MB",
-            code="FILE_TOO_LARGE",
-        )
     mtl_bytes: bytes | None = None
     mtl_filename: str | None = None
     if mtl_file and mtl_file.filename:
@@ -345,6 +329,7 @@ async def image_sources(asset_id: str):
 @router.get("/{asset_id}/image/preview/{filename}")
 async def image_preview(asset_id: str, filename: str):
     """Vorschau einer Bild-Datei (Alias für /files/{filename})."""
+    safe_asset_path(asset_id, filename)
     path = asset_service.get_file_path(asset_id, filename)
     if not path:
         raise_api_error(404, "Datei nicht gefunden", code="FILE_NOT_FOUND")
@@ -362,6 +347,7 @@ async def image_preview(asset_id: str, filename: str):
 @router.post("/{asset_id}/image/crop", response_model=ImageProcessingResponse)
 async def post_image_crop(asset_id: str, body: CropRequest):
     """Bild zuschneiden. Speichert image_cropped.png."""
+    safe_asset_path(asset_id, body.source_file)
     if not asset_service.get_asset(asset_id):
         raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
     try:
@@ -389,6 +375,7 @@ async def post_image_crop(asset_id: str, body: CropRequest):
 @router.post("/{asset_id}/image/resize", response_model=ImageProcessingResponse)
 async def post_image_resize(asset_id: str, body: ResizeRequest):
     """Bild skalieren. Speichert image_resized.png."""
+    safe_asset_path(asset_id, body.source_file)
     if not asset_service.get_asset(asset_id):
         raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
     try:
@@ -415,6 +402,7 @@ async def post_image_resize(asset_id: str, body: ResizeRequest):
 @router.post("/{asset_id}/image/center", response_model=ImageProcessingResponse)
 async def post_image_center(asset_id: str, body: CenterRequest):
     """Subjekt zentrieren (transparenter Hintergrund). Speichert image_centered.png."""
+    safe_asset_path(asset_id, body.source_file)
     if not asset_service.get_asset(asset_id):
         raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
     try:
@@ -439,6 +427,7 @@ async def post_image_center(asset_id: str, body: CenterRequest):
 @router.post("/{asset_id}/image/pad-square", response_model=ImageProcessingResponse)
 async def post_image_pad_square(asset_id: str, body: PadSquareRequest):
     """Bild quadratisch machen (Padding). Speichert image_squared.png."""
+    safe_asset_path(asset_id, body.source_file)
     if not asset_service.get_asset(asset_id):
         raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
     try:
@@ -463,6 +452,7 @@ async def post_image_pad_square(asset_id: str, body: PadSquareRequest):
 @router.get("/{asset_id}/process/analyze", response_model=MeshAnalysis)
 async def process_analyze(asset_id: str, source_file: str = "mesh.glb"):
     """Mesh-Kennzahlen analysieren (kein neues File)."""
+    safe_asset_path(asset_id, source_file)
     if not asset_service.get_asset(asset_id):
         raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
     try:
@@ -474,6 +464,7 @@ async def process_analyze(asset_id: str, source_file: str = "mesh.glb"):
 @router.post("/{asset_id}/process/simplify")
 async def process_simplify(asset_id: str, body: SimplifyRequest):
     """Mesh vereinfachen, speichert mesh_simplified_{target_faces}.glb."""
+    safe_asset_path(asset_id, body.source_file)
     if not asset_service.get_asset(asset_id):
         raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
     try:
@@ -488,6 +479,7 @@ async def process_simplify(asset_id: str, body: SimplifyRequest):
 @router.post("/{asset_id}/process/repair")
 async def process_repair(asset_id: str, body: RepairRequest):
     """Mesh reparieren, speichert mesh_repaired.glb."""
+    safe_asset_path(asset_id, body.source_file)
     if not asset_service.get_asset(asset_id):
         raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
     try:
@@ -502,6 +494,7 @@ async def process_repair(asset_id: str, body: RepairRequest):
 @router.post("/{asset_id}/process/clip-floor")
 async def process_clip_floor(asset_id: str, body: ClipFloorRequest):
     """Boden unterhalb Y-Schwellwert abschneiden, speichert mesh_clipped.glb."""
+    safe_asset_path(asset_id, body.source_file)
     if not asset_service.get_asset(asset_id):
         raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
     try:
@@ -516,6 +509,7 @@ async def process_clip_floor(asset_id: str, body: ClipFloorRequest):
 @router.post("/{asset_id}/process/remove-components")
 async def process_remove_components(asset_id: str, body: RemoveComponentsRequest):
     """Kleine isolierte Komponenten entfernen, speichert mesh_cleaned.glb."""
+    safe_asset_path(asset_id, body.source_file)
     if not asset_service.get_asset(asset_id):
         raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
     try:
@@ -595,6 +589,8 @@ async def start_texture_bake(
     """Startet Texture-Baking-Job. Baking läuft asynchron (30–120s)."""
     if not asset_service.get_asset(asset_id):
         raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
+    safe_asset_path(asset_id, body.source_mesh)
+    safe_asset_path(asset_id, body.target_mesh)
     source_path = asset_service.get_file_path(asset_id, body.source_mesh)
     target_path = asset_service.get_file_path(asset_id, body.target_mesh)
     if not source_path or not source_path.is_file():
@@ -657,6 +653,7 @@ async def delete_asset_file(asset_id: str, filename: str):
     Einzelne Datei löschen (Processing, Export, Image-Processing).
     Original-Files (mesh.glb, image_original.*, image_bgremoved.png) sind nicht löschbar.
     """
+    safe_asset_path(asset_id, filename)
     if not asset_service.get_asset(asset_id):
         raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
     try:
@@ -670,6 +667,7 @@ async def delete_asset_file(asset_id: str, filename: str):
 @router.get("/{asset_id}/files/{filename}")
 async def get_asset_file(asset_id: str, filename: str):
     """Static-File-Download für Asset-Dateien (Bild, GLB, Export-Formate)."""
+    safe_asset_path(asset_id, filename)
     path = asset_service.get_file_path(asset_id, filename)
     if not path:
         raise_api_error(404, "Datei nicht gefunden", code="FILE_NOT_FOUND")
@@ -698,6 +696,7 @@ async def get_asset_file(asset_id: str, filename: str):
 @router.post("/{asset_id}/export", response_model=ExportResponse)
 async def export_asset(asset_id: str, body: ExportRequest):
     """Mesh in Zielformat exportieren (STL, OBJ, PLY, GLTF)."""
+    safe_asset_path(asset_id, body.source_file)
     if not asset_service.get_asset(asset_id):
         raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
     try:

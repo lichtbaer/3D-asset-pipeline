@@ -6,8 +6,11 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import raise_api_error
+from app.core.path_security import safe_asset_path
 from app.database import async_session_factory, get_session
 from app.models import GenerationJob
 from app.schemas.sketchfab import (
@@ -22,8 +25,6 @@ from app.schemas.sketchfab import (
 )
 from app.services import asset_service
 from app.services.sketchfab_service import SketchfabService, SketchfabUploadResult
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(tags=["sketchfab"])
 
@@ -72,6 +73,7 @@ async def upload_to_sketchfab(
         raise_api_error(404, "Ungültige Asset-ID", code="INVALID_ASSET_ID")
 
     # Prüfen ob GLB vorhanden
+    safe_asset_path(asset_id, body.source_file)
     path = asset_service.get_file_path(asset_id, body.source_file)
     if not path or not path.exists():
         raise_api_error(
