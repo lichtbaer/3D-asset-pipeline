@@ -494,6 +494,36 @@ export function MeshProcessingPanel({
           {bakeStatus?.status === "failed" && bakeStatus.error_msg && (
             <p className="mesh-processing__error">{bakeStatus.error_msg}</p>
           )}
+          {bakeStatus?.status === "done" && bakeStatus.output_file && (
+            <div className="mesh-processing__bake-result">
+              <p className="mesh-processing__result-label">
+                Ergebnis: {bakeStatus.output_file}
+              </p>
+              <div className="mesh-processing__result-actions">
+                <a
+                  href={getAssetFileUrl(assetId, bakeStatus.output_file)}
+                  download
+                  className="asset-modal__download"
+                >
+                  Download
+                </a>
+                {onUseForRigging && (
+                  <button
+                    type="button"
+                    className="btn btn--outline"
+                    onClick={() =>
+                      onUseForRigging(
+                        getAssetFileUrl(assetId, bakeStatus.output_file),
+                        assetId
+                      )
+                    }
+                  >
+                    → Als Rigging-Input verwenden
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
           {textureBaking.length > 0 && (
             <div className="mesh-processing__texture-baking-results">
               <p className="mesh-processing__subsection-title">
