@@ -6,6 +6,7 @@ import {
   getAssetFileUrl,
   getAssetTags,
   patchAssetMeta,
+  deleteAssetStep,
 } from "../../api/assets.js";
 import { TagSuggestionBanner } from "./TagSuggestionBanner.js";
 import { usePipelineStore } from "../../store/PipelineStore.js";
@@ -18,6 +19,7 @@ import {
   ProcessingResultsList,
 } from "./MeshProcessingPanel.js";
 import { ExportPanel } from "./ExportPanel.js";
+import { ImageProcessingList } from "./ImageProcessingList.js";
 import { SketchfabPanel } from "./SketchfabPanel.js";
 import { QualityAnalysisPanel } from "./QualityAnalysisPanel.js";
 import { SavePresetModal } from "../presets/SavePresetModal.js";
@@ -87,6 +89,12 @@ export function AssetDetailModal({
   const [nameInput, setNameInput] = useState("");
   const [showSavePreset, setShowSavePreset] = useState(false);
   const [showApplyPreset, setShowApplyPreset] = useState(false);
+  const [stepDeleteModal, setStepDeleteModal] = useState<{
+    step: string;
+    stepLabel: string;
+    affectedSteps: string[];
+    message: string;
+  } | null>(null);
   const lastSyncedAssetIdRef = useRef<string | null>(null);
 
   useFocusTrap(modalRef, true);
@@ -120,6 +128,48 @@ export function AssetDetailModal({
       onAssetUpdate?.();
     } catch {
       // Fehler ignorieren
+    }
+  };
+
+  const handleStepDeleteClick = async (
+    step: "image" | "bgremoval" | "mesh" | "rigging" | "animation",
+    stepLabel: string
+  ) => {
+    try {
+      const res = await deleteAssetStep(assetId, step, {
+        cascade: false,
+        force: false,
+      });
+      if (res.requires_confirmation && res.affected_steps.length > 0) {
+        setStepDeleteModal({
+          step,
+          stepLabel,
+          affectedSteps: res.affected_steps,
+          message: res.message,
+        });
+      } else {
+        void queryClient.invalidateQueries({ queryKey: ["asset", assetId] });
+        void queryClient.invalidateQueries({ queryKey: ["assets"] });
+        onAssetUpdate?.();
+      }
+    } catch {
+      // Fehler ignorieren
+    }
+  };
+
+  const handleStepDeleteConfirm = async () => {
+    if (!stepDeleteModal) return;
+    try {
+      await deleteAssetStep(assetId, stepDeleteModal.step, {
+        cascade: true,
+        force: true,
+      });
+      void queryClient.invalidateQueries({ queryKey: ["asset", assetId] });
+      void queryClient.invalidateQueries({ queryKey: ["assets"] });
+      onAssetUpdate?.();
+      setStepDeleteModal(null);
+    } catch {
+      setStepDeleteModal(null);
     }
   };
 
@@ -266,7 +316,7 @@ export function AssetDetailModal({
           <h3>Dateien</h3>
           <div className="asset-modal__previews">
             {hasImage && imageFile && (
-              <div className="asset-modal__preview-item">
+              <div className="asset-modal__preview-item asset-modal__step-block">
                 <img
                   src={getAssetFileUrl(data.asset_id, imageFile)}
                   alt="Originalbild"
@@ -280,10 +330,17 @@ export function AssetDetailModal({
                 >
                   Download
                 </a>
+                <button
+                  type="button"
+                  className="asset-modal__step-delete"
+                  onClick={() => handleStepDeleteClick("image", "Bild")}
+                >
+                  Step löschen
+                </button>
               </div>
             )}
             {hasBgremoval && bgremovalFile && (
-              <div className="asset-modal__preview-item">
+              <div className="asset-modal__preview-item asset-modal__step-block">
                 <div className="asset-modal__checkerboard">
                   <img
                     src={getAssetFileUrl(data.asset_id, bgremovalFile)}
@@ -299,10 +356,17 @@ export function AssetDetailModal({
                 >
                   Download
                 </a>
+                <button
+                  type="button"
+                  className="asset-modal__step-delete"
+                  onClick={() => handleStepDeleteClick("bgremoval", "Freistellung")}
+                >
+                  Step löschen
+                </button>
               </div>
             )}
             {hasMesh && meshUrl && (
-              <div className="asset-modal__preview-item">
+              <div className="asset-modal__preview-item asset-modal__step-block">
                 <MeshViewer glbUrl={meshUrl} height={450} />
                 <p className="asset-modal__preview-label">mesh.glb</p>
                 <a
@@ -312,10 +376,17 @@ export function AssetDetailModal({
                 >
                   Download GLB
                 </a>
+                <button
+                  type="button"
+                  className="asset-modal__step-delete"
+                  onClick={() => handleStepDeleteClick("mesh", "Mesh")}
+                >
+                  Step löschen
+                </button>
               </div>
             )}
             {hasRigging && riggedUrl && (
-              <div className="asset-modal__preview-item">
+              <div className="asset-modal__preview-item asset-modal__step-block">
                 <MeshViewer glbUrl={riggedUrl} height={450} />
                 <p className="asset-modal__preview-label">mesh_rigged.glb</p>
                 <a
@@ -325,10 +396,17 @@ export function AssetDetailModal({
                 >
                   Download rigged GLB
                 </a>
+                <button
+                  type="button"
+                  className="asset-modal__step-delete"
+                  onClick={() => handleStepDeleteClick("rigging", "Rigging")}
+                >
+                  Step löschen
+                </button>
               </div>
             )}
             {hasAnimation && animationUrl && (
-              <div className="asset-modal__preview-item">
+              <div className="asset-modal__preview-item asset-modal__step-block">
                 <p className="asset-modal__preview-label">🎬 Animation</p>
                 {motionPrompt && (
                   <p className="asset-modal__motion-prompt">
@@ -342,9 +420,22 @@ export function AssetDetailModal({
                 >
                   Download {animationFile ?? "Animation"}
                 </a>
+                <button
+                  type="button"
+                  className="asset-modal__step-delete"
+                  onClick={() => handleStepDeleteClick("animation", "Animation")}
+                >
+                  Step löschen
+                </button>
               </div>
             )}
           </div>
+          {(data.image_processing?.length ?? 0) > 0 && (
+            <ImageProcessingList
+              assetId={data.asset_id}
+              imageProcessing={data.image_processing ?? []}
+            />
+          )}
         </section>
 
         {hasMesh && (
@@ -691,6 +782,43 @@ export function AssetDetailModal({
             navigate(url);
           }}
         />
+      )}
+      {stepDeleteModal && (
+        <div
+          className="asset-modal__overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="step-delete-title"
+        >
+          <div className="asset-modal__step-delete-dialog">
+            <h3 id="step-delete-title">
+              {stepDeleteModal.stepLabel}-Step löschen?
+            </h3>
+            <p>
+              Folgende Steps werden ebenfalls gelöscht:{" "}
+              {stepDeleteModal.affectedSteps.join(", ")}.
+            </p>
+            <p className="asset-modal__step-delete-warning">
+              ⚠ {stepDeleteModal.message}
+            </p>
+            <div className="asset-modal__step-delete-actions">
+              <button
+                type="button"
+                className="btn btn--ghost"
+                onClick={() => setStepDeleteModal(null)}
+              >
+                Abbrechen
+              </button>
+              <button
+                type="button"
+                className="btn btn--primary btn--danger"
+                onClick={handleStepDeleteConfirm}
+              >
+                Alles löschen
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

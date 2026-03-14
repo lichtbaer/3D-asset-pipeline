@@ -140,3 +140,11 @@ class UploadAssetResponse(BaseModel):
 
     asset_id: str
     file: str  # Dateiname des erstellten Steps (z.B. image_original.png, mesh.glb)
+
+
+class StepDeleteResponse(BaseModel):
+    """Response für DELETE /assets/{asset_id}/steps/{step_name} bei Abhängigkeiten."""
+
+    requires_confirmation: bool = False
+    affected_steps: list[str] = Field(default_factory=list)
+    message: str = ""

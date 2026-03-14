@@ -4,6 +4,7 @@ import {
   exportMesh,
   getAssetExports,
   getAssetFileUrl,
+  deleteAssetFile,
 } from "../../api/assets.js";
 import { getMeshSources } from "../../api/meshProcessing.js";
 import type { ExportListItem } from "../../api/assets.js";
@@ -62,6 +63,16 @@ export function ExportPanel({ assetId }: ExportPanelProps) {
   });
 
   const exportsList: ExportListItem[] = exportsData?.exports ?? [];
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+
+  const deleteMutation = useMutation({
+    mutationFn: (filename: string) => deleteAssetFile(assetId, filename),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["asset", assetId] });
+      queryClient.invalidateQueries({ queryKey: ["asset-exports", assetId] });
+      setConfirmDelete(null);
+    },
+  });
 
   const exportMutation = useMutation({
     mutationFn: () =>
@@ -135,21 +146,56 @@ export function ExportPanel({ assetId }: ExportPanelProps) {
         <div className="export-panel__exports">
           <h4>Vorhandene Exports</h4>
           <ul className="export-panel__exports-list">
-            {exportsList.map((exp) => (
-              <li key={`${exp.filename}-${exp.exported_at}`} className="export-panel__export-item">
-                <span className="export-panel__export-name">{exp.filename}</span>
-                <span className="export-panel__export-size">
-                  {formatFileSize(exp.file_size_bytes)}
-                </span>
-                <a
-                  href={getAssetFileUrl(assetId, exp.filename)}
-                  download
-                  className="asset-modal__download"
+            {exportsList.map((exp) => {
+              const isConfirming = confirmDelete === exp.filename;
+              return (
+                <li
+                  key={`${exp.filename}-${exp.exported_at}`}
+                  className="export-panel__export-item"
                 >
-                  ↓ Download
-                </a>
-              </li>
-            ))}
+                  <span className="export-panel__export-name">{exp.filename}</span>
+                  <span className="export-panel__export-size">
+                    {formatFileSize(exp.file_size_bytes)}
+                  </span>
+                  <a
+                    href={getAssetFileUrl(assetId, exp.filename)}
+                    download
+                    className="asset-modal__download"
+                  >
+                    ↓ Download
+                  </a>
+                  {isConfirming ? (
+                    <span className="export-panel__delete-confirm">
+                      <button
+                        type="button"
+                        className="btn btn--ghost btn--sm"
+                        onClick={() => setConfirmDelete(null)}
+                      >
+                        Abbrechen
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn--danger btn--sm"
+                        onClick={() => deleteMutation.mutate(exp.filename)}
+                        disabled={deleteMutation.isPending}
+                      >
+                        Löschen
+                      </button>
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn btn--ghost btn--sm export-panel__delete-btn"
+                      onClick={() => setConfirmDelete(exp.filename)}
+                      aria-label={`${exp.filename} löschen`}
+                      title={`${exp.filename} löschen`}
+                    >
+                      🗑
+                    </button>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}

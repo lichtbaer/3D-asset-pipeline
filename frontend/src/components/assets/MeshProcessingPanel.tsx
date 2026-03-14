@@ -9,7 +9,10 @@ import {
   getMeshSources,
   type RepairOperation,
 } from "../../api/meshProcessing.js";
-import { getAssetFileUrl } from "../../api/assets.js";
+import {
+  getAssetFileUrl,
+  deleteAssetFile,
+} from "../../api/assets.js";
 import { MeshViewer } from "../viewer/MeshViewer.js";
 import type { ProcessingEntry } from "../../api/assets.js";
 
@@ -339,6 +342,18 @@ export function ProcessingResultsList({
   processing,
   onUseForRigging,
 }: ProcessingResultsListProps) {
+  const queryClient = useQueryClient();
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+
+  const deleteMutation = useMutation({
+    mutationFn: (filename: string) => deleteAssetFile(assetId, filename),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["asset", assetId] });
+      queryClient.invalidateQueries({ queryKey: ["mesh-sources", assetId] });
+      setConfirmDelete(null);
+    },
+  });
+
   const uniqueOutputs = [
     ...new Set(
       processing
@@ -355,6 +370,7 @@ export function ProcessingResultsList({
       <ul className="mesh-processing__results-list">
         {uniqueOutputs.map((filename) => {
           const url = getAssetFileUrl(assetId, filename);
+          const isConfirming = confirmDelete === filename;
           return (
             <li key={filename} className="mesh-processing__result-item">
               <div className="mesh-processing__result-preview">
@@ -372,6 +388,38 @@ export function ProcessingResultsList({
                 >
                   → Als Rigging-Input verwenden
                 </button>
+                {isConfirming ? (
+                  <span className="mesh-processing__delete-confirm">
+                    <span className="mesh-processing__delete-text">
+                      {filename} löschen? Nicht rückgängig.
+                    </span>
+                    <button
+                      type="button"
+                      className="btn btn--ghost btn--sm"
+                      onClick={() => setConfirmDelete(null)}
+                    >
+                      Abbrechen
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn--danger btn--sm"
+                      onClick={() => deleteMutation.mutate(filename)}
+                      disabled={deleteMutation.isPending}
+                    >
+                      Löschen
+                    </button>
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn btn--ghost btn--sm mesh-processing__delete-btn"
+                    onClick={() => setConfirmDelete(filename)}
+                    aria-label={`${filename} löschen`}
+                    title={`${filename} löschen`}
+                  >
+                    🗑
+                  </button>
+                )}
               </div>
             </li>
           );

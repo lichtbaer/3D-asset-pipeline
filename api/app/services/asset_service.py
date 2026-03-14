@@ -335,6 +335,174 @@ def update_asset_meta(
     meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
 
 
+# Original-Files, die nicht via DELETE /files/{filename} löschbar sind
+PROTECTED_FILENAMES = frozenset({"mesh.glb", "image_bgremoved.png"})
+
+
+def _is_protected_file(meta: AssetMetadata, filename: str) -> bool:
+    """Prüft ob Datei ein Original-Output ist (nur via Asset-Löschung entfernbar)."""
+    if filename in PROTECTED_FILENAMES:
+        return True
+    # image_original.* (image step)
+    if filename.startswith("image_original."):
+        return True
+    if "image" in meta.steps and meta.steps["image"].get("file") == filename:
+        return True
+    if "bgremoval" in meta.steps and meta.steps["bgremoval"].get("file") == filename:
+        return True
+    if "mesh" in meta.steps and meta.steps["mesh"].get("file") == filename:
+        return True
+    return False
+
+
+# Step-Abhängigkeiten: step -> steps die davon abhängen
+STEP_DEPENDENCIES: dict[str, list[str]] = {
+    "image": ["bgremoval", "mesh", "rigging", "animation"],
+    "bgremoval": ["mesh", "rigging", "animation"],
+    "mesh": ["rigging", "animation"],
+    "rigging": ["animation"],
+    "animation": [],
+}
+
+
+def get_dependent_steps(step: str, existing_steps: set[str]) -> list[str]:
+    """Gibt Steps zurück, die von step abhängen und existieren."""
+    downstream = STEP_DEPENDENCIES.get(step, [])
+    return [s for s in downstream if s in existing_steps]
+
+
+def delete_asset_file(asset_id: str, filename: str) -> bool:
+    """
+    Löscht einzelne Datei aus Asset-Ordner und bereinigt metadata.json.
+    Entfernt Einträge aus processing, image_processing oder exports.
+    Gibt True zurück wenn erfolgreich.
+    Wirft PermissionError wenn Original-File (mesh.glb, image.png, image_bgremoved.png).
+    """
+    meta = get_asset(asset_id)
+    if not meta:
+        raise FileNotFoundError(f"Asset {asset_id} nicht gefunden")
+    if _is_protected_file(meta, filename):
+        raise PermissionError(
+            f"Original-Datei {filename} kann nicht einzeln gelöscht werden. "
+            "Nutze Asset-Löschung."
+        )
+
+    path = get_file_path(asset_id, filename)
+    if not path:
+        raise FileNotFoundError(f"Datei {filename} nicht in Asset {asset_id}")
+
+    meta_path = _metadata_path(asset_id)
+    meta_dict = json.loads(meta_path.read_text(encoding="utf-8"))
+    changed = False
+
+    # Processing-Einträge entfernen
+    if "processing" in meta_dict:
+        before = len(meta_dict["processing"])
+        meta_dict["processing"] = [
+            e for e in meta_dict["processing"]
+            if e.get("output_file") != filename
+        ]
+        if len(meta_dict["processing"]) < before:
+            changed = True
+
+    # Image-Processing-Einträge entfernen
+    if "image_processing" in meta_dict:
+        before = len(meta_dict["image_processing"])
+        meta_dict["image_processing"] = [
+            e for e in meta_dict["image_processing"]
+            if e.get("output_file") != filename
+        ]
+        if len(meta_dict["image_processing"]) < before:
+            changed = True
+
+    # Export-Einträge entfernen (GLTF hat .gltf + .bin)
+    if "exports" in meta_dict:
+        to_remove: list[int] = []
+        for i, e in enumerate(meta_dict["exports"]):
+            out = e.get("output_file", "")
+            if out == filename:
+                to_remove.append(i)
+            elif out == filename.replace(".bin", ".gltf"):
+                to_remove.append(i)
+        for i in reversed(to_remove):
+            meta_dict["exports"].pop(i)
+            changed = True
+
+    # Datei(en) löschen
+    path.unlink(missing_ok=True)
+    # GLTF: .gltf und .bin gehören zusammen
+    if filename.endswith(".gltf"):
+        bin_path = path.with_suffix(".bin")
+        if bin_path.exists():
+            bin_path.unlink(missing_ok=True)
+    elif filename.endswith(".bin"):
+        gltf_path = path.with_suffix(".gltf")
+        if gltf_path.exists():
+            gltf_path.unlink(missing_ok=True)
+
+    if changed:
+        meta_dict["updated_at"] = datetime.now(timezone.utc).isoformat()
+        meta_path.write_text(json.dumps(meta_dict, indent=2), encoding="utf-8")
+
+    logger.info("Asset %s: Datei %s gelöscht", asset_id, filename)
+    return True
+
+
+def delete_step(
+    asset_id: str,
+    step_name: str,
+    cascade: bool = False,
+    force: bool = False,
+) -> dict[str, Any]:
+    """
+    Löscht kompletten Pipeline-Step. Entfernt Step-Datei(en) und metadata.
+    Wenn force=False und abhängige Steps existieren: gibt requires_confirmation zurück.
+    Wenn cascade=True: löscht auch abhängige Steps.
+    """
+    VALID_STEPS = {"image", "bgremoval", "mesh", "rigging", "animation"}
+    if step_name not in VALID_STEPS:
+        raise ValueError(f"Ungültiger Step: {step_name}")
+
+    meta = get_asset(asset_id)
+    if not meta:
+        raise FileNotFoundError(f"Asset {asset_id} nicht gefunden")
+
+    existing = {s for s in VALID_STEPS if s in meta.steps and meta.steps[s]}
+    dependent = get_dependent_steps(step_name, existing)
+
+    if not force and dependent and not cascade:
+        return {
+            "requires_confirmation": True,
+            "affected_steps": dependent,
+            "message": f"{', '.join(dependent)} basieren auf diesem Step. "
+            "Mit cascade=true werden alle gelöscht.",
+        }
+
+    steps_to_delete = [step_name]
+    if cascade:
+        steps_to_delete = [step_name] + dependent
+
+    meta_path = _metadata_path(asset_id)
+    meta_dict = json.loads(meta_path.read_text(encoding="utf-8"))
+    asset_path = _asset_dir(asset_id)
+
+    for step in steps_to_delete:
+        if step not in meta_dict.get("steps", {}):
+            continue
+        step_data = meta_dict["steps"][step]
+        step_file = step_data.get("file")
+        if step_file:
+            file_path = asset_path / step_file
+            if file_path.exists():
+                file_path.unlink(missing_ok=True)
+        del meta_dict["steps"][step]
+
+    meta_dict["updated_at"] = datetime.now(timezone.utc).isoformat()
+    meta_path.write_text(json.dumps(meta_dict, indent=2), encoding="utf-8")
+    logger.info("Asset %s: Steps %s gelöscht", asset_id, steps_to_delete)
+    return {"requires_confirmation": False, "affected_steps": [], "message": ""}
+
+
 def get_file_path(asset_id: str, filename: str) -> Path | None:
     """Pfad zur Datei, None wenn nicht vorhanden oder Pfad ungültig.
 
