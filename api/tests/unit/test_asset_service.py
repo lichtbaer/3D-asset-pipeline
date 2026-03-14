@@ -11,6 +11,21 @@ import pytest
 from app.services import asset_service
 
 
+@pytest.mark.asyncio
+async def test_update_step_writes_file_and_metadata(tmp_storage_paths, sample_asset):
+    """update_step schreibt Datei und aktualisiert metadata."""
+    await asset_service.update_step(
+        sample_asset,
+        "mesh",
+        {"job_id": "j1", "provider_key": "test"},
+        file_bytes=b"glTFmesh",
+        filename="mesh.glb",
+    )
+    meta = asset_service.get_asset(sample_asset)
+    assert "mesh" in meta.steps
+    assert meta.steps["mesh"].get("file") == "mesh.glb"
+
+
 def test_deleted_asset_not_in_list(tmp_storage_paths, sample_asset: str):
     """
     Soft-Delete: gelöschtes Asset erscheint nicht in list_assets(include_deleted=False).
@@ -48,6 +63,32 @@ def test_cannot_delete_image_bgremoved(tmp_storage_paths, sample_asset_with_imag
 
     with pytest.raises(PermissionError, match="Original-Datei"):
         asset_service.delete_asset_file(sample_asset_with_image, "image_bgremoved.png")
+
+
+def test_cannot_delete_image_original(tmp_storage_paths, sample_asset_with_image: str):
+    """image_original.* ist protected (Original-Output)."""
+    with pytest.raises(PermissionError, match="Original-Datei"):
+        asset_service.delete_asset_file(sample_asset_with_image, "image_original.png")
+
+
+def test_cannot_delete_file_referenced_in_step(tmp_storage_paths, tmp_assets_dir):
+    """Datei die in steps referenziert ist, kann nicht gelöscht werden."""
+    a1 = str(uuid.uuid4())
+    asset_path = tmp_assets_dir / a1
+    asset_path.mkdir(parents=True)
+    (asset_path / "custom_mesh.glb").write_bytes(b"glTF")
+    meta = {
+        "asset_id": a1,
+        "created_at": "2025-01-01T12:00:00Z",
+        "updated_at": "2025-01-01T12:00:00Z",
+        "steps": {"mesh": {"file": "custom_mesh.glb", "provider_key": "x"}},
+        "processing": [],
+        "image_processing": [],
+        "exports": [],
+    }
+    (asset_path / "metadata.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    with pytest.raises(PermissionError, match="Original-Datei"):
+        asset_service.delete_asset_file(a1, "custom_mesh.glb")
 
 
 def test_step_delete_warns_on_downstream_dependencies(
@@ -91,6 +132,12 @@ def test_get_file_path_validates_asset_id(tmp_storage_paths):
     assert asset_service.get_file_path("not-a-uuid", "mesh.glb") is None
 
 
+def test_get_file_path_rejects_path_traversal(tmp_storage_paths, sample_asset):
+    """get_file_path gibt None bei Path-Traversal in filename."""
+    path = asset_service.get_file_path(sample_asset, "../../../etc/passwd")
+    assert path is None
+
+
 def test_append_processing_entry(tmp_storage_paths, sample_asset: str):
     """append_processing_entry fügt Eintrag hinzu."""
     meta_before = asset_service.get_asset(sample_asset)
@@ -114,6 +161,8 @@ def _create_asset_with_meta(
     steps: dict | None = None,
     prompt: str | None = None,
     deleted: bool = False,
+    rating: int | None = None,
+    favorited: bool | None = None,
 ) -> None:
     """Hilfsfunktion: Asset mit spezifischer Metadata anlegen."""
     asset_path = tmp_assets_dir / asset_id
@@ -134,6 +183,10 @@ def _create_asset_with_meta(
     }
     if deleted:
         meta["deleted_at"] = now
+    if rating is not None:
+        meta["rating"] = rating
+    if favorited is not None:
+        meta["favorited"] = favorited
     (asset_path / "metadata.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
 
 
@@ -257,6 +310,79 @@ def test_list_assets_sort_options(tmp_storage_paths, tmp_assets_dir):
     assert len(by_rating) >= 3
 
 
+def test_list_assets_sort_by_name(tmp_storage_paths, tmp_assets_dir):
+    """list_assets mit sort=name sortiert alphabetisch nach Name."""
+    a1, a2 = str(uuid.uuid4()), str(uuid.uuid4())
+    _create_asset_with_meta(tmp_assets_dir, a1, steps={})
+    _create_asset_with_meta(tmp_assets_dir, a2, steps={})
+    asset_service.update_asset_meta(a1, name="Zebra")
+    asset_service.update_asset_meta(a2, name="Alpha")
+    assets = asset_service.list_assets(sort="name")
+    ids_in_order = [a.asset_id for a in assets if a.asset_id in (a1, a2)]
+    assert ids_in_order[0] == a2  # Alpha vor Zebra
+    assert ids_in_order[1] == a1
+
+
+def test_list_assets_search_motion_prompt(tmp_storage_paths, tmp_assets_dir):
+    """list_assets sucht in motion_prompt (Animation)."""
+    a1, a2 = str(uuid.uuid4()), str(uuid.uuid4())
+    _create_asset_with_meta(
+        tmp_assets_dir, a1,
+        steps={"animation": {"motion_prompt": "walking dog", "file": "x.glb"}},
+    )
+    _create_asset_with_meta(
+        tmp_assets_dir, a2,
+        steps={"animation": {"motion_prompt": "running cat", "file": "y.glb"}},
+    )
+    assets = asset_service.list_assets(search="walking")
+    assert len(assets) == 1
+    assert assets[0].asset_id == a1
+
+
+def test_get_asset_returns_none_for_missing(tmp_storage_paths):
+    """get_asset gibt None für nicht existierendes Asset."""
+    result = asset_service.get_asset("00000000-0000-0000-0000-000000000000")
+    assert result is None
+
+
+def test_list_mesh_files_empty_dir(tmp_storage_paths, tmp_assets_dir):
+    """list_mesh_files gibt leere Liste wenn kein GLB vorhanden."""
+    a1 = str(uuid.uuid4())
+    asset_path = tmp_assets_dir / a1
+    asset_path.mkdir(parents=True)
+    (asset_path / "metadata.json").write_text(
+        json.dumps({"asset_id": a1, "steps": {}, "created_at": "x", "updated_at": "x"}),
+        encoding="utf-8",
+    )
+    files = asset_service.list_mesh_files(a1)
+    assert files == []
+
+
+def test_list_mesh_files_returns_empty_when_asset_dir_missing(tmp_storage_paths):
+    """list_mesh_files gibt [] wenn Asset-Ordner nicht existiert."""
+    result = asset_service.list_mesh_files("00000000-0000-0000-0000-000000000000")
+    assert result == []
+
+
+def test_list_image_files_empty_dir(tmp_storage_paths, tmp_assets_dir):
+    """list_image_files gibt leere Liste wenn kein Bild vorhanden."""
+    a1 = str(uuid.uuid4())
+    asset_path = tmp_assets_dir / a1
+    asset_path.mkdir(parents=True)
+    (asset_path / "metadata.json").write_text(
+        json.dumps({"asset_id": a1, "steps": {}, "created_at": "x", "updated_at": "x"}),
+        encoding="utf-8",
+    )
+    files = asset_service.list_image_files(a1)
+    assert files == []
+
+
+def test_write_asset_file_raises_when_asset_not_exists(tmp_storage_paths):
+    """write_asset_file wirft FileNotFoundError wenn Asset nicht existiert."""
+    with pytest.raises(FileNotFoundError, match="existiert nicht"):
+        asset_service.write_asset_file("00000000-0000-0000-0000-000000000000", "x.txt", b"x")
+
+
 def test_list_assets_filter_favorited(tmp_storage_paths, tmp_assets_dir):
     """list_assets filtert nach favorited."""
     a1, a2 = str(uuid.uuid4()), str(uuid.uuid4())
@@ -280,6 +406,55 @@ def test_list_assets_filter_rating(tmp_storage_paths, tmp_assets_dir):
     assets = asset_service.list_assets(rating=4)
     assert any(a.asset_id == a1 for a in assets)
     assert not any(a.asset_id == a2 for a in assets)
+
+
+def test_list_assets_sort_by_rating(tmp_storage_paths, tmp_assets_dir):
+    """list_assets sortiert nach rating (höchste zuerst)."""
+    a1, a2 = str(uuid.uuid4()), str(uuid.uuid4())
+    _create_asset_with_meta(tmp_assets_dir, a1, steps={}, rating=5)
+    _create_asset_with_meta(tmp_assets_dir, a2, steps={}, rating=2)
+    assets = asset_service.list_assets(sort="rating")
+    ids = [a.asset_id for a in assets if a.asset_id in (a1, a2)]
+    assert ids[0] == a1
+    assert ids[1] == a2
+
+
+def test_get_all_tags_deduplicates(tmp_storage_paths, tmp_assets_dir):
+    """get_all_tags liefert sortierte, deduplizierte Tags."""
+    a1, a2 = str(uuid.uuid4()), str(uuid.uuid4())
+    _create_asset_with_meta(tmp_assets_dir, a1, tags=["purzel", "dog"])
+    _create_asset_with_meta(tmp_assets_dir, a2, tags=["dog", "cat"])
+    tags = asset_service.get_all_tags()
+    assert sorted(tags) == ["cat", "dog", "purzel"]
+
+
+def test_delete_step_without_cascade_warns(tmp_storage_paths, tmp_assets_dir):
+    """delete_step ohne cascade gibt requires_confirmation wenn abhängige Steps existieren."""
+    a1 = str(uuid.uuid4())
+    asset_path = tmp_assets_dir / a1
+    asset_path.mkdir(parents=True)
+    meta = {
+        "asset_id": a1,
+        "created_at": "2025-01-01T12:00:00.000Z",
+        "updated_at": "2025-01-01T12:00:00.000Z",
+        "steps": {
+            "mesh": {"file": "mesh.glb", "provider_key": "x"},
+            "rigging": {"file": "mesh_rigged.glb", "provider_key": "x"},
+            "animation": {"file": "mesh_animated.glb", "provider_key": "x"},
+        },
+        "processing": [],
+        "image_processing": [],
+        "exports": [],
+    }
+    (asset_path / "metadata.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    (asset_path / "mesh.glb").write_bytes(b"glTF")
+    (asset_path / "mesh_rigged.glb").write_bytes(b"glTF")
+    (asset_path / "mesh_animated.glb").write_bytes(b"glTF")
+
+    result = asset_service.delete_step(a1, "mesh", cascade=False)
+    assert result["requires_confirmation"] is True
+    assert "rigging" in result["affected_steps"]
+    assert "animation" in result["affected_steps"]
 
 
 def test_get_or_create_asset_id(tmp_storage_paths, tmp_assets_dir):
@@ -307,6 +482,42 @@ def test_create_asset_from_image_upload(tmp_storage_paths, tmp_assets_dir):
     assert meta.source == "upload"
     assert "image" in meta.steps
     assert meta.steps["image"].get("provider_key") == "upload"
+
+
+def test_create_asset_from_image_upload_jpg(tmp_storage_paths, tmp_assets_dir):
+    """create_asset_from_image_upload mit JPG speichert als image_original.jpg."""
+    asset_id = asset_service.create_asset_from_image_upload(
+        b"\xff\xd8\xff" + b"x" * 100,
+        "photo.jpg",
+        name="Photo",
+    )
+    meta = asset_service.get_asset(asset_id)
+    assert meta is not None
+    assert "image_original.jpg" in meta.steps["image"].get("file", "")
+
+
+def test_create_asset_from_mesh_upload_glb(tmp_storage_paths, tmp_assets_dir):
+    """create_asset_from_mesh_upload mit GLB erstellt Asset."""
+    import numpy as np
+    import trimesh
+
+    verts = np.array([[0, 0, 0], [1, 0, 0], [0.5, 1, 0]], dtype=np.float32)
+    faces = np.array([[0, 1, 2]], dtype=np.int32)
+    mesh = trimesh.Trimesh(vertices=verts, faces=faces)
+    glb_bytes = mesh.export(file_type="glb")
+    if isinstance(glb_bytes, str):
+        glb_bytes = glb_bytes.encode("utf-8")
+    elif isinstance(glb_bytes, dict):
+        glb_bytes = json.dumps(glb_bytes).encode("utf-8")
+
+    asset_id = asset_service.create_asset_from_mesh_upload(
+        glb_bytes, "model.glb", name="Test Mesh"
+    )
+    meta = asset_service.get_asset(asset_id)
+    assert meta is not None
+    assert meta.source == "upload"
+    assert "mesh" in meta.steps
+    assert meta.steps["mesh"].get("file") == "mesh.glb"
 
 
 def test_list_mesh_files(tmp_storage_paths, sample_asset):
@@ -374,6 +585,94 @@ def test_delete_asset_file_processing_output(tmp_storage_paths, sample_asset):
     assert not any(e.get("output_file") == "mesh_simplified_100.glb" for e in meta.processing)
 
 
+def test_delete_asset_file_image_processing_entry(tmp_storage_paths, sample_asset_with_image):
+    """delete_asset_file entfernt image_processing-Einträge."""
+    asset_service.append_image_processing_entry(
+        sample_asset_with_image,
+        {"operation": "crop", "output_file": "image_cropped.png", "params": {}},
+    )
+    asset_path = asset_service.get_asset_dir(sample_asset_with_image)
+    (asset_path / "image_cropped.png").write_bytes(b"PNG")
+    result = asset_service.delete_asset_file(sample_asset_with_image, "image_cropped.png")
+    assert result is True
+    meta = asset_service.get_asset(sample_asset_with_image)
+    assert not any(e.get("output_file") == "image_cropped.png" for e in meta.image_processing)
+
+
+def test_delete_asset_file_removes_export_entry(tmp_storage_paths, sample_asset):
+    """delete_asset_file entfernt Export-Einträge (z.B. GLTF)."""
+    asset_path = asset_service.get_asset_dir(sample_asset)
+    (asset_path / "export.gltf").write_bytes(b"{}")
+    (asset_path / "export.bin").write_bytes(b"bin")
+    asset_service.update_metadata_fields(
+        sample_asset,
+        {"exports": [{"output_file": "export.gltf", "format": "gltf"}]},
+    )
+    meta_before = asset_service.get_asset(sample_asset)
+    assert len(meta_before.exports) == 1
+    result = asset_service.delete_asset_file(sample_asset, "export.gltf")
+    assert result is True
+    assert not (asset_path / "export.gltf").exists()
+    assert not (asset_path / "export.bin").exists()
+
+
+def test_delete_asset_file_bin_also_removes_gltf(tmp_storage_paths, sample_asset):
+    """delete_asset_file für .bin entfernt auch die zugehörige .gltf."""
+    asset_path = asset_service.get_asset_dir(sample_asset)
+    (asset_path / "model.gltf").write_bytes(b"{}")
+    (asset_path / "model.bin").write_bytes(b"bin")
+    asset_service.update_metadata_fields(
+        sample_asset,
+        {"exports": [{"output_file": "model.bin", "format": "gltf"}]},
+    )
+    result = asset_service.delete_asset_file(sample_asset, "model.bin")
+    assert result is True
+    assert not (asset_path / "model.bin").exists()
+    assert not (asset_path / "model.gltf").exists()
+
+
+def test_list_assets_sort_created_asc(tmp_storage_paths, tmp_assets_dir):
+    """list_assets mit sort=created_asc sortiert älteste zuerst."""
+    a1, a2 = str(uuid.uuid4()), str(uuid.uuid4())
+    _create_asset_with_meta(tmp_assets_dir, a1, steps={})
+    _create_asset_with_meta(tmp_assets_dir, a2, steps={})
+    assets = asset_service.list_assets(sort="created_asc")
+    ids = [a.asset_id for a in assets if a.asset_id in (a1, a2)]
+    assert len(ids) == 2
+
+
+def test_get_file_path_returns_valid_path(tmp_storage_paths, sample_asset):
+    """get_file_path gibt Pfad zurück wenn Datei existiert."""
+    path = asset_service.get_file_path(sample_asset, "mesh.glb")
+    assert path is not None
+    assert path.exists()
+    assert path.name == "mesh.glb"
+
+
+def test_get_file_path_returns_none_for_missing_file(tmp_storage_paths, sample_asset):
+    """get_file_path gibt None wenn Datei nicht existiert."""
+    path = asset_service.get_file_path(sample_asset, "nonexistent.glb")
+    assert path is None
+
+
+def test_delete_asset_file_raises_when_file_not_found(tmp_storage_paths, sample_asset):
+    """delete_asset_file wirft FileNotFoundError wenn Datei nicht im Asset existiert."""
+    with pytest.raises(FileNotFoundError, match="nicht in Asset"):
+        asset_service.delete_asset_file(sample_asset, "nonexistent.glb")
+
+
+def test_delete_step_raises_when_asset_not_found(tmp_storage_paths):
+    """delete_step wirft FileNotFoundError wenn Asset nicht existiert."""
+    with pytest.raises(FileNotFoundError, match="nicht gefunden"):
+        asset_service.delete_step("00000000-0000-0000-0000-000000000000", "mesh")
+
+
+def test_delete_step_raises_for_invalid_step(tmp_storage_paths, sample_asset):
+    """delete_step wirft ValueError für ungültigen Step-Namen."""
+    with pytest.raises(ValueError, match="Ungültiger Step"):
+        asset_service.delete_step(sample_asset, "invalid_step")
+
+
 def test_delete_step_with_cascade(tmp_storage_paths, sample_asset):
     """delete_step mit cascade=True löscht auch abhängige Steps."""
     asset_path = asset_service.get_asset_dir(sample_asset)
@@ -399,3 +698,59 @@ def test_get_dependent_steps():
     assert "mesh" in deps
     deps2 = asset_service.get_dependent_steps("mesh", {"rigging"})
     assert "rigging" in deps2
+
+
+def test_asset_metadata_to_dict_includes_optional_fields():
+    """AssetMetadata.to_dict() enthält optionale Felder wenn gesetzt."""
+    meta = asset_service.AssetMetadata(
+        asset_id="test-id",
+        created_at="2025-01-01T00:00:00Z",
+        updated_at="2025-01-01T00:00:00Z",
+        steps={},
+        sketchfab_upload={"uid": "abc"},
+        source="sketchfab",
+        sketchfab_uid="uid123",
+        sketchfab_url="https://sketchfab.com/...",
+        sketchfab_author="author",
+        downloaded_at="2025-01-01T00:00:00Z",
+        deleted_at="2025-01-01T00:00:00Z",
+        name="Test",
+        tags=["a", "b"],
+        rating=5,
+        notes="Notes",
+        favorited=True,
+    )
+    d = meta.to_dict()
+    assert d["sketchfab_upload"] == {"uid": "abc"}
+    assert d["source"] == "sketchfab"
+    assert d["sketchfab_uid"] == "uid123"
+    assert d["sketchfab_url"] == "https://sketchfab.com/..."
+    assert d["sketchfab_author"] == "author"
+    assert d["downloaded_at"] == "2025-01-01T00:00:00Z"
+    assert d["deleted_at"] == "2025-01-01T00:00:00Z"
+    assert d["name"] == "Test"
+    assert d["tags"] == ["a", "b"]
+    assert d["rating"] == 5
+    assert d["notes"] == "Notes"
+    assert d["favorited"] is True
+
+
+def test_list_assets_filter_source(tmp_storage_paths, tmp_assets_dir):
+    """list_assets filtert nach source."""
+    a1, a2 = str(uuid.uuid4()), str(uuid.uuid4())
+    _create_asset_with_meta(tmp_assets_dir, a1, steps={})
+    _create_asset_with_meta(tmp_assets_dir, a2, steps={})
+    asset_service.update_metadata_fields(a1, {"source": "sketchfab"})
+    asset_service.update_metadata_fields(a2, {"source": "upload"})
+
+    assets = asset_service.list_assets(source="sketchfab")
+    assert any(a.asset_id == a1 for a in assets)
+    assert not any(a.asset_id == a2 for a in assets)
+
+
+def test_restore_asset_already_active(tmp_storage_paths, tmp_assets_dir):
+    """restore_asset bei nicht-gelöschtem Asset gibt True zurück."""
+    a1 = str(uuid.uuid4())
+    _create_asset_with_meta(tmp_assets_dir, a1, deleted=False)
+    result = asset_service.restore_asset(a1)
+    assert result is True

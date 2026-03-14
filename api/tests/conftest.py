@@ -72,6 +72,7 @@ def tmp_storage_paths(tmp_assets_dir: Path, tmp_presets_dir: Path, monkeypatch):
     monkeypatch.setattr("app.core.asset_paths.ASSETS_STORAGE_PATH", tmp_assets_dir)
     monkeypatch.setattr("app.services.asset_service.ASSETS_STORAGE_PATH", tmp_assets_dir)
     monkeypatch.setattr("app.services.preset_service.PRESETS_STORAGE_PATH", tmp_presets_dir)
+    monkeypatch.setattr("app.services.storage_service.ASSETS_STORAGE_PATH", tmp_assets_dir)
     return tmp_assets_dir
 
 
