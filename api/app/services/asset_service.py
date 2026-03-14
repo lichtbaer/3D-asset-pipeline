@@ -44,6 +44,11 @@ class AssetMetadata:
         sketchfab_author: str | None = None,
         downloaded_at: str | None = None,
         exports: list[dict[str, Any]] | None = None,
+        name: str | None = None,
+        tags: list[str] | None = None,
+        rating: int | None = None,
+        notes: str | None = None,
+        favorited: bool | None = None,
     ):
         self.asset_id = asset_id
         self.created_at = created_at
@@ -57,6 +62,11 @@ class AssetMetadata:
         self.sketchfab_author = sketchfab_author
         self.downloaded_at = downloaded_at
         self.exports = exports or []
+        self.name = name
+        self.tags = tags or []
+        self.rating = rating
+        self.notes = notes
+        self.favorited = favorited or False
 
     def to_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = {
@@ -79,6 +89,16 @@ class AssetMetadata:
             out["sketchfab_author"] = self.sketchfab_author
         if self.downloaded_at is not None:
             out["downloaded_at"] = self.downloaded_at
+        if self.name is not None:
+            out["name"] = self.name
+        if self.tags:
+            out["tags"] = self.tags
+        if self.rating is not None:
+            out["rating"] = self.rating
+        if self.notes is not None:
+            out["notes"] = self.notes
+        if self.favorited is not None:
+            out["favorited"] = self.favorited
         return out
 
 
@@ -162,11 +182,71 @@ def get_asset(asset_id: str) -> AssetMetadata | None:
         sketchfab_author=data.get("sketchfab_author"),
         downloaded_at=data.get("downloaded_at"),
         exports=data.get("exports", []),
+        name=data.get("name"),
+        tags=data.get("tags", []),
+        rating=data.get("rating"),
+        notes=data.get("notes"),
+        favorited=data.get("favorited", False),
     )
 
 
-def list_assets() -> list[AssetMetadata]:
-    """Alle Assets sortiert nach created_at desc."""
+def _get_search_text(meta: AssetMetadata) -> str:
+    """Volltext für Suche: Name + Prompt + Tags."""
+    parts: list[str] = []
+    if meta.name:
+        parts.append(meta.name.lower())
+    for step_data in meta.steps.values():
+        if isinstance(step_data, dict):
+            for key in ("prompt", "motion_prompt"):
+                if key in step_data and step_data[key]:
+                    parts.append(str(step_data[key]).lower())
+    parts.extend(t.lower() for t in meta.tags)
+    return " ".join(parts)
+
+
+def _matches_filters(
+    meta: AssetMetadata,
+    search: str | None,
+    tags_filter: list[str],
+    rating_min: int | None,
+    has_step: str | None,
+    favorited: bool | None,
+    source: str | None,
+) -> bool:
+    """Prüft ob Asset alle Filter erfüllt."""
+    if search:
+        search_lower = search.lower().strip()
+        if search_lower and search_lower not in _get_search_text(meta):
+            return False
+    if tags_filter:
+        meta_tags_lower = {t.lower() for t in meta.tags}
+        for t in tags_filter:
+            if t.lower() not in meta_tags_lower:
+                return False
+    if rating_min is not None:
+        r = meta.rating if meta.rating is not None else 0
+        if r < rating_min:
+            return False
+    if has_step:
+        if has_step not in meta.steps or not meta.steps.get(has_step):
+            return False
+    if favorited is not None and meta.favorited != favorited:
+        return False
+    if source and meta.source != source:
+        return False
+    return True
+
+
+def list_assets(
+    search: str | None = None,
+    tags: str | None = None,
+    rating: int | None = None,
+    has_step: str | None = None,
+    favorited: bool | None = None,
+    source: str | None = None,
+    sort: str = "created_desc",
+) -> list[AssetMetadata]:
+    """Alle Assets mit optionalen Filtern und Sortierung."""
     ASSETS_STORAGE_PATH.mkdir(parents=True, exist_ok=True)
     assets: list[AssetMetadata] = []
     for path in ASSETS_STORAGE_PATH.iterdir():
@@ -174,8 +254,73 @@ def list_assets() -> list[AssetMetadata]:
             meta = get_asset(path.name)
             if meta:
                 assets.append(meta)
-    assets.sort(key=lambda a: a.created_at, reverse=True)
+
+    tags_filter = [t.strip() for t in (tags or "").split(",") if t.strip()]
+    rating_min = rating if rating is not None else None
+
+    assets = [
+        a
+        for a in assets
+        if _matches_filters(
+            a, search, tags_filter, rating_min, has_step, favorited, source
+        )
+    ]
+
+    if sort == "created_asc":
+        assets.sort(key=lambda a: a.created_at)
+    elif sort == "name":
+        assets.sort(
+            key=lambda a: (a.name or "").lower() or a.asset_id.lower()
+        )
+    elif sort == "rating":
+        assets.sort(
+            key=lambda a: (a.rating if a.rating is not None else 0),
+            reverse=True,
+        )
+    else:
+        assets.sort(key=lambda a: a.created_at, reverse=True)
     return assets
+
+
+def get_all_tags() -> list[str]:
+    """Alle verwendeten Tags im System (für Autocomplete)."""
+    ASSETS_STORAGE_PATH.mkdir(parents=True, exist_ok=True)
+    seen: set[str] = set()
+    for path in ASSETS_STORAGE_PATH.iterdir():
+        if path.is_dir():
+            meta = get_asset(path.name)
+            if meta and meta.tags:
+                for t in meta.tags:
+                    if t.strip():
+                        seen.add(t.strip())
+    return sorted(seen)
+
+
+def update_asset_meta(
+    asset_id: str,
+    name: str | None = None,
+    tags: list[str] | None = None,
+    rating: int | None = None,
+    notes: str | None = None,
+    favorited: bool | None = None,
+) -> None:
+    """Aktualisiert Meta-Felder (Name, Tags, Rating, Notes, Favorit). Partial update."""
+    meta_path = _metadata_path(asset_id)
+    if not meta_path.exists():
+        raise FileNotFoundError(f"Asset {asset_id} existiert nicht")
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    if name is not None:
+        meta["name"] = name
+    if tags is not None:
+        meta["tags"] = tags
+    if rating is not None:
+        meta["rating"] = rating
+    if notes is not None:
+        meta["notes"] = notes
+    if favorited is not None:
+        meta["favorited"] = favorited
+    meta["updated_at"] = datetime.now(timezone.utc).isoformat()
+    meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
 
 
 def get_file_path(asset_id: str, filename: str) -> Path | None:

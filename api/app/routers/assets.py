@@ -3,12 +3,13 @@
 import asyncio
 from pathlib import Path
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 
 from app.schemas.asset import (
     AssetDetailResponse,
     AssetListItem,
+    AssetMetaUpdateRequest,
     CreateAssetResponse,
     ExportListItem,
     ExportRequest,
@@ -57,10 +58,47 @@ def _thumbnail_url(meta: asset_service.AssetMetadata) -> str | None:
     return None
 
 
+@router.get("/tags")
+async def get_asset_tags():
+    """Alle verwendeten Tags im System (für Autocomplete)."""
+    tags = asset_service.get_all_tags()
+    return {"tags": tags}
+
+
 @router.get("", response_model=list[AssetListItem])
-async def list_assets():
-    """Liste aller Assets, sortiert nach created_at desc."""
-    assets = asset_service.list_assets()
+async def list_assets(
+    search: str | None = Query(None, description="Volltextsuche in Name + Prompt + Tags"),
+    tags: str | None = Query(None, description="Komma-getrennte Tags (Asset muss ALLE haben)"),
+    rating: int | None = Query(None, ge=1, le=5, description="Mindest-Rating 1-5"),
+    has_step: str | None = Query(
+        None,
+        description="Filter: image, mesh, rigging, animation",
+    ),
+    favorited: bool | None = Query(None, description="Nur Favoriten"),
+    source: str | None = Query(
+        None,
+        description="Filter: generated, upload, sketchfab",
+    ),
+    sort: str = Query(
+        "created_desc",
+        description="created_desc, created_asc, name, rating",
+    ),
+):
+    """Liste aller Assets mit Filtern und Sortierung."""
+    if has_step and has_step not in ("image", "mesh", "rigging", "animation"):
+        raise HTTPException(400, detail="has_step muss image, mesh, rigging oder animation sein")
+    if sort and sort not in ("created_desc", "created_asc", "name", "rating"):
+        raise HTTPException(400, detail="sort muss created_desc, created_asc, name oder rating sein")
+
+    assets = asset_service.list_assets(
+        search=search,
+        tags=tags,
+        rating=rating,
+        has_step=has_step,
+        favorited=favorited,
+        source=source,
+        sort=sort or "created_desc",
+    )
     return [
         AssetListItem(
             asset_id=a.asset_id,
@@ -71,6 +109,10 @@ async def list_assets():
                 for k, v in a.steps.items()
             },
             thumbnail_url=_thumbnail_url(a),
+            name=a.name,
+            tags=a.tags,
+            rating=a.rating,
+            favorited=a.favorited,
         )
         for a in assets
     ]
@@ -167,6 +209,36 @@ async def upload_mesh(
     return UploadAssetResponse(asset_id=asset_id, file="mesh.glb")
 
 
+@router.patch("/{asset_id}/meta")
+async def patch_asset_meta(asset_id: str, body: AssetMetaUpdateRequest):
+    """Asset-Metadaten aktualisieren (Name, Tags, Rating, Notes, Favorit). Partial update."""
+    meta = asset_service.get_asset(asset_id)
+    if not meta:
+        raise HTTPException(404, detail="Asset nicht gefunden")
+    updates: dict[str, object] = {}
+    if body.name is not None:
+        updates["name"] = body.name
+    if body.tags is not None:
+        updates["tags"] = body.tags
+    if body.rating is not None:
+        updates["rating"] = body.rating
+    if body.notes is not None:
+        updates["notes"] = body.notes
+    if body.favorited is not None:
+        updates["favorited"] = body.favorited
+    if not updates:
+        return {"message": "Keine Änderungen"}
+    asset_service.update_asset_meta(
+        asset_id,
+        name=body.name,
+        tags=body.tags,
+        rating=body.rating,
+        notes=body.notes,
+        favorited=body.favorited,
+    )
+    return {"message": "Metadaten aktualisiert"}
+
+
 @router.get("/{asset_id}", response_model=AssetDetailResponse)
 async def get_asset(asset_id: str):
     """Vollständige metadata.json eines Assets."""
@@ -186,6 +258,11 @@ async def get_asset(asset_id: str):
         sketchfab_author=meta.sketchfab_author,
         downloaded_at=meta.downloaded_at,
         exports=meta.exports,
+        name=meta.name,
+        tags=meta.tags,
+        rating=meta.rating,
+        notes=meta.notes,
+        favorited=meta.favorited,
     )
 
 
