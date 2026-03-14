@@ -35,6 +35,43 @@ class AssetDetailResponse(BaseModel):
         default_factory=list,
         description="Mesh-Processing-Einträge (simplify, repair)",
     )
+    exports: list[dict] = Field(
+        default_factory=list,
+        description="Export-Einträge (STL, OBJ, PLY, GLTF)",
+    )
+
+
+class ExportRequest(BaseModel):
+    """Request für POST /assets/{asset_id}/export."""
+
+    source_file: str = Field(..., description="z.B. mesh.glb")
+    format: str = Field(..., description="stl | obj | ply | gltf")
+
+
+class ExportResponse(BaseModel):
+    """Response für POST /assets/{asset_id}/export."""
+
+    output_file: str
+    format: str
+    file_size_bytes: int
+    download_url: str
+
+
+class ExportListItem(BaseModel):
+    """Ein Export in GET /assets/{asset_id}/exports."""
+
+    filename: str
+    format: str
+    source_file: str
+    exported_at: str
+    file_size_bytes: int
+    download_url: str
+
+
+class ExportsListResponse(BaseModel):
+    """Response für GET /assets/{asset_id}/exports."""
+
+    exports: list[ExportListItem]
 
 
 class CreateAssetResponse(BaseModel):

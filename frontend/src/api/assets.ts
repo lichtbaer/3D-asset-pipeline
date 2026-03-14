@@ -29,6 +29,36 @@ export interface AssetDetail {
   updated_at: string;
   steps: Record<string, Record<string, unknown>>;
   processing?: ProcessingEntry[];
+  exports?: ExportEntry[];
+}
+
+export interface ExportEntry {
+  format: string;
+  source_file: string;
+  output_file: string;
+  exported_at: string;
+  file_size_bytes: number;
+}
+
+export interface ExportRequest {
+  source_file: string;
+  format: "stl" | "obj" | "ply" | "gltf";
+}
+
+export interface ExportResponse {
+  output_file: string;
+  format: string;
+  file_size_bytes: number;
+  download_url: string;
+}
+
+export interface ExportListItem {
+  filename: string;
+  format: string;
+  source_file: string;
+  exported_at: string;
+  file_size_bytes: number;
+  download_url: string;
 }
 
 export async function listAssets(): Promise<AssetListItem[]> {
@@ -49,4 +79,24 @@ export async function createAsset(): Promise<{ asset_id: string }> {
 export function getAssetFileUrl(assetId: string, filename: string): string {
   const baseUrl = apiClient.defaults.baseURL ?? "http://localhost:8000";
   return `${baseUrl}/assets/${assetId}/files/${filename}`;
+}
+
+export async function exportMesh(
+  assetId: string,
+  req: ExportRequest
+): Promise<ExportResponse> {
+  const { data } = await apiClient.post<ExportResponse>(
+    `/assets/${assetId}/export`,
+    req
+  );
+  return data;
+}
+
+export async function getAssetExports(
+  assetId: string
+): Promise<{ exports: ExportListItem[] }> {
+  const { data } = await apiClient.get<{ exports: ExportListItem[] }>(
+    `/assets/${assetId}/exports`
+  );
+  return data;
 }

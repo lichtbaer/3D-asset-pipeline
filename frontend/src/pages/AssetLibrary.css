@@ -415,6 +415,106 @@
 }
 
 /* Mesh Processing Panel */
+/* Export Panel */
+.export-panel {
+  margin-top: var(--space-lg);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--border);
+}
+
+.export-panel h3 {
+  margin: 0 0 var(--space-md);
+}
+
+.export-panel h4 {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--font-size-sm);
+}
+
+.export-panel__formats {
+  margin-bottom: var(--space-md);
+}
+
+.export-panel__label {
+  display: block;
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--space-xs);
+}
+
+.export-panel__format-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.export-panel__format-buttons .btn--active {
+  background: var(--accent);
+  color: var(--accent-fg, white);
+  border-color: var(--accent);
+}
+
+.export-panel__source {
+  margin-bottom: var(--space-md);
+}
+
+.export-panel__source label {
+  display: block;
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--space-xs);
+}
+
+.export-panel__source select {
+  padding: var(--space-sm);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  font-family: inherit;
+  min-width: 180px;
+}
+
+.export-panel__info {
+  font-size: var(--font-size-sm);
+  color: var(--text);
+  margin: 0 0 var(--space-md);
+}
+
+.export-panel__error {
+  font-size: var(--font-size-sm);
+  color: var(--error, #c00);
+  margin: var(--space-sm) 0 0;
+}
+
+.export-panel__exports {
+  margin-top: var(--space-lg);
+}
+
+.export-panel__exports-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.export-panel__export-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.export-panel__export-item:last-child {
+  border-bottom: none;
+}
+
+.export-panel__export-name {
+  font-size: var(--font-size-sm);
+  flex: 1;
+}
+
+.export-panel__export-size {
+  font-size: var(--font-size-sm);
+  color: var(--text-muted, #666);
+}
+
 .mesh-processing-panel {
   margin-top: var(--space-lg);
   padding-top: var(--space-lg);
