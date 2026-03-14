@@ -32,7 +32,7 @@ _api_auth = [Depends(verify_api_key)]
 
 app = FastAPI(title="Purzel ML Asset Pipeline API")
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
 app.include_router(agents.router, dependencies=_api_auth)
 app.include_router(generation.router, dependencies=_api_auth)
 app.include_router(assets.router, dependencies=_api_auth)

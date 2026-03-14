@@ -12,5 +12,11 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/__tests__/setup.ts'],
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    coverage: {
+      provider: 'v8',
+      thresholds: {
+        lines: 50,
+      },
+    },
   },
 })
