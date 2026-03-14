@@ -20,6 +20,14 @@ export function Layout() {
         >
           Bibliothek
         </NavLink>
+        <NavLink
+          to="/storage"
+          className={({ isActive }) =>
+            `main-nav__link ${isActive ? "main-nav__link--active" : ""}`
+          }
+        >
+          Speicher
+        </NavLink>
       </nav>
       <Outlet />
     </>

@@ -5,6 +5,7 @@ export interface AssetStepInfo {
   provider_key: string;
   file: string;
   generated_at: string | null;
+  name?: string | null;
 }
 
 export interface AssetListItem {
@@ -13,6 +14,7 @@ export interface AssetListItem {
   updated_at: string;
   steps: Record<string, AssetStepInfo>;
   thumbnail_url: string | null;
+  deleted_at?: string | null;
   name?: string | null;
   tags?: string[];
   rating?: number | null;
@@ -103,10 +105,16 @@ export interface ExportListItem {
 }
 
 export async function listAssets(
-  params?: ListAssetsParams
+  params?: ListAssetsParams & { includeDeleted?: boolean }
 ): Promise<AssetListItem[]> {
+  const p = params ?? {};
+  const { includeDeleted, ...rest } = p;
+  const queryParams = {
+    ...rest,
+    ...(includeDeleted ? { include_deleted: "true" } : {}),
+  };
   const { data } = await apiClient.get<AssetListItem[]>("/assets", {
-    params: params ?? {},
+    params: queryParams,
   });
   return data;
 }
@@ -235,4 +243,28 @@ export async function getAssetExports(
     `/assets/${assetId}/exports`
   );
   return data;
+}
+
+export async function deleteAsset(
+  assetId: string,
+  permanent = false
+): Promise<void> {
+  await apiClient.delete(`/assets/${assetId}`, {
+    params: permanent ? { permanent: "true" } : undefined,
+  });
+}
+
+export async function deleteAssetBatch(
+  assetIds: string[],
+  permanent = false
+): Promise<{ deleted_count: number }> {
+  const { data } = await apiClient.delete<{ deleted_count: number }>(
+    "/assets/batch",
+    { data: { asset_ids: assetIds, permanent } }
+  );
+  return data;
+}
+
+export async function restoreAsset(assetId: string): Promise<void> {
+  await apiClient.post(`/assets/${assetId}/restore`);
 }

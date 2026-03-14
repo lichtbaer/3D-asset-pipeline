@@ -44,6 +44,7 @@ class AssetMetadata:
         sketchfab_author: str | None = None,
         downloaded_at: str | None = None,
         exports: list[dict[str, Any]] | None = None,
+        deleted_at: str | None = None,
         name: str | None = None,
         tags: list[str] | None = None,
         rating: int | None = None,
@@ -62,6 +63,7 @@ class AssetMetadata:
         self.sketchfab_author = sketchfab_author
         self.downloaded_at = downloaded_at
         self.exports = exports or []
+        self.deleted_at = deleted_at
         self.name = name
         self.tags = tags or []
         self.rating = rating
@@ -89,6 +91,8 @@ class AssetMetadata:
             out["sketchfab_author"] = self.sketchfab_author
         if self.downloaded_at is not None:
             out["downloaded_at"] = self.downloaded_at
+        if self.deleted_at is not None:
+            out["deleted_at"] = self.deleted_at
         if self.name is not None:
             out["name"] = self.name
         if self.tags:
@@ -182,6 +186,7 @@ def get_asset(asset_id: str) -> AssetMetadata | None:
         sketchfab_author=data.get("sketchfab_author"),
         downloaded_at=data.get("downloaded_at"),
         exports=data.get("exports", []),
+        deleted_at=data.get("deleted_at"),
         name=data.get("name"),
         tags=data.get("tags", []),
         rating=data.get("rating"),
@@ -238,6 +243,7 @@ def _matches_filters(
 
 
 def list_assets(
+    include_deleted: bool = False,
     search: str | None = None,
     tags: str | None = None,
     rating: int | None = None,
@@ -246,14 +252,16 @@ def list_assets(
     source: str | None = None,
     sort: str = "created_desc",
 ) -> list[AssetMetadata]:
-    """Alle Assets mit optionalen Filtern und Sortierung."""
+    """Alle Assets mit optionalen Filtern und Sortierung. Ohne include_deleted
+    werden soft-deleted Assets ausgelassen."""
     ASSETS_STORAGE_PATH.mkdir(parents=True, exist_ok=True)
     assets: list[AssetMetadata] = []
     for path in ASSETS_STORAGE_PATH.iterdir():
         if path.is_dir():
             meta = get_asset(path.name)
             if meta:
-                assets.append(meta)
+                if include_deleted or not meta.deleted_at:
+                    assets.append(meta)
 
     tags_filter = [t.strip() for t in (tags or "").split(",") if t.strip()]
     rating_min = rating if rating is not None else None
@@ -590,9 +598,44 @@ async def persist_animation_job(
     logger.info("Asset %s: animation step persisted", asset_id)
 
 
-def delete_asset(asset_id: str) -> bool:
+def soft_delete_asset(asset_id: str) -> bool:
     """
-    Löscht Asset-Ordner mit allen Dateien.
+    Soft-Delete: Setzt deleted_at in metadata.json.
+    Gibt True zurück wenn erfolgreich.
+    """
+    meta = get_asset(asset_id)
+    if not meta:
+        return False
+    update_metadata_fields(
+        asset_id,
+        {"deleted_at": datetime.now(timezone.utc).isoformat()},
+    )
+    logger.info("Asset %s in Papierkorb verschoben", asset_id)
+    return True
+
+
+def restore_asset(asset_id: str) -> bool:
+    """
+    Stellt soft-deleted Asset wieder her (setzt deleted_at auf null).
+    """
+    meta = get_asset(asset_id)
+    if not meta:
+        return False
+    if not meta.deleted_at:
+        return True  # Bereits aktiv
+    meta_path = _metadata_path(asset_id)
+    meta_dict = json.loads(meta_path.read_text(encoding="utf-8"))
+    meta_dict.pop("deleted_at", None)
+    meta_dict["updated_at"] = datetime.now(timezone.utc).isoformat()
+    meta_path.write_text(json.dumps(meta_dict, indent=2), encoding="utf-8")
+    logger.info("Asset %s wiederhergestellt", asset_id)
+    return True
+
+
+def delete_asset(asset_id: str, permanent: bool = False) -> bool:
+    """
+    Soft-Delete (permanent=False): Setzt deleted_at, Ordner bleibt.
+    Permanent (permanent=True): Löscht Asset-Ordner mit allen Dateien.
     Gibt True zurück wenn gelöscht, False wenn nicht gefunden.
     Validiert asset_id als UUID, um Path-Traversal zu verhindern.
     """
@@ -601,8 +644,11 @@ def delete_asset(asset_id: str) -> bool:
     asset_path = _asset_dir(asset_id)
     if not asset_path.exists():
         return False
-    shutil.rmtree(asset_path)
-    logger.info("Asset %s gelöscht", asset_id)
+    if permanent:
+        shutil.rmtree(asset_path)
+        logger.info("Asset %s permanent gelöscht", asset_id)
+    else:
+        soft_delete_asset(asset_id)
     return True
 
 

@@ -1,0 +1,125 @@
+.storage-page {
+  padding: var(--space-xl);
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.storage-page__header {
+  margin-bottom: var(--space-xl);
+}
+
+.storage-page__header h1 {
+  margin-bottom: var(--space-sm);
+}
+
+.storage-page__subtitle {
+  color: var(--text);
+  margin-bottom: var(--space-md);
+}
+
+.storage-page__back {
+  display: inline-block;
+  color: var(--accent);
+  text-decoration: none;
+  font-size: var(--font-size-sm);
+}
+
+.storage-page__back:hover {
+  text-decoration: underline;
+}
+
+.storage-page__loading,
+.storage-page__error {
+  padding: var(--space-xl);
+  text-align: center;
+  color: var(--text);
+}
+
+.storage-page__summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xl);
+  margin-bottom: var(--space-xl);
+  padding: var(--space-lg);
+  background: var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.storage-page__summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.storage-page__summary-label {
+  font-size: var(--font-size-sm);
+  color: var(--text);
+}
+
+.storage-page__summary-value {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+}
+
+.storage-page__breakdown {
+  margin-bottom: var(--space-xl);
+}
+
+.storage-page__breakdown h2 {
+  font-size: var(--font-size-base);
+  margin-bottom: var(--space-md);
+}
+
+.storage-page__breakdown-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: var(--space-md);
+  align-items: center;
+  margin-bottom: var(--space-sm);
+}
+
+.storage-page__breakdown-bar-wrap {
+  min-width: 120px;
+  height: 20px;
+  background: var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.storage-page__breakdown-bar {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.3s;
+}
+
+.storage-page__breakdown-label {
+  font-size: var(--font-size-sm);
+  min-width: 80px;
+}
+
+.storage-page__breakdown-size {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+}
+
+.storage-page__breakdown-count {
+  font-size: var(--font-size-sm);
+  color: var(--text);
+}
+
+.storage-page__trash {
+  padding: var(--space-lg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.storage-page__trash h2 {
+  font-size: var(--font-size-base);
+  margin: 0 0 var(--space-sm);
+}
+
+.storage-page__trash p {
+  margin: 0 0 var(--space-md);
+  font-size: var(--font-size-sm);
+  color: var(--text);
+}

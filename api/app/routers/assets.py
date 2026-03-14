@@ -10,6 +10,7 @@ from app.schemas.asset import (
     AssetDetailResponse,
     AssetListItem,
     AssetMetaUpdateRequest,
+    BatchDeleteRequest,
     CreateAssetResponse,
     ExportListItem,
     ExportRequest,
@@ -46,6 +47,7 @@ def _step_to_info(step_data: dict) -> dict:
         "provider_key": step_data.get("provider_key", ""),
         "file": step_data.get("file", ""),
         "generated_at": step_data.get("generated_at"),
+        "name": step_data.get("name"),
     }
 
 
@@ -67,6 +69,7 @@ async def get_asset_tags():
 
 @router.get("", response_model=list[AssetListItem])
 async def list_assets(
+    include_deleted: bool = Query(False, description="Papierkorb-Assets einbeziehen"),
     search: str | None = Query(None, description="Volltextsuche in Name + Prompt + Tags"),
     tags: str | None = Query(None, description="Komma-getrennte Tags (Asset muss ALLE haben)"),
     rating: int | None = Query(None, ge=1, le=5, description="Mindest-Rating 1-5"),
@@ -91,6 +94,7 @@ async def list_assets(
         raise HTTPException(400, detail="sort muss created_desc, created_asc, name oder rating sein")
 
     assets = asset_service.list_assets(
+        include_deleted=include_deleted,
         search=search,
         tags=tags,
         rating=rating,
@@ -109,6 +113,7 @@ async def list_assets(
                 for k, v in a.steps.items()
             },
             thumbnail_url=_thumbnail_url(a),
+            deleted_at=a.deleted_at,
             name=a.name,
             tags=a.tags,
             rating=a.rating,
@@ -401,10 +406,34 @@ async def get_asset_exports(asset_id: str):
     )
 
 
+@router.delete("/batch", status_code=200)
+async def delete_assets_batch(body: BatchDeleteRequest):
+    """
+    Mehrere Assets löschen. permanent=false: Soft-Delete (Papierkorb).
+    permanent=true: Unwiderrufliches Löschen.
+    Gibt Anzahl gelöschter Assets zurück.
+    """
+    deleted = 0
+    for aid in body.asset_ids:
+        if asset_service.delete_asset(aid, permanent=body.permanent):
+            deleted += 1
+    return {"deleted_count": deleted}
+
+
+@router.post("/{asset_id}/restore", status_code=204)
+async def restore_asset(asset_id: str):
+    """Asset aus Papierkorb wiederherstellen."""
+    if not asset_service.restore_asset(asset_id):
+        raise HTTPException(404, detail="Asset nicht gefunden oder nicht gelöscht")
+
+
 @router.delete("/{asset_id}", status_code=204)
-async def delete_asset(asset_id: str):
-    """Löscht Asset-Ordner und alle zugehörigen Dateien unwiderruflich."""
-    deleted = asset_service.delete_asset(asset_id)
+async def delete_asset(asset_id: str, permanent: bool = False):
+    """
+    Soft-Delete (Standard): Asset in Papierkorb verschieben (deleted_at setzen).
+    Permanent (permanent=true): Ordner und alle Dateien unwiderruflich löschen.
+    """
+    deleted = asset_service.delete_asset(asset_id, permanent=permanent)
     if not deleted:
         raise HTTPException(404, detail="Asset nicht gefunden")
 
