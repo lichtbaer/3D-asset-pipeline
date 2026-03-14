@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getAsset, getAssetFileUrl } from "../../api/assets.js";
 import { usePipelineStore } from "../../store/PipelineStore.js";
 import { useFocusTrap } from "../../hooks/useFocusTrap.js";
@@ -12,6 +12,7 @@ import {
   ProcessingResultsList,
 } from "./MeshProcessingPanel.js";
 import { ExportPanel } from "./ExportPanel.js";
+import { SketchfabPanel } from "./SketchfabPanel.js";
 
 function formatDate(iso: string): string {
   try {
@@ -41,6 +42,7 @@ interface AssetDetailModalProps {
 
 export function AssetDetailModal({ assetId, onClose }: AssetDetailModalProps) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { setActiveAssetId } = usePipelineStore();
 
   const modalRef = useRef<HTMLDivElement>(null);
@@ -253,6 +255,16 @@ export function AssetDetailModal({ assetId, onClose }: AssetDetailModalProps) {
           <>
             <ExportPanel assetId={data.asset_id} />
             <MeshProcessingPanel assetId={data.asset_id} />
+            <SketchfabPanel
+              assetId={data.asset_id}
+              assetName={`Asset ${data.asset_id.slice(0, 8)}`}
+              sketchfabUpload={data.sketchfab_upload}
+              onAssetUpdate={() => {
+                void queryClient.invalidateQueries({
+                  queryKey: ["asset", assetId],
+                });
+              }}
+            />
             {data.processing && data.processing.length > 0 && (
               <ProcessingResultsList
                 assetId={data.asset_id}

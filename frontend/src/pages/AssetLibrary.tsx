@@ -1,9 +1,11 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { listAssets } from "../api/assets.js";
+import { getSketchfabStatus } from "../api/sketchfab.js";
 import { AssetDetailModal } from "../components/assets/AssetDetailModal.js";
 import { AssetUploadZone } from "../components/assets/AssetUploadZone.js";
+import { SketchfabImportModal } from "../components/assets/SketchfabImportModal.js";
 import type { AssetListItem } from "../api/assets.js";
 
 function formatDate(iso: string): string {
@@ -129,7 +131,22 @@ function AssetCardActions({
 
 export function AssetLibrary() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+  const [showSketchfabImport, setShowSketchfabImport] = useState(false);
+
+  const { data: sketchfabEnabled } = useQuery({
+    queryKey: ["sketchfab-status"],
+    queryFn: getSketchfabStatus,
+  });
+
+  useEffect(() => {
+    const state = location.state as { importedAssetId?: string } | null;
+    if (state?.importedAssetId) {
+      setSelectedAssetId(state.importedAssetId);
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, location.pathname, navigate]);
 
   const { data: assets, isLoading, error } = useQuery({
     queryKey: ["assets"],
@@ -150,9 +167,20 @@ export function AssetLibrary() {
         <p className="asset-library__subtitle">
           Alle gespeicherten Pipeline-Outputs (Bilder, Freistellungen, Meshes)
         </p>
-        <Link to="/pipeline" className="asset-library__link">
-          Zur Pipeline
-        </Link>
+        <div className="asset-library__header-actions">
+          {sketchfabEnabled?.enabled && (
+            <button
+              type="button"
+              className="btn btn--outline"
+              onClick={() => setShowSketchfabImport(true)}
+            >
+              Von Sketchfab importieren
+            </button>
+          )}
+          <Link to="/pipeline" className="asset-library__link">
+            Zur Pipeline
+          </Link>
+        </div>
       </header>
 
       <div className="asset-library__upload-row">
@@ -234,6 +262,9 @@ export function AssetLibrary() {
           assetId={selectedAssetId}
           onClose={() => setSelectedAssetId(null)}
         />
+      )}
+      {showSketchfabImport && (
+        <SketchfabImportModal onClose={() => setShowSketchfabImport(false)} />
       )}
     </main>
   );

@@ -38,6 +38,10 @@
   margin-bottom: var(--space-lg);
 }
 
+.pipeline-tab__sketchfab-link {
+  margin: 0 0 var(--space-md);
+}
+
 .pipeline-mode-toggle {
   display: flex;
   gap: var(--space-sm);

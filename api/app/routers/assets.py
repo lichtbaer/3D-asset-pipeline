@@ -15,6 +15,7 @@ from app.schemas.asset import (
     ExportResponse,
     ExportsListResponse,
     AssetStepInfo,
+    SketchfabUploadInfo,
     UploadAssetResponse,
 )
 from app.schemas.mesh_processing import (
@@ -73,6 +74,25 @@ async def list_assets():
         )
         for a in assets
     ]
+
+
+def _to_sketchfab_upload_info(
+    d: dict | None,
+) -> SketchfabUploadInfo | None:
+    """Konvertiert sketchfab_upload-Dict zu Schema."""
+    if not d or not isinstance(d, dict):
+        return None
+    uid = d.get("uid")
+    url = d.get("url")
+    if not uid or not url:
+        return None
+    return SketchfabUploadInfo(
+        uid=str(uid),
+        url=str(url),
+        embed_url=str(d.get("embed_url", "")),
+        uploaded_at=str(d.get("uploaded_at", "")),
+        is_private=bool(d.get("is_private", False)),
+    )
 
 
 # Upload-Endpunkte (vor /{asset_id} definieren)
@@ -159,6 +179,12 @@ async def get_asset(asset_id: str):
         updated_at=meta.updated_at,
         steps=meta.steps,
         processing=meta.processing,
+        sketchfab_upload=_to_sketchfab_upload_info(meta.sketchfab_upload),
+        source=meta.source,
+        sketchfab_uid=meta.sketchfab_uid,
+        sketchfab_url=meta.sketchfab_url,
+        sketchfab_author=meta.sketchfab_author,
+        downloaded_at=meta.downloaded_at,
         exports=meta.exports,
     )
 
