@@ -4,6 +4,8 @@ import {
   analyzeMesh,
   simplifyMesh,
   repairMesh,
+  clipFloor,
+  removeComponents,
   getMeshSources,
   type RepairOperation,
 } from "../../api/meshProcessing.js";
@@ -20,6 +22,12 @@ const REPAIR_OPTIONS: { value: RepairOperation; label: string }[] = [
   { value: "remove_degenerate", label: "Degenerierte Faces entfernen" },
 ];
 
+const COMPONENT_RATIO_PRESETS = [
+  { value: 0.05, label: "5%" },
+  { value: 0.1, label: "10%" },
+  { value: 0.2, label: "20%" },
+];
+
 interface MeshProcessingPanelProps {
   assetId: string;
 }
@@ -33,6 +41,12 @@ export function MeshProcessingPanel({ assetId }: MeshProcessingPanelProps) {
     "fix_normals",
     "remove_degenerate",
   ]);
+  const [clipFloorMode, setClipFloorMode] = useState<"auto" | "zero" | "custom">(
+    "auto"
+  );
+  const [customYThreshold, setCustomYThreshold] = useState("");
+  const [componentRatio, setComponentRatio] = useState(0.05);
+  const [customComponentRatio, setCustomComponentRatio] = useState("");
 
   const { data: sources } = useQuery({
     queryKey: ["mesh-sources", assetId],
@@ -73,6 +87,43 @@ export function MeshProcessingPanel({ assetId }: MeshProcessingPanelProps) {
         source_file: effectiveSource,
         operations: repairOps,
       }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["asset", assetId] });
+      queryClient.invalidateQueries({ queryKey: ["mesh-sources", assetId] });
+    },
+  });
+
+  const clipFloorMutation = useMutation({
+    mutationFn: () => {
+      let yThreshold: number | null = null;
+      if (clipFloorMode === "zero") yThreshold = 0;
+      else if (clipFloorMode === "custom") {
+        const v = parseFloat(customYThreshold);
+        if (Number.isFinite(v)) yThreshold = v;
+      }
+      return clipFloor(assetId, {
+        source_file: effectiveSource,
+        y_threshold: yThreshold ?? undefined,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["asset", assetId] });
+      queryClient.invalidateQueries({ queryKey: ["mesh-sources", assetId] });
+    },
+  });
+
+  const removeComponentsMutation = useMutation({
+    mutationFn: () => {
+      let ratio = componentRatio;
+      if (customComponentRatio) {
+        const v = parseFloat(customComponentRatio) / 100;
+        if (Number.isFinite(v) && v >= 0 && v <= 1) ratio = v;
+      }
+      return removeComponents(assetId, {
+        source_file: effectiveSource,
+        min_component_ratio: ratio,
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["asset", assetId] });
       queryClient.invalidateQueries({ queryKey: ["mesh-sources", assetId] });
@@ -186,6 +237,92 @@ export function MeshProcessingPanel({ assetId }: MeshProcessingPanelProps) {
         >
           {repairMutation.isPending ? "Reparieren…" : "Reparieren"}
         </button>
+      </div>
+
+      <div className="mesh-processing__artifact-cleanup">
+        <h4>Artefakt-Bereinigung</h4>
+
+        <div className="mesh-processing__clip-floor">
+          <p className="mesh-processing__subsection-title">Boden entfernen</p>
+          <p className="mesh-processing__info">
+            ℹ Empfohlen vor dem Rigging wenn der Mesh auf einem Boden oder
+            Sockel steht.
+          </p>
+          <div className="mesh-processing__presets">
+            <button
+              type="button"
+              className={`btn btn--outline btn--sm ${clipFloorMode === "auto" ? "btn--active" : ""}`}
+              onClick={() => setClipFloorMode("auto")}
+            >
+              Auto
+            </button>
+            <button
+              type="button"
+              className={`btn btn--outline btn--sm ${clipFloorMode === "zero" ? "btn--active" : ""}`}
+              onClick={() => setClipFloorMode("zero")}
+            >
+              0.0
+            </button>
+            <input
+              type="number"
+              step="any"
+              placeholder="Eigener Wert"
+              value={customYThreshold}
+              onChange={(e) => {
+                setCustomYThreshold(e.target.value);
+                setClipFloorMode("custom");
+              }}
+              className="mesh-processing__custom-input"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => clipFloorMutation.mutate()}
+            disabled={clipFloorMutation.isPending}
+          >
+            {clipFloorMutation.isPending ? "Boden abschneiden…" : "Boden abschneiden"}
+          </button>
+        </div>
+
+        <div className="mesh-processing__remove-components">
+          <p className="mesh-processing__subsection-title">
+            Isolierte Teile entfernen
+          </p>
+          <div className="mesh-processing__presets">
+            {COMPONENT_RATIO_PRESETS.map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                className={`btn btn--outline btn--sm ${componentRatio === value && !customComponentRatio ? "btn--active" : ""}`}
+                onClick={() => {
+                  setComponentRatio(value);
+                  setCustomComponentRatio("");
+                }}
+              >
+                {label}
+              </button>
+            ))}
+            <input
+              type="number"
+              min={0}
+              max={100}
+              step={0.1}
+              placeholder="Eigener Wert %"
+              value={customComponentRatio}
+              onChange={(e) => setCustomComponentRatio(e.target.value)}
+              className="mesh-processing__custom-input"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => removeComponentsMutation.mutate()}
+            disabled={removeComponentsMutation.isPending}
+          >
+            {removeComponentsMutation.isPending
+              ? "Kleine Teile entfernen…"
+              : "Kleine Teile entfernen"}
+          </button>
+        </div>
       </div>
     </section>
   );

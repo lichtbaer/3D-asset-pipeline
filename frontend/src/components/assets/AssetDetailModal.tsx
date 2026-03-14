@@ -11,6 +11,7 @@ import {
   MeshProcessingPanel,
   ProcessingResultsList,
 } from "./MeshProcessingPanel.js";
+import { ExportPanel } from "./ExportPanel.js";
 import { SketchfabPanel } from "./SketchfabPanel.js";
 
 function formatDate(iso: string): string {
@@ -252,6 +253,7 @@ export function AssetDetailModal({ assetId, onClose }: AssetDetailModalProps) {
 
         {hasMesh && (
           <>
+            <ExportPanel assetId={data.asset_id} />
             <MeshProcessingPanel assetId={data.asset_id} />
             <SketchfabPanel
               assetId={data.asset_id}

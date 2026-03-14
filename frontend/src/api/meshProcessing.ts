@@ -44,6 +44,30 @@ export interface ProcessingResult {
   };
 }
 
+export interface ClipFloorRequest {
+  source_file: string;
+  y_threshold?: number | null;
+}
+
+export interface ClipFloorResult {
+  output_file: string;
+  y_threshold_used: number;
+  vertices_removed: number;
+  faces_removed: number;
+}
+
+export interface RemoveComponentsRequest {
+  source_file: string;
+  min_component_ratio?: number;
+}
+
+export interface RemoveComponentsResult {
+  output_file: string;
+  components_found: number;
+  components_removed: number;
+  triangles_removed: number;
+}
+
 export async function analyzeMesh(
   assetId: string,
   sourceFile: string = "mesh.glb"
@@ -82,6 +106,28 @@ export async function getMeshSources(
 ): Promise<{ sources: string[] }> {
   const { data } = await apiClient.get<{ sources: string[] }>(
     `/assets/${assetId}/process/sources`
+  );
+  return data;
+}
+
+export async function clipFloor(
+  assetId: string,
+  req: ClipFloorRequest
+): Promise<ClipFloorResult> {
+  const { data } = await apiClient.post<ClipFloorResult>(
+    `/assets/${assetId}/process/clip-floor`,
+    req
+  );
+  return data;
+}
+
+export async function removeComponents(
+  assetId: string,
+  req: RemoveComponentsRequest
+): Promise<RemoveComponentsResult> {
+  const { data } = await apiClient.post<RemoveComponentsResult>(
+    `/assets/${assetId}/process/remove-components`,
+    req
   );
   return data;
 }

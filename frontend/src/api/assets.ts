@@ -43,6 +43,36 @@ export interface AssetDetail {
   sketchfab_url?: string | null;
   sketchfab_author?: string | null;
   downloaded_at?: string | null;
+  exports?: ExportEntry[];
+}
+
+export interface ExportEntry {
+  format: string;
+  source_file: string;
+  output_file: string;
+  exported_at: string;
+  file_size_bytes: number;
+}
+
+export interface ExportRequest {
+  source_file: string;
+  format: "stl" | "obj" | "ply" | "gltf";
+}
+
+export interface ExportResponse {
+  output_file: string;
+  format: string;
+  file_size_bytes: number;
+  download_url: string;
+}
+
+export interface ExportListItem {
+  filename: string;
+  format: string;
+  source_file: string;
+  exported_at: string;
+  file_size_bytes: number;
+  download_url: string;
 }
 
 export async function listAssets(): Promise<AssetListItem[]> {
@@ -60,7 +90,102 @@ export async function createAsset(): Promise<{ asset_id: string }> {
   return data;
 }
 
+export interface UploadImageOptions {
+  file: File;
+  name?: string;
+  onProgress?: (percent: number) => void;
+}
+
+export interface UploadMeshOptions {
+  file: File;
+  mtlFile?: File;
+  name?: string;
+  onProgress?: (percent: number) => void;
+}
+
+export interface UploadImageResponse {
+  asset_id: string;
+  file: string;
+}
+
+export async function uploadImage({
+  file,
+  name,
+  onProgress,
+}: UploadImageOptions): Promise<UploadImageResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+  if (name) formData.append("name", name);
+  const { data } = await apiClient.post<UploadImageResponse>(
+    "/assets/upload/image",
+    formData,
+    {
+      headers: { "Content-Type": "multipart/form-data" },
+      onUploadProgress: onProgress
+        ? (e) => {
+            if (e.total && e.total > 0) {
+              onProgress(Math.round((e.loaded / e.total) * 100));
+            }
+          }
+        : undefined,
+    }
+  );
+  return data;
+}
+
+export interface UploadMeshResponse {
+  asset_id: string;
+  file: string;
+}
+
+export async function uploadMesh({
+  file,
+  mtlFile,
+  name,
+  onProgress,
+}: UploadMeshOptions): Promise<UploadMeshResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+  if (name) formData.append("name", name);
+  if (mtlFile) formData.append("mtl_file", mtlFile);
+  const { data } = await apiClient.post<UploadMeshResponse>(
+    "/assets/upload/mesh",
+    formData,
+    {
+      headers: { "Content-Type": "multipart/form-data" },
+      onUploadProgress: onProgress
+        ? (e) => {
+            if (e.total && e.total > 0) {
+              onProgress(Math.round((e.loaded / e.total) * 100));
+            }
+          }
+        : undefined,
+    }
+  );
+  return data;
+}
+
 export function getAssetFileUrl(assetId: string, filename: string): string {
   const baseUrl = apiClient.defaults.baseURL ?? "http://localhost:8000";
   return `${baseUrl}/assets/${assetId}/files/${filename}`;
+}
+
+export async function exportMesh(
+  assetId: string,
+  req: ExportRequest
+): Promise<ExportResponse> {
+  const { data } = await apiClient.post<ExportResponse>(
+    `/assets/${assetId}/export`,
+    req
+  );
+  return data;
+}
+
+export async function getAssetExports(
+  assetId: string
+): Promise<{ exports: ExportListItem[] }> {
+  const { data } = await apiClient.get<{ exports: ExportListItem[] }>(
+    `/assets/${assetId}/exports`
+  );
+  return data;
 }

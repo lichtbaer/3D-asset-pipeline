@@ -61,6 +61,19 @@
   margin-bottom: var(--space-xl);
 }
 
+.pipeline-page__upload-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+.pipeline-page__upload-hint {
+  font-size: var(--font-size-sm);
+  color: var(--text);
+}
+
 /* Animation form — single definition (removed duplicate) */
 .animation-form__presets {
   display: flex;

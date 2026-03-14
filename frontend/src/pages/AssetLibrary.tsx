@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { listAssets } from "../api/assets.js";
 import { getSketchfabStatus } from "../api/sketchfab.js";
 import { AssetDetailModal } from "../components/assets/AssetDetailModal.js";
+import { AssetUploadZone } from "../components/assets/AssetUploadZone.js";
 import { SketchfabImportModal } from "../components/assets/SketchfabImportModal.js";
 import type { AssetListItem } from "../api/assets.js";
 
@@ -181,6 +182,11 @@ export function AssetLibrary() {
           </Link>
         </div>
       </header>
+
+      <div className="asset-library__upload-row">
+        <AssetUploadZone type="image" />
+        <AssetUploadZone type="mesh" />
+      </div>
 
       {isLoading && !assets && (
         <div className="asset-library__loading">

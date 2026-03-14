@@ -44,6 +44,28 @@ class RepairRequest(BaseModel):
     )
 
 
+class ClipFloorRequest(BaseModel):
+    """Request für POST /assets/{asset_id}/process/clip-floor."""
+
+    source_file: str = Field(..., description="z.B. mesh.glb")
+    y_threshold: float | None = Field(
+        default=None,
+        description="Y-Schwellwert; null = Auto-Detect (untere 5%)",
+    )
+
+
+class RemoveComponentsRequest(BaseModel):
+    """Request für POST /assets/{asset_id}/process/remove-components."""
+
+    source_file: str = Field(..., description="z.B. mesh.glb")
+    min_component_ratio: float = Field(
+        default=0.05,
+        ge=0.0,
+        le=1.0,
+        description="Komponenten unter X% der Hauptmesh-Größe werden entfernt",
+    )
+
+
 class ProcessingResult(BaseModel):
     """Response für simplify/repair."""
 

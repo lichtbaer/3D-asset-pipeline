@@ -1,26 +1,37 @@
 """Asset-API: persistente Speicherung von Pipeline-Outputs."""
 
+import asyncio
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
 from app.schemas.asset import (
     AssetDetailResponse,
     AssetListItem,
-    AssetStepInfo,
     CreateAssetResponse,
+    ExportListItem,
+    ExportRequest,
+    ExportResponse,
+    ExportsListResponse,
+    AssetStepInfo,
     SketchfabUploadInfo,
+    UploadAssetResponse,
 )
 from app.schemas.mesh_processing import (
+    ClipFloorRequest,
     MeshAnalysis,
+    RemoveComponentsRequest,
     RepairRequest,
     SimplifyRequest,
 )
 from app.services import asset_service
+from app.services.mesh_export_service import export as mesh_export, list_exports
 from app.services.mesh_processing_service import (
     analyze as mesh_analyze,
+    clip_floor as mesh_clip_floor,
     repair as mesh_repair,
+    remove_small_components as mesh_remove_components,
     simplify as mesh_simplify,
 )
 
@@ -84,6 +95,78 @@ def _to_sketchfab_upload_info(
     )
 
 
+# Upload-Endpunkte (vor /{asset_id} definieren)
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+IMAGE_MAX_BYTES = 20 * 1024 * 1024  # 20 MB
+MESH_EXTENSIONS = {".glb", ".gltf", ".obj", ".ply", ".stl", ".zip"}
+MESH_MAX_BYTES = 100 * 1024 * 1024  # 100 MB
+
+
+@router.post("/upload/image", response_model=UploadAssetResponse)
+async def upload_image(
+    file: UploadFile = File(...),
+    name: str | None = Form(None),
+):
+    """Bild hochladen (JPG, PNG, WebP, max. 20 MB). Erstellt Asset mit steps.image."""
+    ext = Path(file.filename or "").suffix.lower()
+    if ext not in IMAGE_EXTENSIONS:
+        raise HTTPException(
+            400,
+            detail=f"Ungültiges Format. Erlaubt: {', '.join(IMAGE_EXTENSIONS)}",
+        )
+    content = await file.read()
+    if len(content) > IMAGE_MAX_BYTES:
+        raise HTTPException(
+            400,
+            detail=f"Datei zu groß. Maximum: {IMAGE_MAX_BYTES // (1024*1024)} MB",
+        )
+    target_ext = ext if ext in IMAGE_EXTENSIONS else ".png"
+    target_filename = f"image_original{target_ext}"
+    asset_id = asset_service.create_asset_from_image_upload(
+        content, file.filename or "image" + ext, name
+    )
+    return UploadAssetResponse(asset_id=asset_id, file=target_filename)
+
+
+@router.post("/upload/mesh", response_model=UploadAssetResponse)
+async def upload_mesh(
+    file: UploadFile = File(...),
+    name: str | None = Form(None),
+    mtl_file: UploadFile | None = File(None),
+):
+    """3D-Modell hochladen (GLB, GLTF, OBJ, PLY, STL, ZIP; max. 100 MB). Konvertiert zu GLB."""
+    ext = Path(file.filename or "").suffix.lower()
+    if ext not in MESH_EXTENSIONS:
+        raise HTTPException(
+            400,
+            detail=f"Ungültiges Format. Erlaubt: {', '.join(MESH_EXTENSIONS)}",
+        )
+    content = await file.read()
+    if len(content) > MESH_MAX_BYTES:
+        raise HTTPException(
+            400,
+            detail=f"Datei zu groß. Maximum: {MESH_MAX_BYTES // (1024*1024)} MB",
+        )
+    mtl_bytes: bytes | None = None
+    mtl_filename: str | None = None
+    if mtl_file and mtl_file.filename:
+        mtl_ext = Path(mtl_file.filename).suffix.lower()
+        if mtl_ext == ".mtl":
+            mtl_bytes = await mtl_file.read()
+            mtl_filename = Path(mtl_file.filename).name
+    try:
+        asset_id = asset_service.create_asset_from_mesh_upload(
+            content,
+            file.filename or "mesh" + ext,
+            name,
+            mtl_bytes=mtl_bytes,
+            mtl_filename=mtl_filename,
+        )
+    except ValueError as e:
+        raise HTTPException(400, detail=str(e)) from e
+    return UploadAssetResponse(asset_id=asset_id, file="mesh.glb")
+
+
 @router.get("/{asset_id}", response_model=AssetDetailResponse)
 async def get_asset(asset_id: str):
     """Vollständige metadata.json eines Assets."""
@@ -102,6 +185,7 @@ async def get_asset(asset_id: str):
         sketchfab_url=meta.sketchfab_url,
         sketchfab_author=meta.sketchfab_author,
         downloaded_at=meta.downloaded_at,
+        exports=meta.exports,
     )
 
 
@@ -152,9 +236,39 @@ async def process_repair(asset_id: str, body: RepairRequest):
         raise HTTPException(404, detail=str(e)) from e
 
 
+@router.post("/{asset_id}/process/clip-floor")
+async def process_clip_floor(asset_id: str, body: ClipFloorRequest):
+    """Boden unterhalb Y-Schwellwert abschneiden, speichert mesh_clipped.glb."""
+    if not asset_service.get_asset(asset_id):
+        raise HTTPException(404, detail="Asset nicht gefunden")
+    try:
+        _output_file, result = mesh_clip_floor(
+            asset_id, body.source_file, body.y_threshold
+        )
+        return result
+    except FileNotFoundError as e:
+        raise HTTPException(404, detail=str(e)) from e
+
+
+@router.post("/{asset_id}/process/remove-components")
+async def process_remove_components(asset_id: str, body: RemoveComponentsRequest):
+    """Kleine isolierte Komponenten entfernen, speichert mesh_cleaned.glb."""
+    if not asset_service.get_asset(asset_id):
+        raise HTTPException(404, detail="Asset nicht gefunden")
+    try:
+        _output_file, result = mesh_remove_components(
+            asset_id,
+            body.source_file,
+            body.min_component_ratio,
+        )
+        return result
+    except FileNotFoundError as e:
+        raise HTTPException(404, detail=str(e)) from e
+
+
 @router.get("/{asset_id}/files/{filename}")
 async def get_asset_file(asset_id: str, filename: str):
-    """Static-File-Download für Asset-Dateien (Bild, GLB)."""
+    """Static-File-Download für Asset-Dateien (Bild, GLB, Export-Formate)."""
     path = asset_service.get_file_path(asset_id, filename)
     if not path:
         raise HTTPException(404, detail="Datei nicht gefunden")
@@ -165,11 +279,49 @@ async def get_asset_file(asset_id: str, filename: str):
         ".png": "image/png",
         ".jpg": "image/jpeg",
         ".jpeg": "image/jpeg",
+        ".webp": "image/webp",
         ".glb": "model/gltf-binary",
+        ".stl": "model/stl",
+        ".obj": "text/plain",
+        ".mtl": "text/plain",
+        ".ply": "application/octet-stream",
+        ".gltf": "model/gltf+json",
+        ".bin": "application/octet-stream",
+        ".zip": "application/zip",
     }
     media_type = media_types.get(suffix, "application/octet-stream")
 
     return FileResponse(path, media_type=media_type)
+
+
+@router.post("/{asset_id}/export", response_model=ExportResponse)
+async def export_asset(asset_id: str, body: ExportRequest):
+    """Mesh in Zielformat exportieren (STL, OBJ, PLY, GLTF)."""
+    if not asset_service.get_asset(asset_id):
+        raise HTTPException(404, detail="Asset nicht gefunden")
+    try:
+        result = await asyncio.to_thread(
+            mesh_export,
+            asset_id=asset_id,
+            source_file=body.source_file,
+            target_format=body.format,
+        )
+        return ExportResponse(**result)
+    except FileNotFoundError as e:
+        raise HTTPException(404, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(400, detail=str(e)) from e
+
+
+@router.get("/{asset_id}/exports", response_model=ExportsListResponse)
+async def get_asset_exports(asset_id: str):
+    """Liste aller vorhandenen Exports des Assets."""
+    if not asset_service.get_asset(asset_id):
+        raise HTTPException(404, detail="Asset nicht gefunden")
+    exports = list_exports(asset_id)
+    return ExportsListResponse(
+        exports=[ExportListItem(**e) for e in exports]
+    )
 
 
 @router.delete("/{asset_id}", status_code=204)

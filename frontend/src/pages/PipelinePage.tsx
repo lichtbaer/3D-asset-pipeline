@@ -79,8 +79,12 @@ import { useAssetFromUrl } from "../hooks/useAssetFromUrl.js";
 import { getAssetFileUrl } from "../api/assets.js";
 import { getSketchfabStatus } from "../api/sketchfab.js";
 import { getMeshSources } from "../api/meshProcessing.js";
-import { MeshProcessingPanel } from "../components/assets/MeshProcessingPanel.js";
+import {
+  MeshProcessingPanel,
+  ProcessingResultsList,
+} from "../components/assets/MeshProcessingPanel.js";
 import { AssetPickerModal } from "../components/assets/AssetPickerModal.js";
+import { AssetUploadZone } from "../components/assets/AssetUploadZone.js";
 import { SketchfabImportModal } from "../components/assets/SketchfabImportModal.js";
 import { useToast } from "../components/ui/ToastContext.js";
 import { PipelineStepper, type PipelineStep } from "../components/ui/PipelineStepper.js";
@@ -976,6 +980,21 @@ export function PipelinePage() {
             </button>
           </div>
           <section className="pipeline-page__form">
+            <div className="pipeline-page__upload-row">
+              <AssetUploadZone
+                type="image"
+                compact
+                onSuccess={(assetId, file) => {
+                  setSearchParams({ tab: "bgremoval", assetId });
+                  setBgRemovalSourceImageUrl(
+                    getAssetFileUrl(assetId, file ?? "image_original.png")
+                  );
+                }}
+              />
+              <span className="pipeline-page__upload-hint">
+                oder Bild generieren:
+              </span>
+            </div>
             {imageMode === "single" ? (
               <PromptForm
                 models={models}
@@ -1077,6 +1096,21 @@ export function PipelinePage() {
             </button>
           </div>
           <section className="pipeline-page__form">
+            <div className="pipeline-page__upload-row">
+              <AssetUploadZone
+                type="mesh"
+                compact
+                onSuccess={(assetId, file) => {
+                  setSearchParams({ tab: "rigging", assetId });
+                  setRiggingSourceGlbUrl(
+                    getAssetFileUrl(assetId, file ?? "mesh.glb")
+                  );
+                }}
+              />
+              <span className="pipeline-page__upload-hint">
+                oder Mesh aus Bild generieren:
+              </span>
+            </div>
             {meshMode === "single" ? (
               <MeshForm
                 sourceImageUrl={meshSourceImageUrl}
@@ -1268,7 +1302,24 @@ export function PipelinePage() {
             )}
           </div>
           {urlAssetId ? (
-            <MeshProcessingPanel assetId={urlAssetId} />
+            <>
+              <MeshProcessingPanel assetId={urlAssetId} />
+              {urlAsset?.processing && urlAsset.processing.length > 0 && (
+                <ProcessingResultsList
+                  assetId={urlAssetId}
+                  processing={urlAsset.processing}
+                  onUseForRigging={(url, _assetId) => {
+                    setRiggingSourceGlbUrl(url);
+                    setSearchParams((prev) => {
+                      const next = new URLSearchParams(prev);
+                      next.set("tab", "rigging");
+                      next.set("assetId", urlAssetId);
+                      return next;
+                    });
+                  }}
+                />
+              )}
+            </>
           ) : (
             <p className="pipeline-asset-context__empty">
               Wähle ein Asset aus der Bibliothek, um Mesh-Bearbeitung
