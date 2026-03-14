@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.database import check_db_connection
-from app.routers import generation
+from app.routers import generation, internal_tasks
 
 from app.config.storage import (
     ANIMATION_STORAGE_PATH,
@@ -30,6 +30,7 @@ IMAGE_STORAGE_PATH.mkdir(parents=True, exist_ok=True)
 app = FastAPI(title="Purzel ML Asset Pipeline API")
 app.include_router(generation.router)
 app.include_router(assets.router)
+app.include_router(internal_tasks.router)
 app.mount("/static/meshes", StaticFiles(directory=str(MESH_STORAGE_PATH)), name="meshes")
 app.mount(
     "/static/bgremoval",
