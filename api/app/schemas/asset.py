@@ -58,6 +58,10 @@ class AssetDetailResponse(BaseModel):
         default_factory=list,
         description="Mesh-Processing-Einträge (simplify, repair)",
     )
+    image_processing: list[dict] = Field(
+        default_factory=list,
+        description="Bild-Nachbearbeitung (crop, resize, center, pad_square)",
+    )
     sketchfab_upload: SketchfabUploadInfo | None = None
     source: str | None = None
     sketchfab_uid: str | None = None

@@ -37,6 +37,7 @@ class AssetMetadata:
         updated_at: str,
         steps: dict[str, dict[str, Any]],
         processing: list[dict[str, Any]] | None = None,
+        image_processing: list[dict[str, Any]] | None = None,
         sketchfab_upload: dict[str, Any] | None = None,
         source: str | None = None,
         sketchfab_uid: str | None = None,
@@ -56,6 +57,7 @@ class AssetMetadata:
         self.updated_at = updated_at
         self.steps = steps
         self.processing = processing or []
+        self.image_processing = image_processing or []
         self.sketchfab_upload = sketchfab_upload
         self.source = source
         self.sketchfab_uid = sketchfab_uid
@@ -77,6 +79,7 @@ class AssetMetadata:
             "updated_at": self.updated_at,
             "steps": self.steps,
             "processing": self.processing,
+            "image_processing": self.image_processing,
             "exports": self.exports,
         }
         if self.sketchfab_upload is not None:
@@ -179,6 +182,7 @@ def get_asset(asset_id: str) -> AssetMetadata | None:
         updated_at=data["updated_at"],
         steps=data.get("steps", {}),
         processing=data.get("processing", []),
+        image_processing=data.get("image_processing", []),
         sketchfab_upload=data.get("sketchfab_upload"),
         source=data.get("source"),
         sketchfab_uid=data.get("sketchfab_uid"),
@@ -380,6 +384,31 @@ def append_processing_entry(asset_id: str, entry: dict[str, Any]) -> None:
     meta["processing"].append(entry)
     meta["updated_at"] = datetime.now(timezone.utc).isoformat()
     meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+
+
+def append_image_processing_entry(asset_id: str, entry: dict[str, Any]) -> None:
+    """Fügt Eintrag zum image_processing-Array in metadata.json hinzu."""
+    meta_path = _metadata_path(asset_id)
+    if not meta_path.exists():
+        raise FileNotFoundError(f"Asset {asset_id} existiert nicht")
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    if "image_processing" not in meta:
+        meta["image_processing"] = []
+    meta["image_processing"].append(entry)
+    meta["updated_at"] = datetime.now(timezone.utc).isoformat()
+    meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+
+
+def list_image_files(asset_id: str) -> list[str]:
+    """Listet alle Bild-Dateien im Asset-Ordner (PNG, JPG, WebP)."""
+    asset_path = _asset_dir(asset_id)
+    if not asset_path.exists():
+        return []
+    return sorted(
+        f.name
+        for f in asset_path.iterdir()
+        if f.is_file() and f.suffix.lower() in (".png", ".jpg", ".jpeg", ".webp")
+    )
 
 
 def update_metadata_fields(asset_id: str, fields: dict[str, Any]) -> None:
