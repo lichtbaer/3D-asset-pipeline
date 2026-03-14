@@ -479,6 +479,29 @@
   font-family: inherit;
 }
 
+.mesh-processing__artifact-cleanup {
+  margin-top: var(--space-lg);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border);
+}
+
+.mesh-processing__artifact-cleanup .mesh-processing__clip-floor,
+.mesh-processing__artifact-cleanup .mesh-processing__remove-components {
+  margin-bottom: var(--space-lg);
+}
+
+.mesh-processing__subsection-title {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  margin: 0 0 var(--space-xs);
+}
+
+.mesh-processing__info {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  margin: 0 0 var(--space-sm);
+}
+
 .mesh-processing__checkboxes {
   display: flex;
   flex-direction: column;

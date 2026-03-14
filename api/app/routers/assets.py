@@ -12,14 +12,18 @@ from app.schemas.asset import (
     CreateAssetResponse,
 )
 from app.schemas.mesh_processing import (
+    ClipFloorRequest,
     MeshAnalysis,
+    RemoveComponentsRequest,
     RepairRequest,
     SimplifyRequest,
 )
 from app.services import asset_service
 from app.services.mesh_processing_service import (
     analyze as mesh_analyze,
+    clip_floor as mesh_clip_floor,
     repair as mesh_repair,
+    remove_small_components as mesh_remove_components,
     simplify as mesh_simplify,
 )
 
@@ -122,6 +126,36 @@ async def process_repair(asset_id: str, body: RepairRequest):
             asset_id, body.source_file, body.operations
         )
         return {"output_file": output_file, "processing": entry}
+    except FileNotFoundError as e:
+        raise HTTPException(404, detail=str(e)) from e
+
+
+@router.post("/{asset_id}/process/clip-floor")
+async def process_clip_floor(asset_id: str, body: ClipFloorRequest):
+    """Boden unterhalb Y-Schwellwert abschneiden, speichert mesh_clipped.glb."""
+    if not asset_service.get_asset(asset_id):
+        raise HTTPException(404, detail="Asset nicht gefunden")
+    try:
+        _output_file, result = mesh_clip_floor(
+            asset_id, body.source_file, body.y_threshold
+        )
+        return result
+    except FileNotFoundError as e:
+        raise HTTPException(404, detail=str(e)) from e
+
+
+@router.post("/{asset_id}/process/remove-components")
+async def process_remove_components(asset_id: str, body: RemoveComponentsRequest):
+    """Kleine isolierte Komponenten entfernen, speichert mesh_cleaned.glb."""
+    if not asset_service.get_asset(asset_id):
+        raise HTTPException(404, detail="Asset nicht gefunden")
+    try:
+        _output_file, result = mesh_remove_components(
+            asset_id,
+            body.source_file,
+            body.min_component_ratio,
+        )
+        return result
     except FileNotFoundError as e:
         raise HTTPException(404, detail=str(e)) from e
 

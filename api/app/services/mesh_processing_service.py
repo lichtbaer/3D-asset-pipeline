@@ -7,6 +7,7 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
+import numpy as np
 import open3d as o3d
 import trimesh
 
@@ -177,3 +178,125 @@ def repair(
         [op.value for op in operations],
     )
     return output_filename, entry
+
+
+def clip_floor(
+    asset_id: str,
+    source_file: str,
+    y_threshold: float | None = None,
+) -> tuple[str, dict]:
+    """
+    Schneidet alles unterhalb eines Y-Schwellwerts ab.
+    y_threshold=None → Auto-Detect: untere 5% der Bounding Box.
+    Speichert mesh_clipped.glb.
+    """
+    source_path = _asset_mesh_path(asset_id, source_file)
+    mesh = o3d.io.read_triangle_mesh(str(source_path))
+
+    vertices = np.asarray(mesh.vertices)
+    triangles = np.asarray(mesh.triangles)
+    vertex_count_before = len(vertices)
+    face_count_before = len(triangles)
+
+    if y_threshold is None:
+        y_min = float(vertices[:, 1].min())
+        y_max = float(vertices[:, 1].max())
+        y_threshold = y_min + (y_max - y_min) * 0.05
+
+    v0_y = vertices[triangles[:, 0], 1]
+    v1_y = vertices[triangles[:, 1], 1]
+    v2_y = vertices[triangles[:, 2], 1]
+    all_above = (v0_y >= y_threshold) & (v1_y >= y_threshold) & (v2_y >= y_threshold)
+    triangles_to_remove = ~all_above
+
+    mesh.remove_triangles_by_mask(triangles_to_remove)
+    mesh.remove_unreferenced_vertices()
+
+    vertex_count_after = len(np.asarray(mesh.vertices))
+    face_count_after = len(np.asarray(mesh.triangles))
+
+    output_filename = "mesh_clipped.glb"
+    output_path = asset_service.get_asset_dir(asset_id) / output_filename
+    o3d.io.write_triangle_mesh(str(output_path), mesh)
+
+    processed_at = datetime.now(timezone.utc).isoformat()
+    entry = {
+        "operation": "clip_floor",
+        "params": {"y_threshold": y_threshold},
+        "source_file": source_file,
+        "output_file": output_filename,
+        "processed_at": processed_at,
+    }
+    asset_service.append_processing_entry(asset_id, entry)
+    logger.info(
+        "Asset %s: clip_floor %s -> %s (y=%.4f, removed %d verts, %d faces)",
+        asset_id,
+        source_file,
+        output_filename,
+        y_threshold,
+        vertex_count_before - vertex_count_after,
+        face_count_before - face_count_after,
+    )
+    return output_filename, {
+        "output_file": output_filename,
+        "y_threshold_used": y_threshold,
+        "vertices_removed": vertex_count_before - vertex_count_after,
+        "faces_removed": face_count_before - face_count_after,
+    }
+
+
+def remove_small_components(
+    asset_id: str,
+    source_file: str,
+    min_component_ratio: float = 0.05,
+) -> tuple[str, dict]:
+    """
+    Entfernt kleine, nicht verbundene Komponenten.
+    Komponenten kleiner als min_component_ratio * Hauptmesh werden entfernt.
+    Speichert mesh_cleaned.glb.
+    """
+    source_path = _asset_mesh_path(asset_id, source_file)
+    mesh = o3d.io.read_triangle_mesh(str(source_path))
+
+    triangle_clusters, cluster_n_triangles, _ = mesh.cluster_connected_triangles()
+    triangle_clusters = np.asarray(triangle_clusters)
+    cluster_n_triangles = np.asarray(cluster_n_triangles)
+
+    max_cluster = int(cluster_n_triangles.max())
+    threshold = max_cluster * min_component_ratio
+    components_found = len(cluster_n_triangles)
+
+    triangles_to_remove = cluster_n_triangles[triangle_clusters] < threshold
+    triangles_removed = int(triangles_to_remove.sum())
+    components_removed = int((cluster_n_triangles < threshold).sum())
+
+    mesh.remove_triangles_by_mask(triangles_to_remove)
+    mesh.remove_unreferenced_vertices()
+
+    output_filename = "mesh_cleaned.glb"
+    output_path = asset_service.get_asset_dir(asset_id) / output_filename
+    o3d.io.write_triangle_mesh(str(output_path), mesh)
+
+    processed_at = datetime.now(timezone.utc).isoformat()
+    entry = {
+        "operation": "remove_components",
+        "params": {"min_component_ratio": min_component_ratio},
+        "source_file": source_file,
+        "output_file": output_filename,
+        "processed_at": processed_at,
+    }
+    asset_service.append_processing_entry(asset_id, entry)
+    logger.info(
+        "Asset %s: remove_components %s -> %s (removed %d components, %d triangles)",
+        asset_id,
+        source_file,
+        output_filename,
+        components_removed,
+        triangles_removed,
+    )
+    return output_filename, {
+        "output_file": output_filename,
+        "components_found": components_found,
+        "components_removed": components_removed,
+        "triangles_removed": triangles_removed,
+    }
