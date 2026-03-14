@@ -23,6 +23,24 @@
   background: var(--accent-bg);
 }
 
+.layout {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.layout-main {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.layout-content {
+  flex: 1;
+  overflow: auto;
+}
+
 .counter {
   font-size: 16px;
   padding: 5px 10px;

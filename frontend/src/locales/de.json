@@ -1,0 +1,25 @@
+{
+  "tasks": {
+    "panel": {
+      "title": "Subagenten-Tasks",
+      "active": "Aktive Tasks",
+      "recent": "Letzte Tasks",
+      "integrate": "Integrieren",
+      "noTasks": "Keine Tasks",
+      "empty": "Keine aktiven oder abgeschlossenen Tasks."
+    },
+    "status": {
+      "pending": "Ausstehend",
+      "running": "Läuft",
+      "completed": "Abgeschlossen",
+      "failed": "Fehlgeschlagen",
+      "timeout": "Timeout"
+    },
+    "type": {
+      "repo_analyzer": "Repository-Analyse",
+      "pr_reviewer": "PR-Review",
+      "debt_scanner": "Debt-Scanner",
+      "doc_agent": "Dokumentation"
+    }
+  }
+}

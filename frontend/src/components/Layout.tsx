@@ -1,8 +1,9 @@
 import { NavLink, Outlet } from "react-router-dom";
+import { SubagentTaskPanel } from "./aria/SubagentTaskPanel.js";
 
 export function Layout() {
   return (
-    <>
+    <div className="layout">
       <nav className="main-nav" role="navigation">
         <NavLink
           to="/pipeline"
@@ -21,7 +22,12 @@ export function Layout() {
           Bibliothek
         </NavLink>
       </nav>
-      <Outlet />
-    </>
+      <div className="layout-main">
+        <main className="layout-content">
+          <Outlet />
+        </main>
+        <SubagentTaskPanel />
+      </div>
+    </div>
   );
 }

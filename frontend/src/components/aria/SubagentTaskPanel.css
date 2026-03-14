@@ -1,0 +1,117 @@
+.subagent-task-panel {
+  padding: var(--space-md);
+  background: var(--bg);
+  border-left: 1px solid var(--border);
+  min-width: 280px;
+  max-width: 320px;
+}
+
+.subagent-task-panel__title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 var(--space-md);
+}
+
+.subagent-task-panel__section {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-muted, #666);
+  margin: var(--space-sm) 0;
+}
+
+.subagent-task-panel__loading,
+.subagent-task-panel__empty,
+.subagent-task-panel__error {
+  font-size: 0.9rem;
+  color: var(--text-muted, #666);
+  margin: 0;
+}
+
+.subagent-task-panel__error {
+  color: var(--error, #c00);
+}
+
+.subagent-task-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85rem;
+}
+
+.subagent-task-type {
+  font-weight: 500;
+}
+
+.subagent-task-badge {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.subagent-task-badge--pending {
+  background: #888;
+  color: #fff;
+}
+
+.subagent-task-badge--running {
+  background: #36c;
+  color: #fff;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.subagent-task-badge--completed {
+  background: #2a2;
+  color: #fff;
+}
+
+.subagent-task-badge--failed {
+  background: #c00;
+  color: #fff;
+}
+
+.subagent-task-badge--timeout {
+  background: #f80;
+  color: #fff;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.subagent-task-subproject {
+  color: var(--text-muted, #666);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.subagent-task-age,
+.subagent-task-heartbeat {
+  font-size: 0.8rem;
+  color: var(--text-muted, #666);
+}
+
+.subagent-task-integrate {
+  padding: 4px 8px;
+  font-size: 0.8rem;
+  background: var(--accent);
+  color: var(--accent-fg, #fff);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.subagent-task-integrate:hover {
+  opacity: 0.9;
+}
