@@ -1328,6 +1328,42 @@
   padding: var(--space-xs);
 }
 
+.mesh-processing__texture-baking {
+  margin-top: var(--space-lg);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border-color);
+}
+
+.mesh-processing__texture-baking h4 {
+  margin: 0 0 var(--space-sm);
+}
+
+.mesh-processing__texture-baking-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  margin-bottom: var(--space-sm);
+}
+
+.mesh-processing__texture-baking-fields .mesh-processing__source {
+  flex: 1 1 200px;
+}
+
+.mesh-processing__texture-baking-resolution,
+.mesh-processing__texture-baking-types {
+  flex: 1 1 100%;
+}
+
+.mesh-processing__texture-baking-results {
+  margin-top: var(--space-md);
+}
+
+.mesh-processing__error {
+  color: var(--color-danger, #c00);
+  font-size: var(--font-size-sm);
+  margin-top: var(--space-sm);
+}
+
 .export-panel__export-item {
   display: flex;
   align-items: center;

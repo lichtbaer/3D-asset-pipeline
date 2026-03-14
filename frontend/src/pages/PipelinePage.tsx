@@ -1311,7 +1311,19 @@ export function PipelinePage() {
           </div>
           {urlAssetId ? (
             <>
-              <MeshProcessingPanel assetId={urlAssetId} />
+              <MeshProcessingPanel
+                assetId={urlAssetId}
+                textureBaking={urlAsset?.texture_baking ?? []}
+                onUseForRigging={(url) => {
+                  setRiggingSourceGlbUrl(url);
+                  setSearchParams((prev) => {
+                    const next = new URLSearchParams(prev);
+                    next.set("tab", "rigging");
+                    next.set("assetId", urlAssetId);
+                    return next;
+                  });
+                }}
+              />
               {urlAsset?.processing && urlAsset.processing.length > 0 && (
                 <ProcessingResultsList
                   assetId={urlAssetId}

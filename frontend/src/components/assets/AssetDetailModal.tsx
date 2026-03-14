@@ -461,7 +461,11 @@ export function AssetDetailModal({
             <section ref={exportSectionRef}>
               <ExportPanel assetId={data.asset_id} />
             </section>
-            <MeshProcessingPanel assetId={data.asset_id} />
+            <MeshProcessingPanel
+              assetId={data.asset_id}
+              textureBaking={data.texture_baking ?? []}
+              onUseForRigging={handleUseForRigging}
+            />
             <section ref={sketchfabSectionRef}>
               <SketchfabPanel
                 assetId={data.asset_id}

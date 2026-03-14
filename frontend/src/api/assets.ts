@@ -45,6 +45,15 @@ export interface ImageProcessingEntry {
   processed_at: string;
 }
 
+export interface TextureBakingEntry {
+  source_mesh: string;
+  target_mesh: string;
+  output_file: string;
+  resolution: number;
+  bake_types: string[];
+  baked_at: string;
+}
+
 export interface AssetDetail {
   asset_id: string;
   created_at: string;
@@ -52,6 +61,7 @@ export interface AssetDetail {
   steps: Record<string, Record<string, unknown>>;
   processing?: ProcessingEntry[];
   image_processing?: ImageProcessingEntry[];
+  texture_baking?: TextureBakingEntry[];
   sketchfab_upload?: SketchfabUploadInfo | null;
   source?: string | null;
   sketchfab_uid?: string | null;
@@ -301,6 +311,47 @@ export async function deleteAssetStep(
   if (options?.force) params.set("force", "true");
   const { data } = await apiClient.delete<StepDeleteResponse>(
     `/assets/${assetId}/steps/${stepName}?${params.toString()}`
+  );
+  return data;
+}
+
+export interface TextureBakeRequest {
+  source_mesh: string;
+  target_mesh: string;
+  resolution?: number;
+  bake_types?: string[];
+}
+
+export interface TextureBakeStartResponse {
+  job_id: string;
+  status: string;
+}
+
+export interface TextureBakeStatusResponse {
+  job_id: string;
+  status: string;
+  output_file?: string | null;
+  duration_seconds?: number | null;
+  error_msg?: string | null;
+}
+
+export async function startTextureBake(
+  assetId: string,
+  req: TextureBakeRequest
+): Promise<TextureBakeStartResponse> {
+  const { data } = await apiClient.post<TextureBakeStartResponse>(
+    `/assets/${assetId}/texture/bake`,
+    req
+  );
+  return data;
+}
+
+export async function getTextureBakeStatus(
+  assetId: string,
+  jobId: string
+): Promise<TextureBakeStatusResponse> {
+  const { data } = await apiClient.get<TextureBakeStatusResponse>(
+    `/assets/${assetId}/texture/bake/status/${jobId}`
   );
   return data;
 }
