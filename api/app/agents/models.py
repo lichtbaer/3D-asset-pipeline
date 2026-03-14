@@ -1,6 +1,50 @@
 """Gemeinsame Pydantic-Modelle für alle Agent-Outputs."""
 
+from typing import Literal
+
 from pydantic import BaseModel, Field, field_validator
+
+
+# Valide Issue-Typen für Qualitätsbewertung
+QualityIssueType = Literal[
+    "floor_artifact",
+    "missing_limb",
+    "bad_topology",
+    "not_watertight",
+    "floating_geometry",
+    "low_detail",
+    "high_poly",
+    "pose_issue",
+]
+
+# Valide Severity-Stufen
+QualityIssueSeverity = Literal["low", "medium", "high"]
+
+# Valide empfohlene Aktionen
+RecommendedActionType = Literal[
+    "clip_floor",
+    "repair_mesh",
+    "remove_components",
+    "simplify",
+    "rig",
+    "animate",
+    "export_stl",
+    "export_obj",
+    "sketchfab_upload",
+]
+
+# Valide Workflow-Schritte
+WorkflowStepType = Literal[
+    "clip_floor",
+    "repair_mesh",
+    "remove_components",
+    "simplify",
+    "rig",
+    "animate",
+    "export_stl",
+    "export_obj",
+    "sketchfab_upload",
+]
 
 
 class AgentError(BaseModel):
@@ -49,15 +93,15 @@ class PromptSuggestion(BaseModel):
 class QualityIssue(BaseModel):
     """Ein erkanntes Qualitätsproblem."""
 
-    type: str  # "floor_artifact", "missing_limb", "bad_topology", "low_detail"
-    severity: str  # "low", "medium", "high"
+    type: QualityIssueType
+    severity: QualityIssueSeverity
     description: str
 
 
 class RecommendedAction(BaseModel):
     """Empfohlene Aktion zur Verbesserung."""
 
-    action: str  # "clip_floor", "repair_mesh", "simplify", "regenerate"
+    action: RecommendedActionType
     reason: str
     priority: int  # 1 = höchste Priorität
 
@@ -74,7 +118,7 @@ class QualityAssessment(BaseModel):
 class WorkflowRecommendation(BaseModel):
     """Empfehlung für den nächsten Workflow-Schritt."""
 
-    next_step: str  # "clip_floor", "repair", "simplify", "rig", "animate", "export"
+    next_step: WorkflowStepType
     reason: str
-    alternative_steps: list[str]
+    alternative_steps: list[WorkflowStepType]
     warnings: list[str]
