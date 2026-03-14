@@ -19,6 +19,7 @@ from app.schemas.sketchfab import (
     SketchfabUploadResponse,
     SketchfabUploadStatusResponse,
 )
+from app.core.path_security import safe_asset_path
 from app.services import asset_service
 from app.services.sketchfab_service import SketchfabService, SketchfabUploadResult
 from sqlalchemy import select
@@ -70,6 +71,7 @@ async def upload_to_sketchfab(
         raise HTTPException(404, detail="Ungültige Asset-ID")
 
     # Prüfen ob GLB vorhanden
+    safe_asset_path(asset_id, body.source_file)
     path = asset_service.get_file_path(asset_id, body.source_file)
     if not path or not path.exists():
         raise HTTPException(
