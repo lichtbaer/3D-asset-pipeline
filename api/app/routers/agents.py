@@ -1,11 +1,15 @@
 """Agent-API: Prompt-Assistent, Auto-Tagging, Qualitätsbewertung, Workflow-Empfehlung."""
 
+import asyncio
+from pathlib import Path
 from typing import NoReturn
 
 from fastapi import APIRouter, HTTPException
+from pydantic_ai import BinaryContent
 
-from app.agents.models import AgentError, PromptSuggestion
+from app.agents.models import AgentError, PromptSuggestion, TagSuggestion
 from app.agents.prompt_agent import get_prompt_agent
+from app.agents.tagging_agent import get_tagging_agent
 from app.core.config import settings
 from app.schemas.agents import (
     PromptOptimizeRequest,
@@ -13,6 +17,7 @@ from app.schemas.agents import (
     TagsSuggestRequest,
     WorkflowRecommendRequest,
 )
+from app.services import asset_service
 
 router = APIRouter(prefix="/agents", tags=["agents"])
 
@@ -86,21 +91,95 @@ async def optimize_prompt(body: PromptOptimizeRequest) -> PromptSuggestion:
     return output
 
 
+def _build_tag_suggest_message(body: TagsSuggestRequest) -> str:
+    """Baut die User-Nachricht für den Tagging-Agenten."""
+    parts: list[str] = [f"Asset-ID: {body.asset_id}"]
+    if body.prompt:
+        parts.append(f"Generierungs-Prompt: {body.prompt}")
+    if body.original_filename:
+        parts.append(f"Original-Dateiname: {body.original_filename}")
+    if body.pipeline_steps:
+        parts.append(f"Pipeline-Stand: {', '.join(body.pipeline_steps)}")
+    return "\n".join(parts)
+
+
+def _get_preview_image_path(asset_id: str) -> tuple[Path | None, str | None]:
+    """Erstes verfügbares Bild (image oder bgremoval) für Vision-Analyse."""
+    meta = asset_service.get_asset(asset_id)
+    if not meta:
+        return None, None
+    for step in ("image", "bgremoval"):
+        if step in meta.steps and meta.steps[step].get("file"):
+            filename = meta.steps[step]["file"]
+            path = asset_service.get_file_path(asset_id, filename)
+            if path and path.is_file():
+                suffix = Path(filename).suffix.lower()
+                media = "image/png" if suffix == ".png" else "image/jpeg"
+                return path, media
+    return None, None
+
+
 @router.post(
     "/tags/suggest",
-    response_model=None,
+    response_model=TagSuggestion,
     responses={
         503: {"description": "Agent not available", "model": AgentError},
     },
 )
-async def suggest_tags(_body: TagsSuggestRequest) -> NoReturn:
-    """Tags vorschlagen (Implementierung in PURZEL-038)."""
+async def suggest_tags(body: TagsSuggestRequest) -> TagSuggestion:
+    """Tags vorschlagen basierend auf Prompt, Dateiname, Pipeline-Stand und optional Bild."""
     if not settings.agent_available:
         _raise_503("tagging")
-    raise HTTPException(
-        status_code=501,
-        detail="Not implemented (PURZEL-038)",
+    meta = asset_service.get_asset(body.asset_id)
+    if not meta:
+        raise HTTPException(404, detail="Asset nicht gefunden")
+    pipeline_steps = body.pipeline_steps or list(meta.steps.keys())
+    prompt = body.prompt
+    if not prompt:
+        for step_data in meta.steps.values():
+            if isinstance(step_data, dict) and step_data.get("prompt"):
+                prompt = step_data["prompt"]
+                break
+    message = _build_tag_suggest_message(
+        TagsSuggestRequest(
+            asset_id=body.asset_id,
+            prompt=prompt,
+            original_filename=body.original_filename,
+            pipeline_steps=pipeline_steps,
+            include_image_analysis=body.include_image_analysis,
+        )
     )
+    run_input: list[object] = [message]
+    if body.include_image_analysis:
+        img_path, media_type = _get_preview_image_path(body.asset_id)
+        if img_path and media_type:
+            img_bytes = await asyncio.to_thread(img_path.read_bytes)
+            run_input.append(BinaryContent(data=img_bytes, media_type=media_type))
+    agent = get_tagging_agent()
+    try:
+        result = await agent.run(run_input)
+    except Exception as e:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "agent": "tagging",
+                "error_type": "model_error",
+                "message": str(e),
+                "fallback_available": False,
+            },
+        ) from e
+    output = result.output
+    if output is None:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "agent": "tagging",
+                "error_type": "model_error",
+                "message": "Agent returned no output",
+                "fallback_available": False,
+            },
+        )
+    return output
 
 
 @router.post(

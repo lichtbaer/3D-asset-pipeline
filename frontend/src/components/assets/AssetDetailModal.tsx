@@ -7,6 +7,7 @@ import {
   getAssetTags,
   patchAssetMeta,
 } from "../../api/assets.js";
+import { TagSuggestionBanner } from "./TagSuggestionBanner.js";
 import { usePipelineStore } from "../../store/PipelineStore.js";
 import { useFocusTrap } from "../../hooks/useFocusTrap.js";
 import { useEscapeKey } from "../../hooks/useEscapeKey.js";
@@ -44,12 +45,15 @@ interface AssetDetailModalProps {
   assetId: string;
   onClose: () => void;
   onAssetUpdate?: () => void;
+  /** Nach Upload: Tag-Vorschläge automatisch anzeigen. */
+  initialShowTagSuggestions?: boolean;
 }
 
 export function AssetDetailModal({
   assetId,
   onClose,
   onAssetUpdate,
+  initialShowTagSuggestions = false,
 }: AssetDetailModalProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -71,6 +75,8 @@ export function AssetDetailModal({
 
   const [tagInput, setTagInput] = useState("");
   const [showTagSuggestions, setShowTagSuggestions] = useState(false);
+  const [showAiTagSuggestions, setShowAiTagSuggestions] =
+    useState(initialShowTagSuggestions);
   const [notesInput, setNotesInput] = useState("");
   const [nameInput, setNameInput] = useState("");
   const lastSyncedAssetIdRef = useRef<string | null>(null);
@@ -132,6 +138,12 @@ export function AssetDetailModal({
   useEffect(() => {
     lastSyncedAssetIdRef.current = null;
   }, [assetId]);
+
+  useEffect(() => {
+    if (initialShowTagSuggestions) {
+      setShowAiTagSuggestions(true);
+    }
+  }, [initialShowTagSuggestions]);
 
   useEffect(() => {
     if (
@@ -372,6 +384,30 @@ export function AssetDetailModal({
           </div>
           <div className="asset-modal__verwaltung-tags">
             <label className="asset-modal__verwaltung-label">Tags:</label>
+            <div className="asset-modal__tag-actions">
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm"
+                onClick={() => setShowAiTagSuggestions((v) => !v)}
+                aria-pressed={showAiTagSuggestions}
+              >
+                🤖 Tags vorschlagen
+              </button>
+            </div>
+            {showAiTagSuggestions && (
+              <TagSuggestionBanner
+                assetId={assetId}
+                includeImageAnalysis={true}
+                enabled={showAiTagSuggestions}
+                onAssetUpdate={() => {
+                  void queryClient.invalidateQueries({
+                    queryKey: ["asset", assetId],
+                  });
+                  onAssetUpdate?.();
+                }}
+                onDismiss={() => setShowAiTagSuggestions(false)}
+              />
+            )}
             <div className="asset-modal__tag-chips">
               {currentTags.map((t) => (
                 <span key={t} className="asset-modal__tag-chip">
