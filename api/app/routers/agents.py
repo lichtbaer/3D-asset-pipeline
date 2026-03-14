@@ -4,7 +4,8 @@ from typing import NoReturn
 
 from fastapi import APIRouter, HTTPException
 
-from app.agents.models import AgentError
+from app.agents.models import AgentError, PromptSuggestion
+from app.agents.prompt_agent import get_prompt_agent
 from app.core.config import settings
 from app.schemas.agents import (
     PromptOptimizeRequest,
@@ -35,21 +36,54 @@ def _raise_503(agent: str) -> None:
     )
 
 
+def _build_prompt_message(body: PromptOptimizeRequest) -> str:
+    """Baut die User-Nachricht für den Prompt-Agenten."""
+    parts: list[str] = []
+    if body.existing_prompt:
+        parts.append(f"Bestehender Prompt zur Verbesserung:\n{body.existing_prompt}\n")
+    parts.append(f"Charakter-Beschreibung: {body.description}")
+    if body.style:
+        parts.append(f"Gewünschter Stil: {body.style}")
+    parts.append(f"Verwendung: {body.intended_use}")
+    return "\n".join(parts)
+
+
 @router.post(
     "/prompt/optimize",
-    response_model=None,
+    response_model=PromptSuggestion,
     responses={
         503: {"description": "Agent not available", "model": AgentError},
     },
 )
-async def optimize_prompt(_body: PromptOptimizeRequest) -> NoReturn:
-    """Prompt optimieren (Implementierung in PURZEL-037)."""
+async def optimize_prompt(body: PromptOptimizeRequest) -> PromptSuggestion:
+    """Prompt optimieren oder aus Beschreibung generieren (PURZEL-037)."""
     if not settings.agent_available:
         _raise_503("prompt")
-    raise HTTPException(
-        status_code=501,
-        detail="Not implemented (PURZEL-037)",
-    )
+    agent = get_prompt_agent()
+    try:
+        result = await agent.run(_build_prompt_message(body))
+    except Exception as e:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "agent": "prompt",
+                "error_type": "model_error",
+                "message": str(e),
+                "fallback_available": False,
+            },
+        ) from e
+    output = result.output
+    if output is None:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "agent": "prompt",
+                "error_type": "model_error",
+                "message": "Agent returned no output",
+                "fallback_available": False,
+            },
+        )
+    return output
 
 
 @router.post(

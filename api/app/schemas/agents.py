@@ -8,7 +8,16 @@ from pydantic import BaseModel, Field
 class PromptOptimizeRequest(BaseModel):
     """Request für Prompt-Optimierung (PURZEL-037)."""
 
-    prompt: str = Field(..., min_length=1, description="Zu optimierender Prompt")
+    description: str = Field(..., min_length=1, description="Einfache Charakter-Beschreibung")
+    style: str | None = Field(default=None, description="Stil: cartoon, realistic, pixel-art")
+    intended_use: str = Field(
+        default="rigging",
+        description="Verwendung: rigging, mesh_only, 3d_print",
+    )
+    existing_prompt: str | None = Field(
+        default=None,
+        description="Optional: bestehender Prompt zur Verbesserung",
+    )
 
 
 class TagsSuggestRequest(BaseModel):
