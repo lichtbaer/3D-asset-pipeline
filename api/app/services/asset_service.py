@@ -424,3 +424,135 @@ def get_or_create_asset_id(existing_asset_id: str | None) -> str:
     if existing_asset_id and get_asset(existing_asset_id):
         return existing_asset_id
     return create_asset()
+
+
+def create_asset_from_image_upload(
+    file_bytes: bytes,
+    filename: str,
+    name: str | None = None,
+) -> str:
+    """
+    Erstellt Asset aus hochgeladenem Bild.
+    Speichert Bild als image_original.{ext}, metadata mit source: upload.
+    """
+    asset_id = create_asset()
+    asset_path = _asset_dir(asset_id)
+    ext = Path(filename).suffix.lower() or ".png"
+    if ext not in (".jpg", ".jpeg", ".png", ".webp"):
+        ext = ".png"
+    target_filename = f"image_original{ext}"
+    (asset_path / target_filename).write_bytes(file_bytes)
+
+    display_name = name or Path(filename).stem
+    now = datetime.now(timezone.utc).isoformat()
+    step_data: dict[str, Any] = {
+        "job_id": "",
+        "provider_key": "upload",
+        "file": target_filename,
+        "generated_at": now,
+        "source": "upload",
+        "original_filename": filename,
+        "uploaded_at": now,
+        "name": display_name,
+    }
+
+    meta_path = _metadata_path(asset_id)
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    meta["steps"]["image"] = step_data
+    meta["source"] = "upload"
+    meta["original_filename"] = filename
+    meta["uploaded_at"] = now
+    meta["updated_at"] = now
+    meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    return asset_id
+
+
+def create_asset_from_mesh_upload(
+    file_bytes: bytes,
+    filename: str,
+    name: str | None = None,
+    mtl_bytes: bytes | None = None,
+    mtl_filename: str | None = None,
+) -> str:
+    """
+    Erstellt Asset aus hochgeladenem 3D-Modell.
+    Konvertiert STL/OBJ/PLY zu GLB via trimesh, speichert Original als mesh_original.{ext}.
+    """
+    import tempfile
+    import zipfile
+    from io import BytesIO
+
+    import trimesh
+
+    asset_id = create_asset()
+    asset_path = _asset_dir(asset_id)
+    ext = Path(filename).suffix.lower()
+
+    # Original behalten
+    original_ext = ext or ".glb"
+    original_filename = f"mesh_original{original_ext}"
+    (asset_path / original_filename).write_bytes(file_bytes)
+
+    # Temp-Verzeichnis für Laden (OBJ braucht ggf. MTL im selben Ordner)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp = Path(tmpdir)
+        load_path: Path
+
+        if ext == ".zip":
+            with zipfile.ZipFile(BytesIO(file_bytes), "r") as zf:
+                zf.extractall(tmp)
+            obj_files = list(tmp.rglob("*.obj"))
+            if not obj_files:
+                raise ValueError("ZIP enthält keine OBJ-Datei")
+            load_path = obj_files[0]
+        else:
+            mesh_path = tmp / filename
+            mesh_path.write_bytes(file_bytes)
+            if mtl_bytes and mtl_filename:
+                (tmp / mtl_filename).write_bytes(mtl_bytes)
+            load_path = mesh_path
+
+        try:
+            scene = trimesh.load(str(load_path), force="mesh")
+        except Exception as e:
+            raise ValueError(f"3D-Modell konnte nicht geladen werden: {e}") from e
+
+        # Scene oder einzelnes Mesh zu einem Mesh zusammenführen
+        if isinstance(scene, trimesh.Scene):
+            meshes = list(scene.geometry.values())
+            if not meshes:
+                raise ValueError("3D-Modell enthält keine Meshes")
+            mesh = trimesh.util.concatenate(meshes)
+        elif isinstance(scene, trimesh.Trimesh):
+            mesh = scene
+        else:
+            raise ValueError("Unbekanntes 3D-Format")
+
+        glb_bytes = mesh.export(file_type="glb")
+        (asset_path / "mesh.glb").write_bytes(glb_bytes)
+
+    display_name = name or Path(filename).stem
+    now = datetime.now(timezone.utc).isoformat()
+    original_format = ext.lstrip(".") if ext else "glb"
+    step_data: dict[str, Any] = {
+        "job_id": "",
+        "provider_key": "upload",
+        "file": "mesh.glb",
+        "generated_at": now,
+        "source": "upload",
+        "original_filename": filename,
+        "original_format": original_format,
+        "uploaded_at": now,
+        "name": display_name,
+    }
+
+    meta_path = _metadata_path(asset_id)
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    meta["steps"]["mesh"] = step_data
+    meta["source"] = "upload"
+    meta["original_filename"] = filename
+    meta["original_format"] = original_format
+    meta["uploaded_at"] = now
+    meta["updated_at"] = now
+    meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    return asset_id

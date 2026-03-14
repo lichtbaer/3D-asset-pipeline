@@ -44,6 +44,11 @@
   color: white;
 }
 
+.btn--outline.btn--active {
+  background: var(--accent);
+  color: white;
+}
+
 /* Ghost: no border, subtle hover */
 .btn--ghost {
   color: var(--text);
