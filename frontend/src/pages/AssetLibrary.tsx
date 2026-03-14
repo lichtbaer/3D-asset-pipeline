@@ -1,11 +1,18 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { listAssets } from "../api/assets.js";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  listAssets,
+  deleteAsset,
+  deleteAssetBatch,
+  restoreAsset,
+} from "../api/assets.js";
 import { getSketchfabStatus } from "../api/sketchfab.js";
 import { AssetDetailModal } from "../components/assets/AssetDetailModal.js";
 import { AssetUploadZone } from "../components/assets/AssetUploadZone.js";
 import { SketchfabImportModal } from "../components/assets/SketchfabImportModal.js";
+import { DeleteAssetDialog } from "../components/assets/DeleteAssetDialog.js";
+import { TrashActionsDialog } from "../components/assets/TrashActionsDialog.js";
 import type { AssetListItem } from "../api/assets.js";
 
 function formatDate(iso: string): string {
@@ -63,15 +70,21 @@ function StepBadges({ steps }: { steps: Record<string, { file?: string }> }) {
 
 function AssetCardActions({
   asset,
+  isTrashView,
   onNavigate,
   onClick,
 }: {
   asset: AssetListItem;
+  isTrashView: boolean;
   onNavigate: (tab: string, assetId: string) => void;
+  onDelete: (e: React.MouseEvent, assetId: string) => void;
+  onTrashAction: (e: React.MouseEvent, assetId: string) => void;
   onClick: (e: React.MouseEvent) => void;
 }) {
   const hasMesh = "mesh" in asset.steps && asset.steps.mesh?.file;
   const hasRigging = "rigging" in asset.steps && asset.steps.rigging?.file;
+
+  if (isTrashView) return null;
 
   if (!hasMesh && !hasRigging) return null;
 
@@ -132,8 +145,22 @@ function AssetCardActions({
 export function AssetLibrary() {
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [showSketchfabImport, setShowSketchfabImport] = useState(false);
+  const [showTrash, setShowTrash] = useState(false);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deleteDialog, setDeleteDialog] = useState<{
+    mode: "single" | "batch" | "purge";
+    asset?: AssetListItem | null;
+    assetCount?: number;
+    purgeCount?: number;
+    purgeSize?: string;
+  } | null>(null);
+  const [trashActionAsset, setTrashActionAsset] = useState<AssetListItem | null>(
+    null
+  );
 
   const { data: sketchfabEnabled } = useQuery({
     queryKey: ["sketchfab-status"],
@@ -149,8 +176,8 @@ export function AssetLibrary() {
   }, [location.state, location.pathname, navigate]);
 
   const { data: assets, isLoading, error } = useQuery({
-    queryKey: ["assets"],
-    queryFn: listAssets,
+    queryKey: ["assets", showTrash],
+    queryFn: () => listAssets({ includeDeleted: showTrash }),
   });
 
   const baseUrl =
@@ -160,6 +187,62 @@ export function AssetLibrary() {
     navigate(`/pipeline?tab=${tab}&assetId=${encodeURIComponent(assetId)}`);
   };
 
+  const handleDeleteClick = (e: React.MouseEvent, assetId: string) => {
+    e.stopPropagation();
+    const asset = assets?.find((a) => a.asset_id === assetId);
+    if (asset) setDeleteDialog({ mode: "single", asset });
+  };
+
+  const handleTrashActionClick = (e: React.MouseEvent, assetId: string) => {
+    e.stopPropagation();
+    const asset = assets?.find((a) => a.asset_id === assetId);
+    if (asset) setTrashActionAsset(asset);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteDialog) return;
+    if (deleteDialog.mode === "single" && deleteDialog.asset) {
+      await deleteAsset(deleteDialog.asset.asset_id, false);
+    } else if (deleteDialog.mode === "batch" && deleteDialog.assetCount) {
+      await deleteAssetBatch(Array.from(selectedIds), false);
+      setSelectedIds(new Set());
+      setSelectMode(false);
+    }
+    setDeleteDialog(null);
+    void queryClient.invalidateQueries({ queryKey: ["assets"] });
+    void queryClient.invalidateQueries({ queryKey: ["storage"] });
+  };
+
+  const handleConfirmRestore = async () => {
+    if (trashActionAsset) {
+      await restoreAsset(trashActionAsset.asset_id);
+      setTrashActionAsset(null);
+      void queryClient.invalidateQueries({ queryKey: ["assets"] });
+    }
+  };
+
+  const handleConfirmPermanentDelete = async () => {
+    if (trashActionAsset) {
+      await deleteAsset(trashActionAsset.asset_id, true);
+      setTrashActionAsset(null);
+      void queryClient.invalidateQueries({ queryKey: ["assets"] });
+      void queryClient.invalidateQueries({ queryKey: ["storage"] });
+    }
+  };
+
+  const toggleSelect = (assetId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(assetId)) next.delete(assetId);
+      else next.add(assetId);
+      return next;
+    });
+  };
+
+  const displayAssets = showTrash
+    ? assets?.filter((a) => a.deleted_at) ?? []
+    : assets?.filter((a) => !a.deleted_at) ?? [];
+
   return (
     <main className="asset-library">
       <header className="asset-library__header">
@@ -168,6 +251,26 @@ export function AssetLibrary() {
           Alle gespeicherten Pipeline-Outputs (Bilder, Freistellungen, Meshes)
         </p>
         <div className="asset-library__header-actions">
+          <label className="asset-library__trash-toggle">
+            <input
+              type="checkbox"
+              checked={showTrash}
+              onChange={(e) => setShowTrash(e.target.checked)}
+            />
+            Papierkorb anzeigen
+          </label>
+          {!showTrash && (
+            <button
+              type="button"
+              className="btn btn--outline"
+              onClick={() => {
+                setSelectMode(!selectMode);
+                if (selectMode) setSelectedIds(new Set());
+              }}
+            >
+              {selectMode ? "Abbrechen" : "Auswählen"}
+            </button>
+          )}
           {sketchfabEnabled?.enabled && (
             <button
               type="button"
@@ -177,11 +280,32 @@ export function AssetLibrary() {
               Von Sketchfab importieren
             </button>
           )}
+          <Link to="/storage" className="asset-library__link">
+            Speicher
+          </Link>
           <Link to="/pipeline" className="asset-library__link">
             Zur Pipeline
           </Link>
         </div>
       </header>
+
+      {selectMode && selectedIds.size > 0 && (
+        <div className="asset-library__select-bar">
+          <span>{selectedIds.size} ausgewählt</span>
+          <button
+            type="button"
+            className="btn btn--outline"
+            onClick={() =>
+              setDeleteDialog({
+                mode: "batch",
+                assetCount: selectedIds.size,
+              })
+            }
+          >
+            {selectedIds.size} Assets löschen
+          </button>
+        </div>
+      )}
 
       <div className="asset-library__upload-row">
         <AssetUploadZone type="image" />
@@ -204,27 +328,64 @@ export function AssetLibrary() {
         </div>
       )}
 
-      {assets && assets.length === 0 && (
+      {assets && displayAssets.length === 0 && (
         <div className="asset-library__empty">
-          <p>Noch keine Assets generiert.</p>
-          <Link to="/pipeline" className="asset-library__empty-link">
-            Zur Pipeline →
-          </Link>
+          <p>
+            {showTrash
+              ? "Papierkorb ist leer."
+              : "Noch keine Assets generiert."}
+          </p>
+          {!showTrash && (
+            <Link to="/pipeline" className="asset-library__empty-link">
+              Zur Pipeline →
+            </Link>
+          )}
         </div>
       )}
 
-      {assets && assets.length > 0 && (
+      {displayAssets.length > 0 && (
         <div className="asset-library__grid">
-          {assets.map((asset) => {
+          {displayAssets.map((asset) => {
             const thumbUrl = asset.thumbnail_url
               ? `${baseUrl}${asset.thumbnail_url}`
               : null;
+            const isDeleted = !!asset.deleted_at;
+            const isSelected = selectedIds.has(asset.asset_id);
             return (
-              <div key={asset.asset_id} className="asset-card-wrapper">
+              <div
+                key={asset.asset_id}
+                className={`asset-card-wrapper ${isSelected ? "asset-card-wrapper--selected" : ""} ${isDeleted ? "asset-card-wrapper--deleted" : ""}`}
+              >
+                {selectMode && !showTrash && (
+                  <input
+                    type="checkbox"
+                    className="asset-card__checkbox"
+                    checked={isSelected}
+                    onChange={() => toggleSelect(asset.asset_id)}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                )}
+                {!selectMode && !isDeleted && (
+                  <button
+                    type="button"
+                    className="asset-card__delete-btn"
+                    onClick={(e) => handleDeleteClick(e, asset.asset_id)}
+                    title="In Papierkorb"
+                    aria-label="In Papierkorb verschieben"
+                  >
+                    🗑
+                  </button>
+                )}
                 <button
                   type="button"
-                  className="asset-card"
-                  onClick={() => setSelectedAssetId(asset.asset_id)}
+                  className={`asset-card ${isDeleted ? "asset-card--deleted" : ""}`}
+                  onClick={() => {
+                    if (isDeleted) {
+                      setTrashActionAsset(asset);
+                    } else {
+                      setSelectedAssetId(asset.asset_id);
+                    }
+                  }}
                 >
                   <div className="asset-card__thumb">
                     {thumbUrl ? (
@@ -248,7 +409,10 @@ export function AssetLibrary() {
                 </button>
                 <AssetCardActions
                   asset={asset}
+                  isTrashView={isDeleted}
                   onNavigate={handleNavigateToPipeline}
+                  onDelete={handleDeleteClick}
+                  onTrashAction={handleTrashActionClick}
                   onClick={(e) => e.stopPropagation()}
                 />
               </div>
@@ -257,7 +421,7 @@ export function AssetLibrary() {
         </div>
       )}
 
-      {selectedAssetId && (
+      {selectedAssetId && !assets?.some((a) => a.asset_id === selectedAssetId && a.deleted_at) && (
         <AssetDetailModal
           assetId={selectedAssetId}
           onClose={() => setSelectedAssetId(null)}
@@ -265,6 +429,31 @@ export function AssetLibrary() {
       )}
       {showSketchfabImport && (
         <SketchfabImportModal onClose={() => setShowSketchfabImport(false)} />
+      )}
+
+      {deleteDialog && (
+        <DeleteAssetDialog
+          asset={deleteDialog.asset ?? null}
+          assetCount={deleteDialog.assetCount}
+          mode={deleteDialog.mode}
+          purgeCount={deleteDialog.purgeCount}
+          purgeSize={deleteDialog.purgeSize}
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setDeleteDialog(null)}
+        />
+      )}
+
+      {trashActionAsset && (
+        <div className="delete-dialog-overlay" onClick={() => setTrashActionAsset(null)}>
+          <div onClick={(e) => e.stopPropagation()}>
+            <TrashActionsDialog
+              asset={trashActionAsset}
+              onRestore={handleConfirmRestore}
+              onPermanentDelete={handleConfirmPermanentDelete}
+              onCancel={() => setTrashActionAsset(null)}
+            />
+          </div>
+        </div>
       )}
     </main>
   );

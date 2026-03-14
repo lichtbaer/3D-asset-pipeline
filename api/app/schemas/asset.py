@@ -12,6 +12,7 @@ class AssetStepInfo(BaseModel):
     provider_key: str
     file: str
     generated_at: str | None = None
+    name: str | None = None  # Anzeigename (z.B. aus Upload)
 
 
 class AssetListItem(BaseModel):
@@ -22,6 +23,14 @@ class AssetListItem(BaseModel):
     updated_at: datetime | str
     steps: dict[str, AssetStepInfo] = Field(default_factory=dict)
     thumbnail_url: str | None = None  # Erste Bild-URL falls vorhanden
+    deleted_at: str | None = None  # Gesetzt wenn Asset im Papierkorb
+
+
+class BatchDeleteRequest(BaseModel):
+    """Request für DELETE /assets/batch."""
+
+    asset_ids: list[str] = Field(..., description="Zu löschende Asset-IDs")
+    permanent: bool = Field(default=False, description="Permanent löschen (ohne Papierkorb)")
 
 
 class SketchfabUploadInfo(BaseModel):

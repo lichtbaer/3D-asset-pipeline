@@ -152,6 +152,144 @@
   text-decoration: underline;
 }
 
+/* Delete Dialog */
+.delete-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  padding: var(--space-md);
+}
+
+.delete-dialog {
+  background: var(--bg);
+  border-radius: var(--radius-xl);
+  padding: var(--space-xl);
+  max-width: 420px;
+  box-shadow: var(--shadow-lg);
+}
+
+.delete-dialog h2 {
+  margin: 0 0 var(--space-md);
+  font-size: var(--font-size-lg);
+}
+
+.delete-dialog p {
+  margin: 0 0 var(--space-lg);
+  color: var(--text);
+}
+
+.delete-dialog__actions {
+  display: flex;
+  gap: var(--space-sm);
+  justify-content: flex-end;
+}
+
+.btn--danger {
+  background: var(--error, #c00);
+  color: white;
+  border-color: var(--error, #c00);
+}
+
+.btn--danger:hover {
+  opacity: 0.9;
+}
+
+/* Asset card delete button */
+.asset-card__delete-btn {
+  position: absolute;
+  top: var(--space-sm);
+  right: var(--space-sm);
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-md);
+  background: rgba(0, 0, 0, 0.5);
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+  z-index: 1;
+}
+
+.asset-card:hover .asset-card__delete-btn,
+.asset-card-wrapper--selected .asset-card__delete-btn {
+  opacity: 1;
+}
+
+.asset-card__delete-btn:hover {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+/* Trash overlay on deleted assets */
+.asset-card--deleted .asset-card__thumb::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(200, 0, 0, 0.25);
+  pointer-events: none;
+}
+
+.asset-card--deleted {
+  position: relative;
+}
+
+/* Multi-select */
+.asset-library__select-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  background: var(--border);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-lg);
+}
+
+.asset-card__checkbox {
+  position: absolute;
+  top: var(--space-sm);
+  left: var(--space-sm);
+  width: 20px;
+  height: 20px;
+  z-index: 2;
+  cursor: pointer;
+}
+
+.asset-card-wrapper {
+  position: relative;
+}
+
+.asset-card__thumb {
+  position: relative;
+}
+
+.asset-library__trash-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.asset-library__trash-toggle input {
+  cursor: pointer;
+}
+
+.asset-card-wrapper--deleted .asset-card__thumb::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(200, 0, 0, 0.25);
+  pointer-events: none;
+}
+
 /* AssetDetail */
 .asset-detail {
   padding: var(--space-xl);
