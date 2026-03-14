@@ -55,6 +55,7 @@ import {
   BgRemovalJobHistory,
   type BgRemovalJobHistoryEntry,
 } from "../components/pipeline/BgRemovalJobHistory.js";
+import { ImageEditor } from "../components/pipeline/ImageEditor.js";
 import { RiggingForm } from "../components/pipeline/rigging/RiggingForm.js";
 import { RiggingJobStatus } from "../components/pipeline/rigging/RiggingJobStatus.js";
 import {
@@ -1073,6 +1074,13 @@ export function PipelinePage() {
               onUseForMesh={handleUseForMesh}
             />
           </section>
+          {urlAssetId &&
+            (urlAsset?.steps?.bgremoval?.file || urlAsset?.steps?.image?.file) && (
+            <ImageEditor
+              assetId={urlAssetId}
+              onUseForMesh={handleUseForMesh}
+            />
+          )}
         </div>
       )}
 

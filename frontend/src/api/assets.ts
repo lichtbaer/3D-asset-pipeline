@@ -37,12 +37,21 @@ export interface SketchfabUploadInfo {
   is_private?: boolean;
 }
 
+export interface ImageProcessingEntry {
+  operation: string;
+  params: Record<string, unknown>;
+  source_file: string;
+  output_file: string;
+  processed_at: string;
+}
+
 export interface AssetDetail {
   asset_id: string;
   created_at: string;
   updated_at: string;
   steps: Record<string, Record<string, unknown>>;
   processing?: ProcessingEntry[];
+  image_processing?: ImageProcessingEntry[];
   sketchfab_upload?: SketchfabUploadInfo | null;
   source?: string | null;
   sketchfab_uid?: string | null;
