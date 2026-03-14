@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  globalIgnores(['dist', 'coverage', 'node_modules']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
@@ -24,6 +24,13 @@ export default defineConfig([
       'react-hooks/set-state-in-effect': 'off',
       // PipelineStore exportiert Provider + Hook – Fast Refresh Einschränkung akzeptiert
       'react-refresh/only-export-components': 'warn',
+    },
+  },
+  // Context/Store-Files: Provider + Hook in einer Datei – bewusst so strukturiert
+  {
+    files: ['**/ToastContext.tsx', '**/PipelineStore.tsx'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
     },
   },
 ])

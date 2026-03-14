@@ -114,7 +114,7 @@ export function MeshForm({
         ...prev,
       }));
     }
-  }, [selectedProvider?.key]);
+  }, [selectedProvider]);
 
   const handleParamChange = (key: string, value: unknown) => {
     setParams((prev) => ({ ...prev, [key]: value }));
