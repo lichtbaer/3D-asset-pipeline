@@ -255,6 +255,9 @@ export function AssetLibrary() {
   const location = useLocation();
   const queryClient = useQueryClient();
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+  const [lastUploadedAssetId, setLastUploadedAssetId] = useState<
+    string | null
+  >(null);
   const [showSketchfabImport, setShowSketchfabImport] = useState(false);
   const [showTrash, setShowTrash] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
@@ -497,8 +500,20 @@ export function AssetLibrary() {
       )}
 
       <div className="asset-library__upload-row">
-        <AssetUploadZone type="image" />
-        <AssetUploadZone type="mesh" />
+        <AssetUploadZone
+          type="image"
+          onSuccess={(assetId) => {
+            setSelectedAssetId(assetId);
+            setLastUploadedAssetId(assetId);
+          }}
+        />
+        <AssetUploadZone
+          type="mesh"
+          onSuccess={(assetId) => {
+            setSelectedAssetId(assetId);
+            setLastUploadedAssetId(assetId);
+          }}
+        />
       </div>
 
       <div className="asset-library__search-row">
@@ -740,7 +755,11 @@ export function AssetLibrary() {
       {selectedAssetId && !assets?.some((a) => a.asset_id === selectedAssetId && a.deleted_at) && (
         <AssetDetailModal
           assetId={selectedAssetId}
-          onClose={() => setSelectedAssetId(null)}
+          onClose={() => {
+            setSelectedAssetId(null);
+            setLastUploadedAssetId(null);
+          }}
+          initialShowTagSuggestions={selectedAssetId === lastUploadedAssetId}
           onAssetUpdate={() => {
             void queryClient.invalidateQueries({ queryKey: ["assets"] });
           }}

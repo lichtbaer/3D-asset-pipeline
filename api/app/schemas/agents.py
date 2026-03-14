@@ -23,7 +23,23 @@ class PromptOptimizeRequest(BaseModel):
 class TagsSuggestRequest(BaseModel):
     """Request für Tag-Vorschläge (PURZEL-038)."""
 
-    text: str = Field(..., description="Beschreibung oder Kontext für Tagging")
+    asset_id: str = Field(..., description="Asset-ID")
+    prompt: str | None = Field(
+        default=None,
+        description="Generierungs-Prompt falls vorhanden",
+    )
+    original_filename: str | None = Field(
+        default=None,
+        description="Dateiname bei Uploads",
+    )
+    pipeline_steps: list[str] = Field(
+        default_factory=list,
+        description="Pipeline-Stand: image, mesh, rigging, animation",
+    )
+    include_image_analysis: bool = Field(
+        default=False,
+        description="Vision-Analyse des Vorschau-Bilds",
+    )
 
 
 class QualityAssessRequest(BaseModel):

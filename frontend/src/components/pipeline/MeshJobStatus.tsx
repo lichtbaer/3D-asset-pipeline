@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getMeshJobStatus, retryMeshJob, type MeshJob } from "../../api/mesh.js";
 import { JobErrorBlock } from "../generation/JobErrorBlock.js";
 import { MeshViewer } from "../viewer/MeshViewer.js";
+import { TagSuggestionBanner } from "../assets/TagSuggestionBanner.js";
 import { usePipelineStore } from "../../store/PipelineStore.js";
 
 export interface MeshJobStatusProps {
@@ -123,6 +124,12 @@ export function MeshJobStatus({ jobId, onJobUpdate, onRetrySuccess }: MeshJobSta
             Download GLB
           </a>
         </div>
+        {data.asset_id && (
+          <TagSuggestionBanner
+            assetId={data.asset_id}
+            includeImageAnalysis={true}
+          />
+        )}
         <p className="mesh-job-status__hint">
           Mesh-Generierung kann bis zu 5 Minuten dauern
         </p>

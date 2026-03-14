@@ -1,6 +1,6 @@
 """Gemeinsame Pydantic-Modelle für alle Agent-Outputs."""
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class AgentError(BaseModel):
@@ -19,6 +19,18 @@ class TagSuggestion(BaseModel):
         description="Vorgeschlagene Tags, lowercase, max 20 Zeichen je Tag"
     )
     confidence: float = Field(ge=0.0, le=1.0)
+
+    @field_validator("tags")
+    @classmethod
+    def validate_tags(cls, v: list[str]) -> list[str]:
+        seen: set[str] = set()
+        out: list[str] = []
+        for t in v:
+            t_clean = t.strip().lower()[:20]
+            if t_clean and t_clean not in seen:
+                seen.add(t_clean)
+                out.append(t_clean)
+        return out
 
 
 class PromptSuggestion(BaseModel):

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getJobStatus, retryImageJob } from "../../api/generation.js";
 import { getMeshJobStatus, retryMeshJob } from "../../api/mesh.js";
 import { JobErrorBlock } from "../generation/JobErrorBlock.js";
+import { TagSuggestionBanner } from "../assets/TagSuggestionBanner.js";
 import { MeshViewer } from "../viewer/MeshViewer.js";
 
 export type CompareStep = "image" | "mesh";
@@ -242,6 +243,12 @@ function CompareResultColumnContent({
           >
             GLB herunterladen
           </a>
+          {meshData.asset_id && (
+            <TagSuggestionBanner
+              assetId={meshData.asset_id}
+              includeImageAnalysis={true}
+            />
+          )}
           <p className="mesh-job-status__hint">
             Mesh-Generierung kann bis zu 5 Minuten dauern
           </p>
