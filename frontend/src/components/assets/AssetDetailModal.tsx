@@ -20,6 +20,7 @@ import {
 } from "./MeshProcessingPanel.js";
 import { ExportPanel } from "./ExportPanel.js";
 import { ImageProcessingList } from "./ImageProcessingList.js";
+import { ImageEditor } from "../pipeline/ImageEditor.js";
 import { SketchfabPanel } from "./SketchfabPanel.js";
 import { QualityAnalysisPanel } from "./QualityAnalysisPanel.js";
 import { SavePresetModal } from "../presets/SavePresetModal.js";
@@ -434,6 +435,14 @@ export function AssetDetailModal({
             <ImageProcessingList
               assetId={data.asset_id}
               imageProcessing={data.image_processing ?? []}
+            />
+          )}
+          {(hasImage || hasBgremoval) && (
+            <ImageEditor
+              assetId={data.asset_id}
+              onUseForMesh={(imageUrl) =>
+                handleAction("mesh", imageUrl, data.asset_id)
+              }
             />
           )}
         </section>

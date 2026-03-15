@@ -518,26 +518,38 @@ export function PipelinePage() {
     },
   });
 
-  const handleBgRemovalJobUpdate = useCallback((job: BgRemovalJob) => {
-    setBgRemovalJobHistory((prev) =>
-      prev.map((entry) =>
-        entry.job_id === job.job_id
-          ? {
-              ...entry,
-              status: job.status,
-              result_url: job.result_url,
-              asset_id: job.asset_id,
-            }
-          : entry
-      )
-    );
-    const prevStatus = prevJobStatuses.current.get(job.job_id);
-    if (prevStatus !== job.status) {
-      prevJobStatuses.current.set(job.job_id, job.status);
-      if (job.status === "done") addToast("Freistellung abgeschlossen!", "success");
-      if (job.status === "failed") addToast("Freistellung fehlgeschlagen.", "error");
-    }
-  }, [addToast]);
+  const handleBgRemovalJobUpdate = useCallback(
+    (job: BgRemovalJob) => {
+      setBgRemovalJobHistory((prev) =>
+        prev.map((entry) =>
+          entry.job_id === job.job_id
+            ? {
+                ...entry,
+                status: job.status,
+                result_url: job.result_url,
+                asset_id: job.asset_id,
+              }
+            : entry
+        )
+      );
+      const prevStatus = prevJobStatuses.current.get(job.job_id);
+      if (prevStatus !== job.status) {
+        prevJobStatuses.current.set(job.job_id, job.status);
+        if (job.status === "done") addToast("Freistellung abgeschlossen!", "success");
+        if (job.status === "failed") addToast("Freistellung fehlgeschlagen.", "error");
+        if (job.status === "done" && job.asset_id) {
+          const aid = job.asset_id;
+          setSearchParams((prev) => {
+            const next = new URLSearchParams(prev);
+            next.set("tab", "bgremoval");
+            next.set("assetId", aid);
+            return next;
+          });
+        }
+      }
+    },
+    [addToast, setSearchParams]
+  );
 
   const handleBgRemovalRetrySuccess = useCallback((newJobId: string) => {
     setCurrentBgRemovalJobId(newJobId);
@@ -1066,18 +1078,42 @@ export function PipelinePage() {
               onJobUpdate={handleBgRemovalJobUpdate}
               onUseForMesh={handleUseForMesh}
               onRetrySuccess={handleBgRemovalRetrySuccess}
+              hideUseForMesh={
+                !!(
+                  urlAssetId ||
+                  (currentBgRemovalJob?.status === "done" &&
+                    currentBgRemovalJob?.asset_id)
+                )
+              }
             />
           </section>
           <section className="pipeline-page__history">
             <BgRemovalJobHistory
               jobs={bgRemovalJobHistory}
               onUseForMesh={handleUseForMesh}
+              hideUseForMeshForAssetIds={
+                urlAssetId ||
+                (currentBgRemovalJob?.status === "done" &&
+                  currentBgRemovalJob?.asset_id)
+                  ? [
+                      ...new Set([
+                        ...(currentBgRemovalJob?.asset_id
+                          ? [currentBgRemovalJob.asset_id]
+                          : []),
+                        ...(urlAssetId ? [urlAssetId] : []),
+                      ]),
+                    ]
+                  : []
+              }
             />
           </section>
-          {urlAssetId &&
-            (urlAsset?.steps?.bgremoval?.file || urlAsset?.steps?.image?.file) && (
+          {(urlAssetId ||
+            (currentBgRemovalJob?.status === "done" &&
+              currentBgRemovalJob?.asset_id)) && (
             <ImageEditor
-              assetId={urlAssetId}
+              assetId={
+                urlAssetId ?? currentBgRemovalJob?.asset_id ?? ""
+              }
               onUseForMesh={handleUseForMesh}
             />
           )}
