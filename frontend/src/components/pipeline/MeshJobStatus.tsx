@@ -17,7 +17,7 @@ export function MeshJobStatus({ jobId, onJobUpdate, onRetrySuccess }: MeshJobSta
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [, setSearchParams] = useSearchParams();
-  const { setPendingRiggingGlbUrl, setPendingAnimationGlbUrl } = usePipelineStore();
+  const { setPendingRiggingGlbUrl, setPendingAnimationGlbUrl, setActiveAssetId } = usePipelineStore();
   const { data, isLoading, error } = useQuery({
     queryKey: ["mesh-job", jobId],
     queryFn: () => getMeshJobStatus(jobId!),
@@ -75,16 +75,28 @@ export function MeshJobStatus({ jobId, onJobUpdate, onRetrySuccess }: MeshJobSta
   const handleUseForRigging = () => {
     if (glb_url) {
       setPendingRiggingGlbUrl(glb_url);
+      if (data.asset_id) setActiveAssetId(data.asset_id);
       navigate("/pipeline");
-      setSearchParams({ tab: "rigging" });
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("tab", "rigging");
+        if (data.asset_id) next.set("assetId", data.asset_id);
+        return next;
+      });
     }
   };
 
   const handleUseForAnimation = () => {
     if (glb_url) {
       setPendingAnimationGlbUrl(glb_url);
+      if (data.asset_id) setActiveAssetId(data.asset_id);
       navigate("/pipeline");
-      setSearchParams({ tab: "animation" });
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("tab", "animation");
+        if (data.asset_id) next.set("assetId", data.asset_id);
+        return next;
+      });
     }
   };
 

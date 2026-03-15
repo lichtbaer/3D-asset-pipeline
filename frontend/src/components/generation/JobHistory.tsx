@@ -11,8 +11,9 @@ export interface JobHistoryEntry {
 
 export interface JobHistoryProps {
   jobs: JobHistoryEntry[];
-  onUseForMesh?: (resultUrl: string) => void;
-  onUseForBgRemoval?: (resultUrl: string) => void;
+  /** resultUrl, assetId (für Asset-Verknüpfung beim nächsten Step) */
+  onUseForMesh?: (resultUrl: string, assetId?: string) => void;
+  onUseForBgRemoval?: (resultUrl: string, assetId?: string) => void;
 }
 
 function truncatePrompt(prompt: string, maxLen = 50): string {
@@ -69,7 +70,7 @@ export function JobHistory({
                     <button
                       type="button"
                       className="btn btn--outline btn--sm"
-                      onClick={() => onUseForMesh(job.result_url!)}
+                      onClick={() => onUseForMesh(job.result_url!, job.asset_id ?? undefined)}
                     >
                       → Als Mesh-Input verwenden
                     </button>
@@ -78,7 +79,7 @@ export function JobHistory({
                     <button
                       type="button"
                       className="btn btn--outline btn--sm"
-                      onClick={() => onUseForBgRemoval(job.result_url!)}
+                      onClick={() => onUseForBgRemoval(job.result_url!, job.asset_id ?? undefined)}
                     >
                       → Freistellen
                     </button>

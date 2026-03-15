@@ -11,7 +11,8 @@ export interface BgRemovalJobHistoryEntry {
 
 export interface BgRemovalJobHistoryProps {
   jobs: BgRemovalJobHistoryEntry[];
-  onUseForMesh?: (resultUrl: string) => void;
+  /** resultUrl, assetId (für Asset-Verknüpfung beim Mesh-Step) */
+  onUseForMesh?: (resultUrl: string, assetId?: string) => void;
 }
 
 export function BgRemovalJobHistory({
@@ -59,7 +60,7 @@ export function BgRemovalJobHistory({
                 <button
                   type="button"
                   className="btn btn--outline btn--sm"
-                  onClick={() => onUseForMesh(job.result_url!)}
+                  onClick={() => onUseForMesh(job.result_url!, job.asset_id ?? undefined)}
                 >
                   → Als Mesh-Input verwenden
                 </button>
