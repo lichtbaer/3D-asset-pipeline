@@ -99,7 +99,7 @@ class BiRefNetHfProvider(BgRemovalProvider):
         """
         from gradio_client import Client, handle_file
 
-        client = Client(BIREFNET_SPACE, hf_token=hf_token)
+        client = Client(BIREFNET_SPACE, token=hf_token)
         result = client.predict(
             f=handle_file(image_path),
             api_name="/png",

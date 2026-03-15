@@ -36,7 +36,7 @@ class HYMotionProvider(BaseAnimationProvider):
         """Lazy-Init Client (HF_TOKEN für private Spaces)."""
         if self._client is None:
             hf_token = os.getenv("HF_TOKEN")
-            self._client = Client(HY_MOTION_SPACE, hf_token=hf_token or "")
+            self._client = Client(HY_MOTION_SPACE, token=hf_token or "")
         return self._client
 
     def _run_predict(
@@ -49,7 +49,7 @@ class HYMotionProvider(BaseAnimationProvider):
         HY-Motion-1.0: text-to-motion, liefert FBX.
         Gibt Datei-Bytes zurück oder None bei Fehler.
         """
-        client = Client(HY_MOTION_SPACE, hf_token=hf_token or "")
+        client = Client(HY_MOTION_SPACE, token=hf_token or "")
         # Prompt-Engineering optional; für MVP nutzen wir Prompt direkt
         rewritten = motion_prompt
         result = client.predict(
