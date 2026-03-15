@@ -22,7 +22,8 @@ from app.agents.models import (
 @pytest.fixture
 def client(tmp_storage_paths) -> TestClient:
     from app.main import app
-    return TestClient(app)
+    from tests.conftest import PrefixedTestClient
+    return PrefixedTestClient(app)
 
 
 @pytest.fixture

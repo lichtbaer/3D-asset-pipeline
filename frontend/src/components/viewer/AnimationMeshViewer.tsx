@@ -170,7 +170,7 @@ export function AnimationMeshViewer({
       },
       undefined,
       (err) => {
-        console.error("AnimationMeshViewer: GLB load error", glbUrl, err);
+        console.warn("AnimationMeshViewer: GLB load error", glbUrl, err);
         if (mountedRef.current) {
           setError("3D-Vorschau nicht verfügbar");
           setLoading(false);

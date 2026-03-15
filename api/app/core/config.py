@@ -1,22 +1,37 @@
-"""Zentrale Konfiguration für Agent-Features (API-Keys, Modelle)."""
+"""Zentrale Konfiguration (API-Keys, CORS, Auth)."""
 
-import os
-from typing import Optional
+from __future__ import annotations
+
+from pydantic import field_validator
+from pydantic_settings import BaseSettings
 
 
-class Settings:
+class Settings(BaseSettings):
     """Laufzeit-Konfiguration aus Umgebungsvariablen."""
 
-    ANTHROPIC_API_KEY: Optional[str] = os.getenv("ANTHROPIC_API_KEY")
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
+
+    ANTHROPIC_API_KEY: str | None = None
 
     # API-Key-Authentifizierung: leer = kein Schutz (dev), gesetzt = Bearer-Auth erforderlich
-    _api_key_raw = os.getenv("API_KEY")
-    API_KEY: Optional[str] = (_api_key_raw or "").strip() or None
+    API_KEY: str | None = None
 
     # CORS: kommagetrennte Origins (ALLOWED_ORIGINS oder CORS_ORIGINS)
-    ALLOWED_ORIGINS: str = os.getenv(
-        "ALLOWED_ORIGINS", os.getenv("CORS_ORIGINS", "http://localhost:5173")
-    )
+    ALLOWED_ORIGINS: str = "http://localhost:5173"
+    CORS_ORIGINS: str | None = None
+
+    @field_validator("API_KEY", mode="before")
+    @classmethod
+    def _strip_api_key(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        stripped = v.strip()
+        return stripped or None
+
+    @property
+    def resolved_origins(self) -> str:
+        """ALLOWED_ORIGINS hat Vorrang; CORS_ORIGINS als Fallback."""
+        return self.ALLOWED_ORIGINS or self.CORS_ORIGINS or "http://localhost:5173"
 
     @property
     def agent_available(self) -> bool:

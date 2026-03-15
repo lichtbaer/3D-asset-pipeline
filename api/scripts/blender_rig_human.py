@@ -60,6 +60,7 @@ def enable_rigify() -> bool:
         bpy.ops.preferences.addon_enable(module="rigify")
         return True
     except Exception:
+        print("Rigify-Addon nicht verfuegbar", file=sys.stderr)
         return False
 
 

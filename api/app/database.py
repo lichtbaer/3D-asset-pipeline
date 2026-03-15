@@ -1,9 +1,12 @@
+import logging
 import os
 from collections.abc import AsyncGenerator
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
+
+logger = logging.getLogger(__name__)
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
@@ -41,4 +44,5 @@ async def check_db_connection() -> bool:
             await conn.execute(text("SELECT 1"))
         return True
     except Exception:
+        logger.debug("DB health check failed", exc_info=True)
         return False

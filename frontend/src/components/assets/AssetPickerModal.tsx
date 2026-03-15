@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { listAssets } from "../../api/assets.js";
+import { API_BASE } from "../../api/client.js";
 import type { AssetListItem } from "../../api/assets.js";
 import { useFocusTrap } from "../../hooks/useFocusTrap.js";
 import { useEscapeKey } from "../../hooks/useEscapeKey.js";
@@ -71,8 +72,7 @@ export function AssetPickerModal({
   useBodyScrollLock(isOpen);
 
   const filteredAssets = assets ? filterAssets(assets, filter) : [];
-  const baseUrl =
-    import.meta.env.VITE_API_URL || "http://localhost:8000";
+  const baseUrl = API_BASE;
 
   if (!isOpen) return null;
 

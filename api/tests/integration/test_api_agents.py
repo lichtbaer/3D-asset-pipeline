@@ -10,7 +10,8 @@ from fastapi.testclient import TestClient
 @pytest.fixture
 def client(tmp_storage_paths) -> TestClient:
     from app.main import app
-    return TestClient(app)
+    from tests.conftest import PrefixedTestClient
+    return PrefixedTestClient(app)
 
 
 def test_agent_returns_503_without_api_key(client: TestClient, monkeypatch):

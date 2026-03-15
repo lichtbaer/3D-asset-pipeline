@@ -188,7 +188,7 @@ export function MeshViewer({
       },
       undefined,
       (err) => {
-        console.error("MeshViewer: GLB load error", glbUrl, err);
+        console.warn("MeshViewer: GLB load error", glbUrl, err);
         if (mountedRef.current) {
           setError("3D-Vorschau nicht verfügbar");
           setLoading(false);

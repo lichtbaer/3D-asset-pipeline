@@ -1,4 +1,4 @@
-import { apiClient } from "./client.js";
+import { API_BASE, apiClient } from "./client.js";
 
 export interface BgRemovalRequest {
   source_image_url: string;
@@ -60,7 +60,7 @@ export async function postBgRemoval(
 export async function getBgRemovalJobStatus(
   jobId: string
 ): Promise<BgRemovalJob> {
-  const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
+  const baseUrl = API_BASE;
   const { data } = await apiClient.get<{
     job_id: string;
     status: string;

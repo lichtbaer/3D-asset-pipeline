@@ -8,6 +8,7 @@ import {
   restoreAsset,
   patchAssetMeta,
 } from "../api/assets.js";
+import { API_BASE } from "../api/client.js";
 import { getSketchfabStatus } from "../api/sketchfab.js";
 import { AssetDetailModal } from "../components/assets/AssetDetailModal.js";
 import { AssetUploadZone } from "../components/assets/AssetUploadZone.js";
@@ -369,8 +370,7 @@ export function AssetLibrary() {
     }
   };
 
-  const baseUrl =
-    import.meta.env.VITE_API_URL || "http://localhost:8000";
+  const baseUrl = API_BASE;
 
   const handleNavigateToPipeline = (tab: string, assetId: string) => {
     navigate(`/pipeline?tab=${tab}&assetId=${encodeURIComponent(assetId)}`);

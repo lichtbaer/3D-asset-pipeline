@@ -1,4 +1,4 @@
-import { apiClient } from "./client.js";
+import { API_BASE, apiClient } from "./client.js";
 
 export interface RiggingGenerateRequest {
   source_glb_url: string;
@@ -67,7 +67,7 @@ export async function getRiggingJobStatus(
     asset_id: string | null;
     failed_at?: string | null;
   }>(`/generate/rigging/${jobId}`);
-  const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
+  const baseUrl = API_BASE;
   const glb_url = data.glb_url
     ? data.glb_url.startsWith("http")
       ? data.glb_url
