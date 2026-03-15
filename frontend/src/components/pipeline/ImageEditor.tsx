@@ -15,7 +15,8 @@ import {
 
 interface ImageEditorProps {
   assetId: string;
-  onUseForMesh: (imageUrl: string) => void;
+  /** (imageUrl, assetId?) – assetId für Asset-Verknüpfung beim Mesh-Step */
+  onUseForMesh: (imageUrl: string, assetId?: string) => void;
 }
 
 export function ImageEditor({ assetId, onUseForMesh }: ImageEditorProps) {
@@ -45,8 +46,28 @@ export function ImageEditor({ assetId, onUseForMesh }: ImageEditorProps) {
   });
 
   const sources = sourcesData?.sources ?? [];
+
+  useEffect(() => {
+    if (sources.length === 0) return;
+    const preferred =
+      sources.includes("image_bgremoved.png")
+        ? "image_bgremoved.png"
+        : sources.includes("image.png")
+          ? "image.png"
+          : sources[0];
+    if (preferred && !sources.includes(sourceFile)) {
+      setSourceFile(preferred);
+    }
+  }, [sources, sourceFile]);
+  /** Bevorzuge image_bgremoved.png, sonst image.png, sonst erstes verfügbares */
+  const preferredSource =
+    sources.includes("image_bgremoved.png")
+      ? "image_bgremoved.png"
+      : sources.includes("image.png")
+        ? "image.png"
+        : sources[0] ?? "";
   const effectiveSource =
-    sources.includes(sourceFile) ? sourceFile : sources[0] ?? "";
+    sources.includes(sourceFile) ? sourceFile : preferredSource;
   const previewUrl = effectiveSource
     ? getAssetFileUrl(assetId, effectiveSource)
     : "";
@@ -228,6 +249,15 @@ export function ImageEditor({ assetId, onUseForMesh }: ImageEditorProps) {
     ]),
   ].filter(Boolean);
 
+  /** Zuletzt bearbeitetes Bild: letzter Processing-Output oder Quelle */
+  const lastEditedFile =
+    imageProcessingEntries.length > 0
+      ? imageProcessingEntries[imageProcessingEntries.length - 1].output_file
+      : effectiveSource;
+  const lastEditedUrl = lastEditedFile
+    ? getAssetFileUrl(assetId, lastEditedFile)
+    : "";
+
   if (sources.length === 0) return null;
 
   const isPending =
@@ -351,6 +381,18 @@ export function ImageEditor({ assetId, onUseForMesh }: ImageEditorProps) {
             Zuschneiden
           </button>
 
+          {lastEditedUrl && (
+            <div className="image-editor__primary-cta">
+              <button
+                type="button"
+                className="btn btn--outline"
+                onClick={() => onUseForMesh(lastEditedUrl, assetId)}
+              >
+                → Als Mesh-Input verwenden
+              </button>
+            </div>
+          )}
+
           <div className="image-editor__resize form-group">
             <h3>Skalieren</h3>
             <div className="image-editor__resize-row">
@@ -413,7 +455,7 @@ export function ImageEditor({ assetId, onUseForMesh }: ImageEditorProps) {
                   type="button"
                   className="btn btn--sm btn--ghost"
                   onClick={() =>
-                    onUseForMesh(getAssetFileUrl(assetId, filename))
+                    onUseForMesh(getAssetFileUrl(assetId, filename), assetId)
                   }
                 >
                   → Als Mesh-Input verwenden

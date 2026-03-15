@@ -6,7 +6,7 @@ import {
   type AnimationJob,
 } from "../../api/animation.js";
 import { JobErrorBlock } from "../generation/JobErrorBlock.js";
-import { MeshViewer } from "../viewer/MeshViewer.js";
+import { AnimationMeshViewer } from "../viewer/AnimationMeshViewer.js";
 
 export interface AnimationJobStatusProps {
   jobId: string | null;
@@ -64,21 +64,15 @@ export function AnimationJobStatus({
   const { status, animated_glb_url } = data;
 
   if (status === "done" && animated_glb_url) {
-    const isGlb = animated_glb_url.toLowerCase().endsWith(".glb");
     return (
       <div className="job-status job-status--done">
         <p className="job-status__label">Fertig!</p>
         <div className="animation-job-status__preview">
-          {isGlb ? (
-            <MeshViewer glbUrl={animated_glb_url} height={300} />
-          ) : (
-            <p>
-              <a href={animated_glb_url} download className="job-status__download">
-                Animation herunterladen (FBX)
-              </a>
-            </p>
-          )}
+          <AnimationMeshViewer glbUrl={animated_glb_url} height={300} />
         </div>
+        <a href={animated_glb_url} download className="job-status__download">
+          Animation herunterladen
+        </a>
         {data.asset_id && (
           <Link to="/assets" className="job-status__library-link">
             → In Bibliothek ansehen
