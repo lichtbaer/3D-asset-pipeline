@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState, useCallback } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
 import "./MeshViewer.css";
@@ -122,61 +123,81 @@ export function AnimationMeshViewer({
     resizeObserver.observe(container);
     resize();
 
-    const loader = new GLTFLoader();
-    loader.load(
-      glbUrl,
-      (gltf) => {
-        gltfRef.current = gltf;
-        const model = gltf.scene;
-        modelRef.current = model;
+    const onModelLoaded = (model: THREE.Group, clips: THREE.AnimationClip[]) => {
+      if (!mountedRef.current) return;
 
-        const box = new THREE.Box3().setFromObject(model);
-        const center = box.getCenter(new THREE.Vector3());
-        model.position.sub(center);
+      modelRef.current = model;
 
-        const sphere = new THREE.Sphere();
-        box.getBoundingSphere(sphere);
-        const radius = sphere.radius;
-        const camDistance = radius * 3;
-        camera.position.set(0, radius * 0.5, camDistance);
-        controls.target.set(0, 0, 0);
-        controls.update();
+      const box = new THREE.Box3().setFromObject(model);
+      const center = box.getCenter(new THREE.Vector3());
+      model.position.sub(center);
 
-        scene.add(model);
+      const sphere = new THREE.Sphere();
+      box.getBoundingSphere(sphere);
+      const radius = sphere.radius || 1;
+      const camDistance = radius * 3;
+      camera.position.set(0, radius * 0.5, camDistance);
+      controls.target.set(0, 0, 0);
+      controls.update();
 
-        const mixer = new THREE.AnimationMixer(model);
-        mixerRef.current = mixer;
-        const actions = new Map<string, THREE.AnimationAction>();
-        actionsRef.current = actions;
+      scene.add(model);
 
-        const clips = gltf.animations ?? [];
-        clipsRef.current = clips;
-        const names = clips.map((c, i) => c.name || `clip_${i}`);
-        setClipNames(names);
+      const mixer = new THREE.AnimationMixer(model);
+      mixerRef.current = mixer;
+      const actions = new Map<string, THREE.AnimationAction>();
+      actionsRef.current = actions;
 
-        clips.forEach((clip, i) => {
-          const key = clip.name || `clip_${i}`;
-          const action = mixer.clipAction(clip);
-          action.setLoop(THREE.LoopRepeat, Infinity);
-          actions.set(key, action);
-        });
+      clipsRef.current = clips;
+      const names = clips.map((c, i) => c.name || `clip_${i}`);
+      setClipNames(names);
 
-        if (names.length > 0) {
-          setSelectedClip(names[0]);
-          setDuration(clips[0].duration);
-        }
+      clips.forEach((clip, i) => {
+        const key = clip.name || `clip_${i}`;
+        const action = mixer.clipAction(clip);
+        action.setLoop(THREE.LoopRepeat, Infinity);
+        actions.set(key, action);
+      });
 
-        if (mountedRef.current) setLoading(false);
-      },
-      undefined,
-      (err) => {
-        console.warn("AnimationMeshViewer: GLB load error", glbUrl, err);
-        if (mountedRef.current) {
-          setError("3D-Vorschau nicht verfügbar");
-          setLoading(false);
-        }
+      if (names.length > 0) {
+        setSelectedClip(names[0]);
+        setDuration(clips[0].duration);
       }
-    );
+
+      setLoading(false);
+    };
+
+    const onError = (err: unknown) => {
+      console.warn("AnimationMeshViewer: load error", glbUrl, err);
+      if (mountedRef.current) {
+        setError("3D-Vorschau nicht verfügbar");
+        setLoading(false);
+      }
+    };
+
+    const isFbx = glbUrl.toLowerCase().endsWith(".fbx");
+
+    if (isFbx) {
+      const fbxLoader = new FBXLoader();
+      fbxLoader.load(
+        glbUrl,
+        (group) => {
+          onModelLoaded(group, group.animations ?? []);
+        },
+        undefined,
+        onError
+      );
+    } else {
+      const gltfLoader = new GLTFLoader();
+      gltfLoader.load(
+        glbUrl,
+        (gltf) => {
+          gltfRef.current = gltf;
+          onModelLoaded(gltf.scene, gltf.animations ?? []);
+        },
+        undefined,
+        onError
+      );
+    }
 
     let frameId: number | null = null;
     const animate = () => {
@@ -211,11 +232,11 @@ export function AnimationMeshViewer({
         cancelAnimationFrame(frameId);
       }
       const mixer = mixerRef.current;
-      const gltf = gltfRef.current;
+      const model = modelRef.current;
       if (mixer) {
         mixer.stopAllAction();
-        if (gltf?.scene) {
-          mixer.uncacheRoot(gltf.scene);
+        if (model) {
+          mixer.uncacheRoot(model);
         }
         mixerRef.current = null;
       }

@@ -78,24 +78,15 @@ export function AnimationJobStatus({
   const { status, animated_glb_url } = data;
 
   if (status === "done" && animated_glb_url) {
-    const isGlb = animated_glb_url.toLowerCase().endsWith(".glb");
     return (
       <div className="job-status job-status--done">
         <p className="job-status__label">Fertig!</p>
         <div className="animation-job-status__preview">
-          {isGlb ? (
-            <AnimationMeshViewer glbUrl={animated_glb_url} height={400} />
-          ) : (
-            <p>
-              <a href={animated_glb_url} download className="job-status__download">
-                Animation herunterladen (FBX)
-              </a>
-            </p>
-          )}
+          <AnimationMeshViewer glbUrl={animated_glb_url} height={400} />
         </div>
         <div className="compare-results__actions">
           <a href={animated_glb_url} download className="job-status__download">
-            Download
+            Animation herunterladen
           </a>
           {onTryDifferentPreset && (
             <button
