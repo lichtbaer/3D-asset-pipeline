@@ -54,24 +54,59 @@ Nahezu identische Kopien in zwei Verzeichnissen:
 
 **Empfehlung:** Auf `pydantic_settings.BaseSettings` migrieren.
 
+#### 6. Uebergrosse Komponenten und Services
+Mehrere Dateien sind zu gross und sollten aufgeteilt werden:
+
+| Datei | Zeilen | Prioritaet |
+|-------|--------|------------|
+| `frontend/src/pages/PipelinePage.tsx` | 1.369 | Kritisch |
+| `frontend/src/pages/AssetLibrary.tsx` | 861 | Kritisch |
+| `frontend/src/components/assets/AssetDetailModal.tsx` | 829 | Kritisch |
+| `api/app/routers/generation.py` | 1.019 | Hoch |
+| `api/app/services/asset_service.py` | 962 | Hoch |
+| `api/app/routers/assets.py` | 798 | Hoch |
+
+**Empfehlung:** Logik in Sub-Komponenten/Sub-Services extrahieren.
+
+#### 7. Backend Coverage-Omits
+7 kritische Dateien sind von der Coverage-Messung ausgeschlossen (`pyproject.toml`):
+- `app/main.py`, `app/routers/generation.py`, `app/services/mesh_generation.py`
+- `app/services/animation_generation.py`, `app/services/bgremoval.py`
+- `app/services/mesh_export_service.py`
+
+**Empfehlung:** Omits schrittweise entfernen und Tests ergaenzen.
+
+#### 8. In-Memory Job State (Texture Baking)
+`api/app/services/job_service.py` speichert Texture-Baking-Jobs in einem `dict` im Speicher. State geht bei Server-Neustart verloren.
+
+**Empfehlung:** In die Datenbank (GenerationJob) migrieren.
+
 ---
 
 ### Niedrig
 
-#### 6. console.error() im Frontend
+#### 9. console.error() im Frontend
 `MeshViewer.tsx:191` und `AnimationMeshViewer.tsx:173` verwenden `console.error()` statt strukturiertem Logging.
 
 **Empfehlung:** Error-Boundary mit Service-Anbindung einfuehren.
 
-#### 7. `type: ignore` in main.py
+#### 10. `type: ignore` in main.py
 `api/app/main.py:35` hat `# type: ignore[arg-type]` fuer `_rate_limit_exceeded_handler`.
 
 **Empfehlung:** Typ-Annotation korrekt definieren oder slowapi-Typen pruefen.
 
-#### 8. Print-Logging in Blender-Skripten
+#### 11. Print-Logging in Blender-Skripten
 4 Skripte mit insgesamt ~24 `print()`-Aufrufen statt `logging.getLogger()`.
 
 **Empfehlung:** Akzeptabel fuer CLI-Subprozesse, aber `logging` waere konsistenter.
+
+#### 12. Kein API-Versioning
+Alle Endpoints direkt unter `/generate`, `/assets` etc. ohne Versions-Prefix.
+
+**Empfehlung:** `/api/v1/` Prefix einfuehren fuer zukuenftige Migrationen.
+
+#### 13. CORS allow_headers zu permissiv
+`api/app/main.py` setzt `allow_headers=["*"]` — sollte auf benoetigte Headers eingeschraenkt werden.
 
 ---
 
