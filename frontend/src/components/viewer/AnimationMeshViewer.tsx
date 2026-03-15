@@ -123,6 +123,24 @@ export function AnimationMeshViewer({
     resizeObserver.observe(container);
     resize();
 
+    /** Sammelt AnimationClips aus dem Objekt (Root + Kinder, für FBX-Fallback). */
+    const collectAnimations = (obj: THREE.Object3D): THREE.AnimationClip[] => {
+      const clips: THREE.AnimationClip[] = [];
+      const seen = new Set<THREE.AnimationClip>();
+      obj.traverse((child) => {
+        const anims = (child as THREE.Group & { animations?: THREE.AnimationClip[] }).animations;
+        if (anims?.length) {
+          for (const clip of anims) {
+            if (!seen.has(clip)) {
+              seen.add(clip);
+              clips.push(clip);
+            }
+          }
+        }
+      });
+      return clips;
+    };
+
     const onModelLoaded = (model: THREE.Group, clips: THREE.AnimationClip[]) => {
       if (!mountedRef.current) return;
 
@@ -142,16 +160,17 @@ export function AnimationMeshViewer({
 
       scene.add(model);
 
+      const allClips = clips.length > 0 ? clips : collectAnimations(model);
       const mixer = new THREE.AnimationMixer(model);
       mixerRef.current = mixer;
       const actions = new Map<string, THREE.AnimationAction>();
       actionsRef.current = actions;
 
-      clipsRef.current = clips;
-      const names = clips.map((c, i) => c.name || `clip_${i}`);
+      clipsRef.current = allClips;
+      const names = allClips.map((c, i) => c.name || `clip_${i}`);
       setClipNames(names);
 
-      clips.forEach((clip, i) => {
+      allClips.forEach((clip, i) => {
         const key = clip.name || `clip_${i}`;
         const action = mixer.clipAction(clip);
         action.setLoop(THREE.LoopRepeat, Infinity);
@@ -160,7 +179,9 @@ export function AnimationMeshViewer({
 
       if (names.length > 0) {
         setSelectedClip(names[0]);
-        setDuration(clips[0].duration);
+        setDuration(allClips[0].duration);
+      } else if (mountedRef.current) {
+        setError("Keine Animationen im File gefunden");
       }
 
       setLoading(false);
