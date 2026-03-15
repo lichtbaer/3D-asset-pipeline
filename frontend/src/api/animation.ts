@@ -1,4 +1,4 @@
-import { apiClient } from "./client.js";
+import { API_BASE, apiClient } from "./client.js";
 
 export interface AnimationGenerateRequest {
   source_glb_url: string;
@@ -70,7 +70,7 @@ export async function postGenerateAnimation(
 export async function getAnimationJobStatus(
   jobId: string
 ): Promise<AnimationJob> {
-  const baseUrl = apiClient.defaults.baseURL ?? import.meta.env.VITE_API_URL ?? "http://localhost:8000";
+  const baseUrl = API_BASE;
   const { data } = await apiClient.get<{
     job_id: string;
     status: string;

@@ -1,4 +1,4 @@
-from fastapi import Depends, FastAPI
+from fastapi import APIRouter, Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
@@ -33,12 +33,15 @@ _api_auth = [Depends(verify_api_key)]
 app = FastAPI(title="Purzel ML Asset Pipeline API")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
-app.include_router(agents.router, dependencies=_api_auth)
-app.include_router(generation.router, dependencies=_api_auth)
-app.include_router(assets.router, dependencies=_api_auth)
-app.include_router(presets.router, dependencies=_api_auth)
-app.include_router(sketchfab.router, dependencies=_api_auth)
-app.include_router(storage.router, dependencies=_api_auth)
+
+_v1 = APIRouter(prefix="/api/v1")
+_v1.include_router(agents.router)
+_v1.include_router(generation.router)
+_v1.include_router(assets.router)
+_v1.include_router(presets.router)
+_v1.include_router(sketchfab.router)
+_v1.include_router(storage.router)
+app.include_router(_v1, dependencies=_api_auth)
 app.mount("/static/meshes", StaticFiles(directory=str(MESH_STORAGE_PATH)), name="meshes")
 app.mount(
     "/static/bgremoval",
@@ -63,7 +66,7 @@ app.add_middleware(
     allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
-    allow_headers=["*"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 

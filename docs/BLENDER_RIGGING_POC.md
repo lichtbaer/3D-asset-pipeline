@@ -28,7 +28,7 @@ Oder direkt mit Docker:
 ```bash
 docker compose --profile tools run --rm blender \
   --background \
-  --python /workspace/scripts/blender_rig_test.py \
+  --python /workspace/api/scripts/blender_rig_human.py \
   -- /workspace/storage/meshes/input.glb /workspace/storage/meshes/output_rigged.glb
 ```
 

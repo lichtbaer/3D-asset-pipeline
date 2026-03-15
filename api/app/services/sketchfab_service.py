@@ -103,6 +103,7 @@ class SketchfabService:
                     err_json = response.json()
                     err_msg = err_json.get("detail", err_json.get("error", err_body))
                 except Exception:
+                    logger.debug("Sketchfab error response not JSON")
                     err_msg = err_body
                 raise RuntimeError(f"Sketchfab Upload fehlgeschlagen: {err_msg}")
 

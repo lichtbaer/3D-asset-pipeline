@@ -149,18 +149,30 @@ def sample_asset_with_image(tmp_storage_paths: Path, tmp_assets_dir: Path) -> st
     return asset_id
 
 
+API_PREFIX = "/api/v1"
+
+
+class PrefixedTestClient(TestClient):
+    """TestClient der /api/v1 Prefix automatisch zu relativen Pfaden hinzufuegt."""
+
+    def request(self, method: str, url: str, **kwargs):
+        if url.startswith("/") and not url.startswith(API_PREFIX):
+            url = f"{API_PREFIX}{url}"
+        return super().request(method, url, **kwargs)
+
+
 @pytest.fixture
 def test_client():
-    """FastAPI TestClient."""
+    """FastAPI TestClient mit /api/v1 Prefix."""
 
     def _client():
         from app.main import app
-        return TestClient(app)
+        return PrefixedTestClient(app)
 
     return _client
 
 
 @pytest.fixture
 def client(test_client) -> TestClient:
-    """TestClient-Instanz."""
+    """TestClient-Instanz mit automatischem /api/v1 Prefix."""
     return test_client()

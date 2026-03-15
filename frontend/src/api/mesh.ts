@@ -1,4 +1,4 @@
-import { apiClient } from "./client.js";
+import { API_BASE, apiClient } from "./client.js";
 
 export interface MeshGenerationRequest {
   source_image_url: string;
@@ -71,7 +71,7 @@ export async function getMeshJobStatus(jobId: string): Promise<MeshJob> {
     asset_id: string | null;
     failed_at?: string | null;
   }>(`/generate/mesh/${jobId}`);
-  const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
+  const baseUrl = API_BASE;
   const glb_url = data.glb_url
     ? (data.glb_url.startsWith("http") ? data.glb_url : `${baseUrl}${data.glb_url}`)
     : null;
