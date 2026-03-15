@@ -13,6 +13,8 @@ export interface BgRemovalJobStatusProps {
   onJobUpdate?: (job: BgRemovalJob) => void;
   onUseForMesh?: (resultUrl: string) => void;
   onRetrySuccess?: (newJobId: string) => void;
+  /** Versteckt den "→ Als Mesh-Input verwenden"-Button (z.B. wenn ImageEditor sichtbar) */
+  hideUseForMesh?: boolean;
 }
 
 export function BgRemovalJobStatus({
@@ -20,6 +22,7 @@ export function BgRemovalJobStatus({
   onJobUpdate,
   onUseForMesh,
   onRetrySuccess,
+  hideUseForMesh = false,
 }: BgRemovalJobStatusProps) {
   const queryClient = useQueryClient();
   const { data, isLoading, error } = useQuery({
@@ -101,7 +104,7 @@ export function BgRemovalJobStatus({
             />
           </div>
         </div>
-        {onUseForMesh && (
+        {onUseForMesh && !hideUseForMesh && (
           <button
             type="button"
             className="btn btn--outline btn--sm"

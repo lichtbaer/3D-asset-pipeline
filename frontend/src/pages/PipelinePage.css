@@ -104,6 +104,11 @@
   margin-bottom: var(--space-sm);
 }
 
+.image-editor__primary-cta {
+  margin-top: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
 .image-editor__resize {
   margin-top: var(--space-lg);
 }

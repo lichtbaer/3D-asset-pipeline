@@ -12,11 +12,14 @@ export interface BgRemovalJobHistoryEntry {
 export interface BgRemovalJobHistoryProps {
   jobs: BgRemovalJobHistoryEntry[];
   onUseForMesh?: (resultUrl: string) => void;
+  /** Asset-IDs, für die der "→ Als Mesh-Input verwenden"-Button versteckt wird (ImageEditor zeigt ihn) */
+  hideUseForMeshForAssetIds?: string[];
 }
 
 export function BgRemovalJobHistory({
   jobs,
   onUseForMesh,
+  hideUseForMeshForAssetIds = [],
 }: BgRemovalJobHistoryProps) {
   if (jobs.length === 0) {
     return (
@@ -55,15 +58,21 @@ export function BgRemovalJobHistory({
               >
                 {job.status}
               </span>
-              {job.status === "done" && job.result_url && onUseForMesh && (
-                <button
-                  type="button"
-                  className="btn btn--outline btn--sm"
-                  onClick={() => onUseForMesh(job.result_url!)}
-                >
-                  → Als Mesh-Input verwenden
-                </button>
-              )}
+              {job.status === "done" &&
+                job.result_url &&
+                onUseForMesh &&
+                !(
+                  job.asset_id &&
+                  hideUseForMeshForAssetIds.includes(job.asset_id)
+                ) && (
+                  <button
+                    type="button"
+                    className="btn btn--outline btn--sm"
+                    onClick={() => onUseForMesh(job.result_url!)}
+                  >
+                    → Als Mesh-Input verwenden
+                  </button>
+                )}
               {job.status === "done" && job.asset_id && (
                 <Link
                   to={`/assets/${job.asset_id}`}
