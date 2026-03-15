@@ -11,7 +11,7 @@ import { JobErrorBlock } from "../generation/JobErrorBlock.js";
 export interface BgRemovalJobStatusProps {
   jobId: string | null;
   onJobUpdate?: (job: BgRemovalJob) => void;
-  onUseForMesh?: (resultUrl: string) => void;
+  onUseForMesh?: (resultUrl: string, assetId?: string) => void;
   onRetrySuccess?: (newJobId: string) => void;
   /** Versteckt den "→ Als Mesh-Input verwenden"-Button (z.B. wenn ImageEditor sichtbar) */
   hideUseForMesh?: boolean;
@@ -108,7 +108,7 @@ export function BgRemovalJobStatus({
           <button
             type="button"
             className="btn btn--outline btn--sm"
-            onClick={() => onUseForMesh(result_url)}
+            onClick={() => onUseForMesh(result_url, data.asset_id ?? undefined)}
           >
             → Als Mesh-Input verwenden
           </button>

@@ -13,8 +13,9 @@ export interface CompareResultsProps {
   providerLabelA: string;
   providerLabelB: string;
   step: CompareStep;
-  onUseForMesh?: (resultUrl: string) => void;
-  onUseForBgRemoval?: (resultUrl: string) => void;
+  /** resultUrl, assetId (für Asset-Verknüpfung) */
+  onUseForMesh?: (resultUrl: string, assetId?: string) => void;
+  onUseForBgRemoval?: (resultUrl: string, assetId?: string) => void;
   onRetrySuccessA?: (newJobId: string) => void;
   onRetrySuccessB?: (newJobId: string) => void;
 }
@@ -28,8 +29,8 @@ function CompareResultColumnImage({
 }: {
   jobId: string;
   providerLabel: string;
-  onUseForMesh?: (resultUrl: string) => void;
-  onUseForBgRemoval?: (resultUrl: string) => void;
+  onUseForMesh?: (resultUrl: string, assetId?: string) => void;
+  onUseForBgRemoval?: (resultUrl: string, assetId?: string) => void;
   onRetrySuccess?: (newJobId: string) => void;
 }) {
   const queryClient = useQueryClient();
@@ -121,8 +122,8 @@ function CompareResultColumnContent({
   error: Error | null;
   providerLabel: string;
   step: CompareStep;
-  onUseForMesh?: (resultUrl: string) => void;
-  onUseForBgRemoval?: (resultUrl: string) => void;
+  onUseForMesh?: (resultUrl: string, assetId?: string) => void;
+  onUseForBgRemoval?: (resultUrl: string, assetId?: string) => void;
   onRetry?: () => void;
   isRetrying?: boolean;
 }) {
@@ -176,7 +177,7 @@ function CompareResultColumnContent({
                 <button
                   type="button"
                   className="btn btn--outline btn--sm"
-                  onClick={() => onUseForMesh(imageJobData.result_url!)}
+                  onClick={() => onUseForMesh(imageJobData.result_url!, imageJobData.asset_id ?? undefined)}
                 >
                   → Weiter verwenden (Mesh)
                 </button>
@@ -185,7 +186,7 @@ function CompareResultColumnContent({
                 <button
                   type="button"
                   className="btn btn--outline btn--sm"
-                  onClick={() => onUseForBgRemoval(imageJobData.result_url!)}
+                  onClick={() => onUseForBgRemoval(imageJobData.result_url!, imageJobData.asset_id ?? undefined)}
                 >
                   → Weiter verwenden (Freistellung)
                 </button>

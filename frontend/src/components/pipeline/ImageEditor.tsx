@@ -15,7 +15,8 @@ import {
 
 interface ImageEditorProps {
   assetId: string;
-  onUseForMesh: (imageUrl: string) => void;
+  /** (imageUrl, assetId?) – assetId für Asset-Verknüpfung beim Mesh-Step */
+  onUseForMesh: (imageUrl: string, assetId?: string) => void;
 }
 
 export function ImageEditor({ assetId, onUseForMesh }: ImageEditorProps) {
@@ -385,7 +386,7 @@ export function ImageEditor({ assetId, onUseForMesh }: ImageEditorProps) {
               <button
                 type="button"
                 className="btn btn--outline"
-                onClick={() => onUseForMesh(lastEditedUrl)}
+                onClick={() => onUseForMesh(lastEditedUrl, assetId)}
               >
                 → Als Mesh-Input verwenden
               </button>
@@ -454,7 +455,7 @@ export function ImageEditor({ assetId, onUseForMesh }: ImageEditorProps) {
                   type="button"
                   className="btn btn--sm btn--ghost"
                   onClick={() =>
-                    onUseForMesh(getAssetFileUrl(assetId, filename))
+                    onUseForMesh(getAssetFileUrl(assetId, filename), assetId)
                   }
                 >
                   → Als Mesh-Input verwenden

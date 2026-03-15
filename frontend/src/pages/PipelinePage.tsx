@@ -322,35 +322,39 @@ export function PipelinePage() {
   }, [urlAsset, urlAssetId, searchParams]);
 
   const handleUseForMesh = useCallback(
-    (resultUrl: string) => {
+    (resultUrl: string, assetId?: string) => {
       setPendingMeshImageUrl(resultUrl);
+      if (assetId) setActiveAssetId(assetId);
       setActiveTab("mesh");
     },
-    [setActiveTab]
+    [setActiveTab, setActiveAssetId]
   );
 
   const handleUseForBgRemoval = useCallback(
-    (resultUrl: string) => {
+    (resultUrl: string, assetId?: string) => {
       setPendingBgRemovalImageUrl(resultUrl);
+      if (assetId) setActiveAssetId(assetId);
       setActiveTab("bgremoval");
     },
-    [setActiveTab]
+    [setActiveTab, setActiveAssetId]
   );
 
   const handleCompareUseForMesh = useCallback(
-    (resultUrl: string) => {
+    (resultUrl: string, assetId?: string) => {
       setMeshSourceImageUrl(resultUrl);
+      if (assetId) setActiveAssetId(assetId);
       setActiveTab("mesh");
     },
-    [setActiveTab]
+    [setActiveTab, setActiveAssetId]
   );
 
   const handleCompareUseForBgRemoval = useCallback(
-    (resultUrl: string) => {
+    (resultUrl: string, assetId?: string) => {
       setPendingBgRemovalImageUrl(resultUrl);
+      if (assetId) setActiveAssetId(assetId);
       setActiveTab("bgremoval");
     },
-    [setActiveTab]
+    [setActiveTab, setActiveAssetId]
   );
 
   const [currentImageJobId, setCurrentImageJobId] = useState<string | null>(null);
@@ -670,11 +674,10 @@ export function PipelinePage() {
       provider_key: string;
       asset_id?: string | null;
     } = { ...req };
-    if (activeAssetId) {
-      payload.asset_id = activeAssetId;
-      setActiveAssetId(null);
-    } else if (req.asset_id) {
-      payload.asset_id = req.asset_id;
+    const effectiveAssetId = activeAssetId ?? urlAssetId ?? req.asset_id ?? undefined;
+    if (effectiveAssetId) {
+      payload.asset_id = effectiveAssetId;
+      if (activeAssetId) setActiveAssetId(null);
     }
     riggingCreateMutation.mutate(payload);
   };
@@ -781,9 +784,10 @@ export function PipelinePage() {
       params?: Record<string, unknown>;
       asset_id?: string;
     } = { ...req };
-    if (activeAssetId) {
-      payload.asset_id = activeAssetId;
-      setActiveAssetId(null);
+    const effectiveAssetId = activeAssetId ?? urlAssetId ?? req.asset_id ?? undefined;
+    if (effectiveAssetId) {
+      payload.asset_id = effectiveAssetId;
+      if (activeAssetId) setActiveAssetId(null);
     }
     animationCreateMutation.mutate(payload);
   };
@@ -811,9 +815,10 @@ export function PipelinePage() {
       bgremoval_provider_key?: string;
       asset_id?: string;
     } = { ...req };
-    if (activeAssetId) {
-      payload.asset_id = activeAssetId;
-      setActiveAssetId(null);
+    const effectiveAssetId = activeAssetId ?? urlAssetId ?? undefined;
+    if (effectiveAssetId) {
+      payload.asset_id = effectiveAssetId;
+      if (activeAssetId) setActiveAssetId(null);
     }
     meshCreateMutation.mutate(payload);
   };
@@ -827,9 +832,10 @@ export function PipelinePage() {
       provider_key: string;
       asset_id?: string;
     } = { ...req };
-    if (activeAssetId) {
-      payload.asset_id = activeAssetId;
-      setActiveAssetId(null);
+    const effectiveAssetId = activeAssetId ?? urlAssetId ?? undefined;
+    if (effectiveAssetId) {
+      payload.asset_id = effectiveAssetId;
+      if (activeAssetId) setActiveAssetId(null);
     }
     bgRemovalCreateMutation.mutate(payload);
   };
