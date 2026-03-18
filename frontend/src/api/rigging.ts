@@ -1,4 +1,5 @@
-import { API_BASE, apiClient } from "./client.js";
+import { apiClient } from "./client.js";
+import { toAbsoluteUrl, createRetryFn } from "./utils.js";
 
 export interface RiggingGenerateRequest {
   source_glb_url: string;
@@ -67,12 +68,7 @@ export async function getRiggingJobStatus(
     asset_id: string | null;
     failed_at?: string | null;
   }>(`/generate/rigging/${jobId}`);
-  const baseUrl = API_BASE;
-  const glb_url = data.glb_url
-    ? data.glb_url.startsWith("http")
-      ? data.glb_url
-      : `${baseUrl}${data.glb_url}`
-    : null;
+  const glb_url = toAbsoluteUrl(data.glb_url);
   return {
     job_id: String(data.job_id),
     status: data.status as RiggingJobStatus,
@@ -89,17 +85,7 @@ export async function getRiggingJobStatus(
   };
 }
 
-export async function retryRiggingJob(
-  jobId: string
-): Promise<{ job_id: string; status: string }> {
-  const { data } = await apiClient.post<{ job_id: string; status: string }>(
-    `/generate/rigging/retry/${jobId}`
-  );
-  return {
-    job_id: String(data.job_id),
-    status: data.status,
-  };
-}
+export const retryRiggingJob = createRetryFn("/generate/rigging");
 
 export async function getRiggingProviders(): Promise<GetRiggingProvidersResponse> {
   const { data } = await apiClient.get<GetRiggingProvidersResponse>(

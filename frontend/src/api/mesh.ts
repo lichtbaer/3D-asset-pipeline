@@ -1,4 +1,5 @@
-import { API_BASE, apiClient } from "./client.js";
+import { apiClient } from "./client.js";
+import { toAbsoluteUrl, createRetryFn } from "./utils.js";
 
 export interface MeshGenerationRequest {
   source_image_url: string;
@@ -71,10 +72,7 @@ export async function getMeshJobStatus(jobId: string): Promise<MeshJob> {
     asset_id: string | null;
     failed_at?: string | null;
   }>(`/generate/mesh/${jobId}`);
-  const baseUrl = API_BASE;
-  const glb_url = data.glb_url
-    ? (data.glb_url.startsWith("http") ? data.glb_url : `${baseUrl}${data.glb_url}`)
-    : null;
+  const glb_url = toAbsoluteUrl(data.glb_url);
   return {
     job_id: String(data.job_id),
     status: data.status as MeshJobStatus,
@@ -91,15 +89,7 @@ export async function getMeshJobStatus(jobId: string): Promise<MeshJob> {
   };
 }
 
-export async function retryMeshJob(jobId: string): Promise<{ job_id: string; status: string }> {
-  const { data } = await apiClient.post<{ job_id: string; status: string }>(
-    `/generate/mesh/retry/${jobId}`
-  );
-  return {
-    job_id: String(data.job_id),
-    status: data.status,
-  };
-}
+export const retryMeshJob = createRetryFn("/generate/mesh");
 
 export async function getMeshProviders(): Promise<GetMeshProvidersResponse> {
   const { data } = await apiClient.get<GetMeshProvidersResponse>(
