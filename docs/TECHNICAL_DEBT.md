@@ -25,32 +25,48 @@ Alle API-Endpoints unter `/api/v1/` Prefix. Health-Endpoint und Static-Mounts bl
 #### ~~13. CORS allow_headers zu permissiv~~ (behoben)
 `allow_headers` auf `["Content-Type", "Authorization"]` eingeschraenkt.
 
-#### ~~14. Duplizierte Error-Extraktion im Frontend~~ (behoben)
+#### ~~14. Error-Handling-Duplikation in Orchestrierungs-Services~~ (behoben)
+Alle 5 Orchestrierungsfunktionen (mesh, rigging, animation, image, bgremoval) hatten nahezu identische try-except-Bloecke.
+Zentraler `handle_provider_errors()` Context Manager in `api/app/services/job_error_handler.py` eingefuehrt.
+
+#### ~~15. Magic Strings fuer Job-Status~~ (behoben)
+Status-Werte `"pending"`, `"processing"`, `"done"`, `"failed"` waren als Strings ueberall verstreut.
+`JobStatus` StrEnum in `api/app/models/enums.py` eingefuehrt und in allen Services verwendet.
+
+#### ~~16. Lose Callback-Typisierung~~ (behoben)
+`Callable[..., Awaitable[None]]` Typ-Aliase verloren alle Typinformationen.
+Typsicheres `UpdateJobCallback` Protocol in `api/app/services/job_error_handler.py` eingefuehrt.
+
+#### ~~17. AssetMetadata als plain Python-Klasse~~ (behoben)
+`AssetMetadata` mit 17 Init-Parametern und manuellem `to_dict()` auf Pydantic `BaseModel` migriert.
+Automatische Validierung, Serialisierung und reduzierter Boilerplate.
+
+#### ~~18. Duplizierte Error-Extraktion im Frontend~~ (behoben)
 Fehler-Extraktion aus Axios-Responses war 3x dupliziert (AssetUploadZone, useChat, PromptAssistant).
 Zentralisiert in `frontend/src/utils/errorUtils.ts` (`extractErrorMessage`).
 
-#### ~~15. Duplizierte Job-Retry- und URL-Logik~~ (behoben)
+#### ~~19. Duplizierte Job-Retry- und URL-Logik~~ (behoben)
 Fast identische Retry-Funktionen und URL-Konstruktion in 4 API-Modulen (animation, bgremoval, mesh, rigging).
 Extrahiert in `frontend/src/api/utils.ts` (`createRetryFn`, `toAbsoluteUrl`).
 
-#### ~~16. Fehlende ErrorBoundary~~ (behoben)
+#### ~~20. Fehlende ErrorBoundary~~ (behoben)
 `App.tsx` hatte keine React ErrorBoundary. Unbehandelte Render-Fehler fuehrten zu leerer Seite.
 `ErrorBoundary`-Komponente in `frontend/src/components/ErrorBoundary.tsx` hinzugefuegt.
 
-#### ~~17. Stille Fehler in AssetDetailModal~~ (behoben)
+#### ~~21. Stille Fehler in AssetDetailModal~~ (behoben)
 `saveMeta()`, `handleStepDeleteClick()` und `handleStepDeleteConfirm()` ignorierten Fehler.
 Jetzt werden Toast-Benachrichtigungen bei Fehler angezeigt.
 
-#### ~~18. Chat-SessionStorage ohne Debounce~~ (behoben)
+#### ~~22. Chat-SessionStorage ohne Debounce~~ (behoben)
 `useChat` schrieb bei jeder Nachricht sofort in sessionStorage. Jetzt mit 500ms Debounce und
 Begrenzung auf max. 50 gespeicherte Nachrichten.
 
-#### ~~19. Duplizierter AssetStepData-Typ~~ (behoben)
+#### ~~23. Duplizierter AssetStepData-Typ~~ (behoben)
 `AssetStepData` war in `AssetDetailModal.tsx` lokal definiert, obwohl `assets.ts` einen generischen
 `Record<string, unknown>` fuer Steps nutzte. Konkreten `AssetStepData`-Typ in `assets.ts` definiert
 und in AssetDetailModal importiert.
 
-#### ~~20. npm audit fehlte in CI~~ (behoben)
+#### ~~24. npm audit fehlte in CI~~ (behoben)
 Backend hatte `pip-audit` in der CI-Pipeline, Frontend nicht. `npm audit --audit-level=high`
 als CI-Schritt im Frontend-Job hinzugefuegt.
 
@@ -132,3 +148,7 @@ Mehrere Dateien sind zu gross und sollten aufgeteilt werden:
 - Alembic-Migrationen ordentlich versioniert
 - API-Versioning unter `/api/v1/` (neu)
 - Pydantic-basierte Settings mit `.env`-Support (neu)
+- Zentralisiertes Error-Handling via Context Manager (neu)
+- JobStatus StrEnum statt Magic Strings (neu)
+- Typsichere Callback-Protokolle (neu)
+- AssetMetadata als Pydantic BaseModel (neu)

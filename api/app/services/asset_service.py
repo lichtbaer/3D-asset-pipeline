@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+from pydantic import BaseModel, Field
 
 from app.config.storage import (
     ASSETS_STORAGE_PATH,
@@ -25,92 +26,60 @@ from app.services.metadata_service import get_metadata_service
 
 logger = logging.getLogger(__name__)
 
-# Step-Typen für metadata.json
+# Step-Typen fuer metadata.json
 StepType = str  # "image" | "bgremoval" | "mesh"
 
+# Felder die immer in to_dict() enthalten sind
+_ALWAYS_INCLUDE = frozenset({
+    "asset_id", "created_at", "updated_at", "steps",
+    "processing", "image_processing", "texture_baking", "exports",
+})
 
-class AssetMetadata:
-    """Repräsentation der metadata.json eines Assets."""
 
-    def __init__(
-        self,
-        asset_id: str,
-        created_at: str,
-        updated_at: str,
-        steps: dict[str, dict[str, Any]],
-        processing: list[dict[str, Any]] | None = None,
-        image_processing: list[dict[str, Any]] | None = None,
-        texture_baking: list[dict[str, Any]] | None = None,
-        sketchfab_upload: dict[str, Any] | None = None,
-        source: str | None = None,
-        sketchfab_uid: str | None = None,
-        sketchfab_url: str | None = None,
-        sketchfab_author: str | None = None,
-        downloaded_at: str | None = None,
-        exports: list[dict[str, Any]] | None = None,
-        deleted_at: str | None = None,
-        name: str | None = None,
-        tags: list[str] | None = None,
-        rating: int | None = None,
-        notes: str | None = None,
-        favorited: bool | None = None,
-    ):
-        self.asset_id = asset_id
-        self.created_at = created_at
-        self.updated_at = updated_at
-        self.steps = steps
-        self.processing = processing or []
-        self.image_processing = image_processing or []
-        self.texture_baking = texture_baking or []
-        self.sketchfab_upload = sketchfab_upload
-        self.source = source
-        self.sketchfab_uid = sketchfab_uid
-        self.sketchfab_url = sketchfab_url
-        self.sketchfab_author = sketchfab_author
-        self.downloaded_at = downloaded_at
-        self.exports = exports or []
-        self.deleted_at = deleted_at
-        self.name = name
-        self.tags = tags or []
-        self.rating = rating
-        self.notes = notes
-        self.favorited = favorited or False
+class AssetMetadata(BaseModel):
+    """Repraesentation der metadata.json eines Assets."""
+
+    model_config = {"populate_by_name": True}
+
+    asset_id: str
+    created_at: str
+    updated_at: str
+    steps: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    processing: list[dict[str, Any]] = Field(default_factory=list)
+    image_processing: list[dict[str, Any]] = Field(default_factory=list)
+    texture_baking: list[dict[str, Any]] = Field(default_factory=list)
+    exports: list[dict[str, Any]] = Field(default_factory=list)
+    sketchfab_upload: dict[str, Any] | None = None
+    source: str | None = None
+    sketchfab_uid: str | None = None
+    sketchfab_url: str | None = None
+    sketchfab_author: str | None = None
+    downloaded_at: str | None = None
+    deleted_at: str | None = None
+    name: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    rating: int | None = None
+    notes: str | None = None
+    favorited: bool = False
 
     def to_dict(self) -> dict[str, Any]:
-        out: dict[str, Any] = {
-            "asset_id": self.asset_id,
-            "created_at": self.created_at,
-            "updated_at": self.updated_at,
-            "steps": self.steps,
-            "processing": self.processing,
-            "image_processing": self.image_processing,
-            "texture_baking": self.texture_baking,
-            "exports": self.exports,
-        }
-        if self.sketchfab_upload is not None:
-            out["sketchfab_upload"] = self.sketchfab_upload
-        if self.source is not None:
-            out["source"] = self.source
-        if self.sketchfab_uid is not None:
-            out["sketchfab_uid"] = self.sketchfab_uid
-        if self.sketchfab_url is not None:
-            out["sketchfab_url"] = self.sketchfab_url
-        if self.sketchfab_author is not None:
-            out["sketchfab_author"] = self.sketchfab_author
-        if self.downloaded_at is not None:
-            out["downloaded_at"] = self.downloaded_at
-        if self.deleted_at is not None:
-            out["deleted_at"] = self.deleted_at
-        if self.name is not None:
-            out["name"] = self.name
-        if self.tags:
-            out["tags"] = self.tags
-        if self.rating is not None:
-            out["rating"] = self.rating
-        if self.notes is not None:
-            out["notes"] = self.notes
-        if self.favorited is not None:
-            out["favorited"] = self.favorited
+        """Serialisiert fuer metadata.json — optionale Felder nur wenn gesetzt."""
+        full = self.model_dump()
+        out: dict[str, Any] = {k: v for k, v in full.items() if k in _ALWAYS_INCLUDE}
+        for key, value in full.items():
+            if key in _ALWAYS_INCLUDE:
+                continue
+            # tags: nur wenn nicht-leer
+            if key == "tags":
+                if value:
+                    out[key] = value
+            # favorited: immer wenn True (bool-Default ist False)
+            elif key == "favorited":
+                if value:
+                    out[key] = value
+            # alle anderen: nur wenn nicht None
+            elif value is not None:
+                out[key] = value
         return out
 
 
@@ -164,28 +133,7 @@ def get_asset(asset_id: str) -> AssetMetadata | None:
     data = get_metadata_service().read(asset_id)
     if not data:
         return None
-    return AssetMetadata(
-        asset_id=data["asset_id"],
-        created_at=data["created_at"],
-        updated_at=data["updated_at"],
-        steps=data.get("steps", {}),
-        processing=data.get("processing", []),
-        image_processing=data.get("image_processing", []),
-        texture_baking=data.get("texture_baking", []),
-        sketchfab_upload=data.get("sketchfab_upload"),
-        source=data.get("source"),
-        sketchfab_uid=data.get("sketchfab_uid"),
-        sketchfab_url=data.get("sketchfab_url"),
-        sketchfab_author=data.get("sketchfab_author"),
-        downloaded_at=data.get("downloaded_at"),
-        exports=data.get("exports", []),
-        deleted_at=data.get("deleted_at"),
-        name=data.get("name"),
-        tags=data.get("tags", []),
-        rating=data.get("rating"),
-        notes=data.get("notes"),
-        favorited=data.get("favorited", False),
-    )
+    return AssetMetadata(**data)
 
 
 def _get_search_text(meta: AssetMetadata) -> str:

@@ -3,23 +3,14 @@ Orchestrierung der Rigging-Generierung: Download, Provider-Aufruf, Speicherung.
 """
 import asyncio
 import logging
-from typing import Awaitable, Callable
 
 from app.config.storage import MESH_STORAGE_PATH
-from app.exceptions import (
-    BlenderRigifyError,
-    BlenderRigifyTimeoutError,
-    UniRigInvalidMeshError,
-    UniRigTimeoutError,
-)
-from app.logging_utils import log_job_error
+from app.models.enums import JobStatus
 from app.providers.rigging import get_rigging_provider
 from app.providers.rigging.base import RiggingParams
+from app.services.job_error_handler import UpdateJobCallback, handle_provider_errors
 
 logger = logging.getLogger(__name__)
-
-# (job_id, status, glb_file_path, error_msg, *, error_type, error_detail)
-UpdateRiggingJobCallback = Callable[..., Awaitable[None]]
 
 RIGGING_TIMEOUT_SEC = 300
 
@@ -29,116 +20,27 @@ async def run_rigging(
     source_glb_url: str,
     provider_key: str,
     asset_id: str | None,
-    update_job_callback: UpdateRiggingJobCallback,
+    update_job_callback: UpdateJobCallback,
 ) -> None:
     """
-    Führt das Rigging über den konfigurierten Provider aus.
+    Fuehrt das Rigging ueber den konfigurierten Provider aus.
     """
     provider = get_rigging_provider(provider_key)
     params = RiggingParams(source_glb_url=source_glb_url, asset_id=asset_id)
 
-    await update_job_callback(job_id, "processing", None, None)
+    await update_job_callback(job_id, JobStatus.PROCESSING, None, None)
 
-    try:
+    result = None
+    async with handle_provider_errors(
+        logger, job_id, provider_key, update_job_callback, provider.display_name
+    ):
         result = await asyncio.wait_for(
             provider.rig(params),
             timeout=RIGGING_TIMEOUT_SEC,
         )
-    except asyncio.TimeoutError:
-        err = f"Rigging timed out after {RIGGING_TIMEOUT_SEC}s"
-        log_job_error(
-            logger,
-            "Rigging Timeout",
-            job_id=job_id,
-            provider_key=provider_key,
-            error_type="UniRigTimeoutError",
-            error_detail=err,
-        )
-        await update_job_callback(
-            job_id,
-            "failed",
-            None,
-            err,
-            error_type="UniRigTimeoutError",
-            error_detail=err,
-        )
-        return
-    except (UniRigTimeoutError, BlenderRigifyTimeoutError) as e:
-        err = str(e)
-        error_type = type(e).__name__
-        log_job_error(
-            logger,
-            "Rigging Timeout",
-            job_id=job_id,
-            provider_key=provider_key,
-            error_type=error_type,
-            error_detail=err,
-        )
-        await update_job_callback(
-            job_id,
-            "failed",
-            None,
-            err,
-            error_type=error_type,
-            error_detail=err,
-        )
-        return
-    except (UniRigInvalidMeshError, BlenderRigifyError) as e:
-        err = str(e)
-        error_type = type(e).__name__
-        log_job_error(
-            logger,
-            "Rigging: Mesh nicht riggbar" if isinstance(e, UniRigInvalidMeshError) else "Blender Rigify Fehler",
-            job_id=job_id,
-            provider_key=provider_key,
-            error_type=error_type,
-            error_detail=err,
-        )
-        await update_job_callback(
-            job_id,
-            "failed",
-            None,
-            err,
-            error_type=error_type,
-            error_detail=err,
-        )
-        return
-    except ValueError as e:
-        log_job_error(
-            logger,
-            "Rigging: ungültige Parameter",
-            job_id=job_id,
-            provider_key=provider_key,
-            error_type="ValueError",
-            error_detail=str(e),
-        )
-        await update_job_callback(
-            job_id,
-            "failed",
-            None,
-            str(e),
-            error_type="ValueError",
-            error_detail=str(e),
-        )
-        return
-    except Exception as e:
-        log_job_error(
-            logger,
-            f"{provider.display_name} Fehler",
-            job_id=job_id,
-            provider_key=provider_key,
-            error_type=type(e).__name__,
-            error_detail=str(e),
-        )
-        await update_job_callback(
-            job_id,
-            "failed",
-            None,
-            str(e),
-            error_type=type(e).__name__,
-            error_detail=str(e),
-        )
-        return
+
+    if result is None:
+        return  # Fehler wurde vom Context Manager behandelt
 
     # Speichere rigged GLB in MESH_STORAGE_PATH (analog zu mesh jobs)
     MESH_STORAGE_PATH.mkdir(parents=True, exist_ok=True)
@@ -146,4 +48,4 @@ async def run_rigging(
     target_glb.write_bytes(result.rigged_glb_bytes)
     stored_path = str(target_glb)
 
-    await update_job_callback(job_id, "done", stored_path, None)
+    await update_job_callback(job_id, JobStatus.DONE, stored_path, None)
