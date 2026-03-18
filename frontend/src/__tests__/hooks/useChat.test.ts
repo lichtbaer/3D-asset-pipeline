@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useChat } from "../../hooks/useChat.js";
 
@@ -10,6 +10,7 @@ const STORAGE_KEY = "purzel-chat-history";
 
 describe("useChat", () => {
   beforeEach(async () => {
+    vi.useFakeTimers();
     sessionStorage.clear();
     vi.clearAllMocks();
     const { sendChatMessage } = await import("../../api/chat.js");
@@ -19,6 +20,10 @@ describe("useChat", () => {
       prompt_suggestion: null,
       action: null,
     });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("lädt leere History aus sessionStorage", () => {
@@ -31,6 +36,11 @@ describe("useChat", () => {
 
     await act(async () => {
       result.current.sendMessage("Hallo");
+    });
+
+    // Advance past debounce timer
+    act(() => {
+      vi.advanceTimersByTime(600);
     });
 
     const stored = sessionStorage.getItem(STORAGE_KEY);
@@ -52,8 +62,8 @@ describe("useChat", () => {
     });
     expect(result.current.messages).toEqual([]);
     const stored = sessionStorage.getItem(STORAGE_KEY);
-    expect(stored).toBeTruthy();
-    expect(JSON.parse(stored!)).toEqual([]);
+    // clearHistory calls sessionStorage.removeItem directly
+    expect(stored).toBeNull();
   });
 
   it("ignoriert leere Nachrichten", async () => {

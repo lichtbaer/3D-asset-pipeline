@@ -1,4 +1,5 @@
-import { API_BASE, apiClient } from "./client.js";
+import { apiClient } from "./client.js";
+import { toAbsoluteUrl, createRetryFn } from "./utils.js";
 
 export interface AnimationGenerateRequest {
   source_glb_url: string;
@@ -70,7 +71,6 @@ export async function postGenerateAnimation(
 export async function getAnimationJobStatus(
   jobId: string
 ): Promise<AnimationJob> {
-  const baseUrl = API_BASE;
   const { data } = await apiClient.get<{
     job_id: string;
     status: string;
@@ -86,10 +86,7 @@ export async function getAnimationJobStatus(
     asset_id: string | null;
     failed_at?: string | null;
   }>(`/generate/animation/${jobId}`);
-  const animated_glb_url =
-    data.animated_glb_url && !data.animated_glb_url.startsWith("http")
-      ? `${baseUrl}${data.animated_glb_url}`
-      : data.animated_glb_url;
+  const animated_glb_url = toAbsoluteUrl(data.animated_glb_url);
   return {
     job_id: String(data.job_id),
     status: data.status as AnimationJobStatus,
@@ -107,14 +104,4 @@ export async function getAnimationJobStatus(
   };
 }
 
-export async function retryAnimationJob(
-  jobId: string
-): Promise<{ job_id: string; status: string }> {
-  const { data } = await apiClient.post<{ job_id: string; status: string }>(
-    `/generate/animation/retry/${jobId}`
-  );
-  return {
-    job_id: String(data.job_id),
-    status: data.status,
-  };
-}
+export const retryAnimationJob = createRetryFn("/generate/animation");

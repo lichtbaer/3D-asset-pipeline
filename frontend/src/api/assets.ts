@@ -54,11 +54,21 @@ export interface TextureBakingEntry {
   baked_at: string;
 }
 
+export interface AssetStepData {
+  job_id?: string;
+  provider_key?: string;
+  file?: string;
+  prompt?: string;
+  motion_prompt?: string;
+  generated_at?: string | null;
+  [key: string]: unknown;
+}
+
 export interface AssetDetail {
   asset_id: string;
   created_at: string;
   updated_at: string;
-  steps: Record<string, Record<string, unknown>>;
+  steps: Record<string, AssetStepData>;
   processing?: ProcessingEntry[];
   image_processing?: ImageProcessingEntry[];
   texture_baking?: TextureBakingEntry[];

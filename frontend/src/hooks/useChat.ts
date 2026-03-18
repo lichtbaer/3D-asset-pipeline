@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { sendChatMessage } from "../api/chat.js";
 import type { ChatMessage } from "../api/chat.js";
+import { extractErrorMessage } from "../utils/errorUtils.js";
 
 const STORAGE_KEY = "purzel-chat-history";
+const MAX_STORED_MESSAGES = 50;
+const SAVE_DEBOUNCE_MS = 500;
 
 function loadHistory(): ChatMessage[] {
   try {
@@ -25,9 +28,10 @@ function loadHistory(): ChatMessage[] {
 
 function saveHistory(messages: ChatMessage[]): void {
   try {
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+    const trimmed = messages.slice(-MAX_STORED_MESSAGES);
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
   } catch {
-    // ignore
+    // ignore — sessionStorage may be full or unavailable
   }
 }
 
@@ -56,8 +60,11 @@ export function useChat({ assetId }: UseChatOptions = {}): UseChatResult {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => {
-    saveHistory(messages);
+    clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => saveHistory(messages), SAVE_DEBOUNCE_MS);
+    return () => clearTimeout(saveTimerRef.current);
   }, [messages]);
 
   const sendMessage = useCallback(
@@ -94,19 +101,7 @@ export function useChat({ assetId }: UseChatOptions = {}): UseChatResult {
           promptSuggestion: res.prompt_suggestion ?? null,
         });
       } catch (e) {
-        let errMsg: string;
-        if (e && typeof e === "object" && "response" in e) {
-          const res = (e as { response?: { data?: { detail?: unknown } } })
-            .response?.data?.detail;
-          errMsg =
-            typeof res === "string"
-              ? res
-              : res && typeof res === "object" && "message" in res
-                ? String((res as { message: unknown }).message)
-                : "Fehler beim Senden";
-        } else {
-          errMsg = e instanceof Error ? e.message : "Fehler beim Senden";
-        }
+        const errMsg = extractErrorMessage(e, "Fehler beim Senden");
         setError(errMsg);
         const fallbackMsg: ChatMessage = {
           role: "assistant",

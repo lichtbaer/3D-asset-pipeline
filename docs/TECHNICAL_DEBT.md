@@ -41,6 +41,35 @@ Typsicheres `UpdateJobCallback` Protocol in `api/app/services/job_error_handler.
 `AssetMetadata` mit 17 Init-Parametern und manuellem `to_dict()` auf Pydantic `BaseModel` migriert.
 Automatische Validierung, Serialisierung und reduzierter Boilerplate.
 
+#### ~~18. Duplizierte Error-Extraktion im Frontend~~ (behoben)
+Fehler-Extraktion aus Axios-Responses war 3x dupliziert (AssetUploadZone, useChat, PromptAssistant).
+Zentralisiert in `frontend/src/utils/errorUtils.ts` (`extractErrorMessage`).
+
+#### ~~19. Duplizierte Job-Retry- und URL-Logik~~ (behoben)
+Fast identische Retry-Funktionen und URL-Konstruktion in 4 API-Modulen (animation, bgremoval, mesh, rigging).
+Extrahiert in `frontend/src/api/utils.ts` (`createRetryFn`, `toAbsoluteUrl`).
+
+#### ~~20. Fehlende ErrorBoundary~~ (behoben)
+`App.tsx` hatte keine React ErrorBoundary. Unbehandelte Render-Fehler fuehrten zu leerer Seite.
+`ErrorBoundary`-Komponente in `frontend/src/components/ErrorBoundary.tsx` hinzugefuegt.
+
+#### ~~21. Stille Fehler in AssetDetailModal~~ (behoben)
+`saveMeta()`, `handleStepDeleteClick()` und `handleStepDeleteConfirm()` ignorierten Fehler.
+Jetzt werden Toast-Benachrichtigungen bei Fehler angezeigt.
+
+#### ~~22. Chat-SessionStorage ohne Debounce~~ (behoben)
+`useChat` schrieb bei jeder Nachricht sofort in sessionStorage. Jetzt mit 500ms Debounce und
+Begrenzung auf max. 50 gespeicherte Nachrichten.
+
+#### ~~23. Duplizierter AssetStepData-Typ~~ (behoben)
+`AssetStepData` war in `AssetDetailModal.tsx` lokal definiert, obwohl `assets.ts` einen generischen
+`Record<string, unknown>` fuer Steps nutzte. Konkreten `AssetStepData`-Typ in `assets.ts` definiert
+und in AssetDetailModal importiert.
+
+#### ~~24. npm audit fehlte in CI~~ (behoben)
+Backend hatte `pip-audit` in der CI-Pipeline, Frontend nicht. `npm audit --audit-level=high`
+als CI-Schritt im Frontend-Job hinzugefuegt.
+
 ---
 
 ## Offene Befunde
