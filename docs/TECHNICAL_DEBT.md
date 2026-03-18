@@ -25,6 +25,22 @@ Alle API-Endpoints unter `/api/v1/` Prefix. Health-Endpoint und Static-Mounts bl
 #### ~~13. CORS allow_headers zu permissiv~~ (behoben)
 `allow_headers` auf `["Content-Type", "Authorization"]` eingeschraenkt.
 
+#### ~~14. Error-Handling-Duplikation in Orchestrierungs-Services~~ (behoben)
+Alle 5 Orchestrierungsfunktionen (mesh, rigging, animation, image, bgremoval) hatten nahezu identische try-except-Bloecke.
+Zentraler `handle_provider_errors()` Context Manager in `api/app/services/job_error_handler.py` eingefuehrt.
+
+#### ~~15. Magic Strings fuer Job-Status~~ (behoben)
+Status-Werte `"pending"`, `"processing"`, `"done"`, `"failed"` waren als Strings ueberall verstreut.
+`JobStatus` StrEnum in `api/app/models/enums.py` eingefuehrt und in allen Services verwendet.
+
+#### ~~16. Lose Callback-Typisierung~~ (behoben)
+`Callable[..., Awaitable[None]]` Typ-Aliase verloren alle Typinformationen.
+Typsicheres `UpdateJobCallback` Protocol in `api/app/services/job_error_handler.py` eingefuehrt.
+
+#### ~~17. AssetMetadata als plain Python-Klasse~~ (behoben)
+`AssetMetadata` mit 17 Init-Parametern und manuellem `to_dict()` auf Pydantic `BaseModel` migriert.
+Automatische Validierung, Serialisierung und reduzierter Boilerplate.
+
 ---
 
 ## Offene Befunde
@@ -103,3 +119,7 @@ Mehrere Dateien sind zu gross und sollten aufgeteilt werden:
 - Alembic-Migrationen ordentlich versioniert
 - API-Versioning unter `/api/v1/` (neu)
 - Pydantic-basierte Settings mit `.env`-Support (neu)
+- Zentralisiertes Error-Handling via Context Manager (neu)
+- JobStatus StrEnum statt Magic Strings (neu)
+- Typsichere Callback-Protokolle (neu)
+- AssetMetadata als Pydantic BaseModel (neu)

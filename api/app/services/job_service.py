@@ -13,6 +13,7 @@ from sqlalchemy import select
 
 from app.database import async_session_factory
 from app.models import GenerationJob
+from app.models.enums import JobStatus
 from app.services import asset_service
 
 # Job-Typen die result_url nutzen (Image, BgRemoval, Sketchfab)
@@ -40,7 +41,7 @@ async def _persist_job_completion(job_id: str) -> None:
             select(GenerationJob).where(GenerationJob.id == UUID(job_id))
         )
         job = result.scalar_one_or_none()
-        if not job or job.status != "done":
+        if not job or job.status != JobStatus.DONE:
             return
 
         asset_id_str: str | None = str(job.asset_id) if job.asset_id else None
@@ -138,7 +139,7 @@ class JobService:
 
     async def start(self, job_id: str) -> None:
         """Setzt Job-Status auf processing."""
-        await self._update_status(job_id, "processing")
+        await self._update_status(job_id, JobStatus.PROCESSING)
 
     async def complete(
         self,
@@ -155,7 +156,7 @@ class JobService:
             )
             job = result.scalar_one_or_none()
             if job:
-                job.status = "done"
+                job.status = JobStatus.DONE
                 job.updated_at = datetime.now(timezone.utc)
                 if result_url is not None:
                     job.result_url = result_url
@@ -195,7 +196,7 @@ class JobService:
         """Setzt Job-Status auf failed."""
         await self._update_status(
             job_id,
-            "failed",
+            JobStatus.FAILED,
             error_msg=error,
             error_type=error_type or type(error).__name__,
             error_detail=error_detail or error,
@@ -257,7 +258,7 @@ class JobService:
                 if error_detail is not None:
                     job.error_detail = error_detail
                 await session.commit()
-        if status == "done":
+        if status == JobStatus.DONE:
             await _persist_job_completion(job_id)
 
 
