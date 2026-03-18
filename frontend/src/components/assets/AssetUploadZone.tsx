@@ -7,6 +7,7 @@ import {
   type UploadMeshOptions,
 } from "../../api/assets.js";
 import { useToast } from "../ui/ToastContext.js";
+import { extractErrorMessage } from "../../utils/errorUtils.js";
 
 const IMAGE_ACCEPT = ".jpg,.jpeg,.png,.webp";
 const IMAGE_MAX_MB = 20;
@@ -160,15 +161,7 @@ export function AssetUploadZone({
         onSuccess?.(res.asset_id, res.file);
       }
     } catch (err) {
-      const msg =
-        err && typeof err === "object" && "response" in err
-          ? String(
-              (err as { response?: { data?: { detail?: string } } }).response
-                ?.data?.detail ?? "Upload fehlgeschlagen"
-            )
-          : err instanceof Error
-            ? err.message
-            : "Upload fehlgeschlagen";
+      const msg = extractErrorMessage(err, "Upload fehlgeschlagen");
       setError(msg);
       addToast(msg, "error");
     } finally {

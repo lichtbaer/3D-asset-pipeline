@@ -5,6 +5,7 @@ import {
   type PromptSuggestion,
   type PromptIntendedUse,
 } from "../../api/promptAgent.js";
+import { extractErrorMessage } from "../../utils/errorUtils.js";
 
 const STYLE_OPTIONS = [
   { value: "", label: "— Stil wählen —" },
@@ -84,26 +85,19 @@ export function PromptAssistant({
 
   const isLoading = optimizeMutation.isPending;
   const error = optimizeMutation.error;
-  const axiosError = error && typeof error === "object" && "response" in error
-    ? (error as { response?: { status?: number; data?: { message?: string } } })
-    : null;
 
   const errorMessage = (() => {
-    if (!axiosError?.response) {
-      if (error) return "Netzwerkfehler oder Timeout. Bitte später erneut versuchen.";
-      return null;
+    if (!error) return null;
+    if (error && typeof error === "object" && "response" in error) {
+      const res = (error as { response?: { status?: number; data?: { message?: string } } }).response;
+      if (res?.status === 503) {
+        return "Prompt-Assistent nicht verfügbar: ANTHROPIC_API_KEY nicht gesetzt.";
+      }
+      if (res?.status === 502) {
+        return res.data?.message ?? "Fehler bei der Prompt-Optimierung. Bitte später erneut versuchen.";
+      }
     }
-    const res = axiosError.response;
-    if (res.status === 503) {
-      return "Prompt-Assistent nicht verfügbar: ANTHROPIC_API_KEY nicht gesetzt.";
-    }
-    if (res.status === 502) {
-      return res.data?.message ?? "Fehler bei der Prompt-Optimierung. Bitte später erneut versuchen.";
-    }
-    if (res.status && res.status >= 400) {
-      return res.data?.message ?? "Ein Fehler ist aufgetreten. Bitte später erneut versuchen.";
-    }
-    return null;
+    return extractErrorMessage(error, "Netzwerkfehler oder Timeout. Bitte später erneut versuchen.");
   })();
 
   return (

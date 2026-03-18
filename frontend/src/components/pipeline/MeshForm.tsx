@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import type { MeshProvider } from "../../api/mesh.js";
 import type { BgRemovalProvider } from "../../api/bgremoval.js";
 import { InlineError } from "../../components/ui/InlineError.js";
@@ -116,9 +116,9 @@ export function MeshForm({
     }
   }, [selectedProvider]);
 
-  const handleParamChange = (key: string, value: unknown) => {
+  const handleParamChange = useCallback((key: string, value: unknown) => {
     setParams((prev) => ({ ...prev, [key]: value }));
-  };
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

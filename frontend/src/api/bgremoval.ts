@@ -1,4 +1,5 @@
-import { API_BASE, apiClient } from "./client.js";
+import { apiClient } from "./client.js";
+import { toAbsoluteUrl, createRetryFn } from "./utils.js";
 
 export interface BgRemovalRequest {
   source_image_url: string;
@@ -60,7 +61,6 @@ export async function postBgRemoval(
 export async function getBgRemovalJobStatus(
   jobId: string
 ): Promise<BgRemovalJob> {
-  const baseUrl = API_BASE;
   const { data } = await apiClient.get<{
     job_id: string;
     status: string;
@@ -75,11 +75,7 @@ export async function getBgRemovalJobStatus(
     asset_id: string | null;
     failed_at?: string | null;
   }>(`/generate/bgremoval/${jobId}`);
-  const result_url = data.result_url
-    ? data.result_url.startsWith("http")
-      ? data.result_url
-      : `${baseUrl}${data.result_url}`
-    : null;
+  const result_url = toAbsoluteUrl(data.result_url);
   return {
     job_id: String(data.job_id),
     status: data.status as BgRemovalJobStatus,
@@ -96,17 +92,7 @@ export async function getBgRemovalJobStatus(
   };
 }
 
-export async function retryBgRemovalJob(
-  jobId: string
-): Promise<{ job_id: string; status: string }> {
-  const { data } = await apiClient.post<{ job_id: string; status: string }>(
-    `/generate/bgremoval/retry/${jobId}`
-  );
-  return {
-    job_id: String(data.job_id),
-    status: data.status,
-  };
-}
+export const retryBgRemovalJob = createRetryFn("/generate/bgremoval");
 
 export async function getBgRemovalProviders(): Promise<GetBgRemovalProvidersResponse> {
   const { data } = await apiClient.get<GetBgRemovalProvidersResponse>(

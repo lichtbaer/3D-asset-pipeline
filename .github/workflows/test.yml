@@ -2,7 +2,7 @@ name: Test
 
 on:
   push:
-    branches: [main, cursor/*]
+    branches: [main, cursor/*, claude/*]
   pull_request:
     branches: [main]
 
@@ -69,3 +69,6 @@ jobs:
 
       - name: Run ESLint
         run: npm run lint
+
+      - name: Run npm audit
+        run: npm audit --audit-level=high

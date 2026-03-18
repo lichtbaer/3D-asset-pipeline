@@ -7,8 +7,10 @@ import {
   getAssetTags,
   patchAssetMeta,
   deleteAssetStep,
+  type AssetStepData,
 } from "../../api/assets.js";
 import { TagSuggestionBanner } from "./TagSuggestionBanner.js";
+import { useToast } from "../ui/ToastContext.js";
 import { usePipelineStore } from "../../store/PipelineStore.js";
 import { useFocusTrap } from "../../hooks/useFocusTrap.js";
 import { useEscapeKey } from "../../hooks/useEscapeKey.js";
@@ -38,16 +40,6 @@ function formatDate(iso: string): string {
   }
 }
 
-interface AssetStepData {
-  job_id?: string;
-  provider_key?: string;
-  file?: string;
-  prompt?: string;
-  motion_prompt?: string;
-  generated_at?: string | null;
-  [key: string]: unknown;
-}
-
 interface AssetDetailModalProps {
   assetId: string;
   onClose: () => void;
@@ -64,6 +56,7 @@ export function AssetDetailModal({
 }: AssetDetailModalProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { addToast } = useToast();
   const { setActiveAssetId } = usePipelineStore();
 
   const modalRef = useRef<HTMLDivElement>(null);
@@ -128,7 +121,7 @@ export function AssetDetailModal({
       void queryClient.invalidateQueries({ queryKey: ["asset", assetId] });
       onAssetUpdate?.();
     } catch {
-      // Fehler ignorieren
+      addToast("Metadaten konnten nicht gespeichert werden.", "error");
     }
   };
 
@@ -154,7 +147,7 @@ export function AssetDetailModal({
         onAssetUpdate?.();
       }
     } catch {
-      // Fehler ignorieren
+      addToast("Schritt konnte nicht gelöscht werden.", "error");
     }
   };
 
@@ -170,6 +163,7 @@ export function AssetDetailModal({
       onAssetUpdate?.();
       setStepDeleteModal(null);
     } catch {
+      addToast("Schritt konnte nicht gelöscht werden.", "error");
       setStepDeleteModal(null);
     }
   };
