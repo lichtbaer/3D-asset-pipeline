@@ -104,7 +104,7 @@ function jobToHistoryEntry(job: GenerationJob, prompt: string): JobHistoryEntry 
   return {
     job_id: job.job_id,
     prompt,
-    model_key: job.model_key,
+    provider_key: job.provider_key,
     status: job.status,
     result_url: job.result_url,
     asset_id: job.asset_id,

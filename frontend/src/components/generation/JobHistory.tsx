@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 export interface JobHistoryEntry {
   job_id: string;
   prompt: string;
-  model_key: string;
+  provider_key: string;
   status: string;
   result_url: string | null;
   asset_id?: string | null;
@@ -58,7 +58,7 @@ export function JobHistory({
               <p className="job-history__prompt">
                 {truncatePrompt(job.prompt)}
               </p>
-              <p className="job-history__model">{job.model_key}</p>
+              <p className="job-history__model">{job.provider_key}</p>
               <span
                 className={`job-history__status job-history__status--${job.status}`}
               >
