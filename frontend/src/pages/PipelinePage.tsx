@@ -374,7 +374,7 @@ export function PipelinePage() {
         {
           job_id: res.job_id,
           prompt: variables.prompt,
-          model_key: variables.model_key,
+          provider_key: variables.provider_key,
           status: "pending",
           result_url: null,
         },
@@ -406,7 +406,7 @@ export function PipelinePage() {
       {
         job_id: newJobId,
         prompt: failedJob?.prompt ?? "",
-        model_key: failedJob?.model_key ?? "",
+        provider_key: failedJob?.provider_key ?? "",
         status: "pending",
         result_url: null,
       },

@@ -1,3 +1,5 @@
+import { CheckIcon } from "../icons/index.js";
+
 export interface PipelineStep {
   id: string;
   label: string;
@@ -39,7 +41,7 @@ export function PipelineStepper({ steps, onStepClick }: PipelineStepperProps) {
                 aria-current={step.active ? "step" : undefined}
               >
                 <span className="pipeline-stepper__indicator">
-                  {step.completed ? "✓" : index + 1}
+                  {step.completed ? <CheckIcon size={16} /> : index + 1}
                 </span>
                 <span className="pipeline-stepper__label">{step.label}</span>
               </button>

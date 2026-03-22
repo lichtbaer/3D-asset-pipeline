@@ -219,7 +219,7 @@ export function AssetDetailModal({
         <div className="asset-modal__content">
           <div className="asset-modal__loading">
             <div className="spinner" aria-hidden />
-            <p>Asset wird geladen...</p>
+            <p id="asset-detail-title">Asset wird geladen...</p>
           </div>
         </div>
       </div>
@@ -231,7 +231,7 @@ export function AssetDetailModal({
       <div className="asset-modal" role="dialog" aria-modal="true" ref={modalRef} aria-labelledby="asset-detail-title">
         <div className="asset-modal__backdrop" onClick={onClose} />
         <div className="asset-modal__content">
-          <p className="asset-modal__error">
+          <p id="asset-detail-title" className="asset-modal__error">
             Fehler beim Laden:{" "}
             {error instanceof Error ? error.message : "Unbekannter Fehler"}
           </p>

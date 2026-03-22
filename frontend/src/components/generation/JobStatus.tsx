@@ -93,7 +93,7 @@ export function JobStatus({ jobId, onJobUpdate, onRetrySuccess }: JobStatusProps
         <JobErrorBlock
           errorType={data.error_type}
           errorDetail={data.error_detail ?? data.error_msg}
-          providerKey={data.provider_key ?? data.model_key}
+          providerKey={data.provider_key}
           failedAt={data.failed_at}
           onRetry={onRetrySuccess ? () => retryMutation.mutate() : undefined}
           isRetrying={retryMutation.isPending}
