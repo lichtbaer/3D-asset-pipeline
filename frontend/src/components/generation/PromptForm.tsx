@@ -50,7 +50,7 @@ export function PromptForm({
     if (prompt.trim().length < 10) return;
     onSubmit({
       prompt: prompt.trim(),
-      model_key: selectedModel || "picsart-default",
+      provider_key: selectedModel || "picsart-default",
       width,
       height,
       negative_prompt: negativePrompt.trim() || undefined,

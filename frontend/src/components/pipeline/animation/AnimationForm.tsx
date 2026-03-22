@@ -7,6 +7,7 @@ import {
   type MotionPreset,
 } from "../../../api/animation.js";
 import { InlineError } from "../../../components/ui/InlineError.js";
+import { CharacterCounter } from "../../../components/ui/CharacterCounter.js";
 import { Tooltip } from "../../../components/ui/Tooltip.js";
 import { useFormValidation } from "../../../hooks/useFormValidation.js";
 
@@ -135,6 +136,7 @@ export function AnimationForm({
         <label htmlFor="animation-motion-prompt">
           Eigene Bewegung beschreiben
         </label>
+        <CharacterCounter current={motionPrompt.trim().length} minimum={10} />
         <textarea
           id="animation-motion-prompt"
           value={motionPrompt}

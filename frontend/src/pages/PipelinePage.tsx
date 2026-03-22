@@ -104,7 +104,7 @@ function jobToHistoryEntry(job: GenerationJob, prompt: string): JobHistoryEntry 
   return {
     job_id: job.job_id,
     prompt,
-    model_key: job.model_key,
+    provider_key: job.provider_key,
     status: job.status,
     result_url: job.result_url,
     asset_id: job.asset_id,
@@ -374,7 +374,7 @@ export function PipelinePage() {
         {
           job_id: res.job_id,
           prompt: variables.prompt,
-          model_key: variables.model_key,
+          provider_key: variables.provider_key,
           status: "pending",
           result_url: null,
         },
@@ -406,7 +406,7 @@ export function PipelinePage() {
       {
         job_id: newJobId,
         prompt: failedJob?.prompt ?? "",
-        model_key: failedJob?.model_key ?? "",
+        provider_key: failedJob?.provider_key ?? "",
         status: "pending",
         result_url: null,
       },

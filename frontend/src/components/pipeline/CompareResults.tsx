@@ -204,7 +204,7 @@ function CompareResultColumnContent({
             <JobErrorBlock
               errorType={imageJobData.error_type}
               errorDetail={imageJobData.error_detail ?? imageJobData.error_msg}
-              providerKey={imageJobData.provider_key ?? imageJobData.model_key}
+              providerKey={imageJobData.provider_key}
               failedAt={imageJobData.failed_at}
               onRetry={onRetry}
               isRetrying={isRetrying}

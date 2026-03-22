@@ -275,3 +275,10 @@
     flex-shrink: 0;
   }
 }
+
+/* === Elapsed Time === */
+.elapsed-time {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}

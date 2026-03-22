@@ -2,7 +2,7 @@ import { apiClient } from "./client.js";
 
 export interface GenerateImageRequest {
   prompt: string;
-  model_key: string;
+  provider_key: string;
   width: number;
   height: number;
   negative_prompt?: string;
@@ -19,7 +19,7 @@ export interface GenerationJob {
   error_type: string | null;
   error_detail: string | null;
   provider_key: string;
-  model_key: string;
+  model_key?: string;
   created_at: string;
   updated_at?: string;
   asset_id: string | null;
@@ -73,7 +73,6 @@ export async function getJobStatus(jobId: string): Promise<GenerationJob> {
     error_type: data.error_type,
     error_detail: data.error_detail,
     provider_key: data.provider_key ?? data.model_key,
-    model_key: data.model_key ?? data.provider_key ?? "",
     created_at: data.created_at,
     updated_at: data.updated_at,
     asset_id: data.asset_id ? String(data.asset_id) : null,

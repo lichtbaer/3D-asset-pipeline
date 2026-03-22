@@ -28,14 +28,14 @@ export async function startImageCompare(
   const [resA, resB] = await Promise.all([
     postGenerateImage({
       prompt: req.prompt,
-      model_key: req.provider_key_a,
+      provider_key: req.provider_key_a,
       width: req.width,
       height: req.height,
       negative_prompt: req.negative_prompt,
     }),
     postGenerateImage({
       prompt: req.prompt,
-      model_key: req.provider_key_b,
+      provider_key: req.provider_key_b,
       width: req.width,
       height: req.height,
       negative_prompt: req.negative_prompt,

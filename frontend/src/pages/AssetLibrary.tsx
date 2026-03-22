@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
+import { ImageIcon, ScissorsIcon, CubeIcon, BoneIcon, FilmIcon } from "../components/icons/index.js";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   listAssets,
@@ -48,31 +49,31 @@ function StepBadges({ steps }: { steps: Record<string, { file?: string }> }) {
         title="Bild"
         className={hasImage ? "" : "asset-card__badge--missing"}
       >
-        🖼
+        <ImageIcon size={14} />
       </span>
       <span
         title="Freistellung"
         className={hasBgremoval ? "" : "asset-card__badge--missing"}
       >
-        ✂️
+        <ScissorsIcon size={14} />
       </span>
       <span
         title="Mesh"
         className={hasMesh ? "" : "asset-card__badge--missing"}
       >
-        🧊
+        <CubeIcon size={14} />
       </span>
       <span
         title="Rigging"
         className={hasRigging ? "" : "asset-card__badge--missing"}
       >
-        🦴
+        <BoneIcon size={14} />
       </span>
       <span
         title="Animation"
         className={hasAnimation ? "" : "asset-card__badge--missing"}
       >
-        🎬
+        <FilmIcon size={14} />
       </span>
     </span>
   );

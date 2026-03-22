@@ -6,6 +6,7 @@ import type { AssetListItem } from "../../api/assets.js";
 import { useFocusTrap } from "../../hooks/useFocusTrap.js";
 import { useEscapeKey } from "../../hooks/useEscapeKey.js";
 import { useBodyScrollLock } from "../../hooks/useBodyScrollLock.js";
+import { CubeIcon, BoneIcon, FilmIcon } from "../icons/index.js";
 
 function formatDate(iso: string): string {
   try {
@@ -24,9 +25,9 @@ function StepBadges({ steps }: { steps: Record<string, { file?: string }> }) {
   const hasAnimation = "animation" in steps;
   return (
     <span className="asset-picker__badges">
-      {hasMesh && <span title="Mesh">🧊</span>}
-      {hasRigging && <span title="Rigging">🦴</span>}
-      {hasAnimation && <span title="Animation">🎬</span>}
+      {hasMesh && <span title="Mesh"><CubeIcon size={14} /></span>}
+      {hasRigging && <span title="Rigging"><BoneIcon size={14} /></span>}
+      {hasAnimation && <span title="Animation"><FilmIcon size={14} /></span>}
     </span>
   );
 }
