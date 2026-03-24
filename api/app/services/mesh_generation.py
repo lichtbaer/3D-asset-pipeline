@@ -13,6 +13,7 @@ from typing import Any, Awaitable, Callable
 import httpx
 
 from app.config.storage import MESH_STORAGE_PATH
+from app.core.config import settings
 from app.logging_utils import log_job_error
 from app.models.enums import JobStatus
 from app.services.job_error_handler import UpdateJobCallback, handle_provider_errors
@@ -47,10 +48,30 @@ async def run_mesh_generation(
 
     try:
         # 1. Bild herunterladen
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=float(settings.IMAGE_DOWNLOAD_TIMEOUT_S)) as client:
             response = await client.get(source_image_url)
             response.raise_for_status()
             image_bytes = response.content
+
+        if len(image_bytes) > settings.IMAGE_DOWNLOAD_MAX_SIZE:
+            err = (
+                f"Heruntergeladenes Bild zu groß: {len(image_bytes)} Bytes "
+                f"(max. {settings.IMAGE_DOWNLOAD_MAX_SIZE} Bytes)"
+            )
+            log_job_error(
+                logger,
+                "Mesh-Generierung: Bild-Download zu groß",
+                job_id=job_id,
+                provider_key=provider_key,
+                error_type="ImageTooLargeError",
+                error_detail=err,
+            )
+            await update_job_callback(
+                job_id, JobStatus.FAILED, None, err,
+                error_type="ImageTooLargeError",
+                error_detail=err,
+            )
+            return
 
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
             f.write(image_bytes)
@@ -67,7 +88,7 @@ async def run_mesh_generation(
         ):
             glb_path = await asyncio.wait_for(
                 provider.generate(temp_image_path, merged_params),
-                timeout=300,
+                timeout=settings.MESH_GENERATION_TIMEOUT_S,
             )
 
         if glb_path is None:
@@ -127,11 +148,14 @@ async def run_mesh_generation(
             error_detail=str(e),
         )
     finally:
-        if temp_image_path and os.path.exists(temp_image_path):
+        if temp_image_path:
             try:
                 os.unlink(temp_image_path)
             except OSError:
-                pass
+                logger.debug(
+                    "Temp-Datei konnte nicht gelöscht werden: %s",
+                    temp_image_path,
+                )
 
 
 async def run_mesh_generation_with_auto_bgremoval(

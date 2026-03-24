@@ -45,3 +45,8 @@ def get_provider(key: str) -> ImageProvider:
 def list_providers() -> list[ImageProvider]:
     """Liefert alle registrierten Image-Provider."""
     return list(_REGISTRY.values())
+
+
+def list_available_keys() -> list[str]:
+    """Liefert die Keys aller registrierten Image-Provider."""
+    return list(_REGISTRY.keys())

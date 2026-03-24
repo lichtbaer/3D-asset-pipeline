@@ -3,18 +3,24 @@ import re
 from pathlib import Path
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Query, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, Response
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import raise_api_error
+from app.core.rate_limit import limiter
 from app.database import get_session
 from app.models import GenerationJob
 from app.providers.animation import (
     get_animation_provider,
+    list_animation_available_keys,
     list_animation_providers,
 )
-from app.providers.rigging import get_rigging_provider, list_rigging_providers
+from app.providers.rigging import (
+    get_rigging_provider,
+    list_rigging_available_keys,
+    list_rigging_providers,
+)
 from app.schemas.generation import (
     AnimationGenerateRequest,
     AnimationGenerateResponse,
@@ -57,8 +63,14 @@ from app.services.bgremoval_providers import (
 from app.services.bgremoval_providers import (
     list_providers as list_bgremoval_providers,
 )
+from app.services.bgremoval_providers.registry import (
+    list_available_keys as list_bgremoval_available_keys,
+)
 from app.services.image_providers import get_provider as get_image_provider
 from app.services.image_providers import list_providers
+from app.services.image_providers.registry import (
+    list_available_keys as list_image_available_keys,
+)
 from app.services.job_service import get_job_service
 from app.services.mesh_generation import (
     run_mesh_generation,
@@ -66,6 +78,9 @@ from app.services.mesh_generation import (
 )
 from app.services.mesh_providers import MESH_PROVIDERS
 from app.services.mesh_providers import get_provider as get_mesh_provider
+from app.services.mesh_providers.registry import (
+    list_available_keys as list_mesh_available_keys,
+)
 from app.services.picsart import run_image_generation
 from app.services.rigging_generation import run_rigging
 
@@ -185,8 +200,22 @@ async def list_image_providers():
     )
 
 
+@router.get("/providers")
+async def list_all_available_providers():
+    """Listet alle verfügbaren Provider je Typ (nur tatsächlich geladene)."""
+    return {
+        "image": list_image_available_keys(),
+        "mesh": list_mesh_available_keys(),
+        "bgremoval": list_bgremoval_available_keys(),
+        "rigging": list_rigging_available_keys(),
+        "animation": list_animation_available_keys(),
+    }
+
+
 @router.post("/image", response_model=ImageGenerateResponse, status_code=202)
+@limiter.limit("10/minute")
 async def create_image_generation(
+    request: Request,
     body: ImageGenerateRequest,
     background_tasks: BackgroundTasks,
     response: Response,
@@ -204,7 +233,10 @@ async def create_image_generation(
         try:
             asset_id = UUID(body.asset_id)
         except ValueError:
-            pass
+            raise_api_error(
+                422, f"Ungültige asset_id: {body.asset_id}",
+                code="VALIDATION_ERROR",
+            )
 
     job = GenerationJob(
         job_type="image",
@@ -282,7 +314,9 @@ async def list_bgremoval_providers_endpoint():
 
 
 @router.post("/bgremoval", response_model=BgRemovalGenerateResponse, status_code=202)
+@limiter.limit("10/minute")
 async def create_bgremoval(
+    request: Request,
     body: BgRemovalGenerateRequest,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
@@ -297,7 +331,10 @@ async def create_bgremoval(
         try:
             asset_id = UUID(body.asset_id)
         except ValueError:
-            pass
+            raise_api_error(
+                422, f"Ungültige asset_id: {body.asset_id}",
+                code="VALIDATION_ERROR",
+            )
     if asset_id is None and body.source_job_id:
         src = await session.execute(
             select(GenerationJob).where(GenerationJob.id == body.source_job_id)
@@ -479,7 +516,9 @@ async def list_mesh_providers():
 
 
 @router.post("/mesh", response_model=MeshGenerateResponse, status_code=202)
+@limiter.limit("10/minute")
 async def create_mesh_generation(
+    request: Request,
     body: MeshGenerateRequest,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
@@ -499,7 +538,10 @@ async def create_mesh_generation(
         try:
             asset_id = UUID(body.asset_id)
         except ValueError:
-            pass
+            raise_api_error(
+                422, f"Ungültige asset_id: {body.asset_id}",
+                code="VALIDATION_ERROR",
+            )
     if asset_id is None and body.source_job_id:
         src = await session.execute(
             select(GenerationJob).where(GenerationJob.id == body.source_job_id)
@@ -663,7 +705,9 @@ async def list_rigging_providers_endpoint():
 
 
 @router.post("/rigging", response_model=RiggingGenerateResponse, status_code=202)
+@limiter.limit("10/minute")
 async def create_rigging(
+    request: Request,
     body: RiggingGenerateRequest,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
@@ -678,7 +722,10 @@ async def create_rigging(
         try:
             asset_id = UUID(body.asset_id)
         except ValueError:
-            pass
+            raise_api_error(
+                422, f"Ungültige asset_id: {body.asset_id}",
+                code="VALIDATION_ERROR",
+            )
     if asset_id is None:
         aid = _extract_asset_id_from_url(body.source_glb_url)
         if aid:
@@ -779,7 +826,9 @@ async def get_animation_presets(provider_key: str):
 
 
 @router.post("/animation", response_model=AnimationGenerateResponse, status_code=202)
+@limiter.limit("10/minute")
 async def create_animation(
+    request: Request,
     body: AnimationGenerateRequest,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
@@ -801,7 +850,10 @@ async def create_animation(
         try:
             asset_id = UUID(body.asset_id)
         except ValueError:
-            pass
+            raise_api_error(
+                422, f"Ungültige asset_id: {body.asset_id}",
+                code="VALIDATION_ERROR",
+            )
     if asset_id is None:
         aid = _extract_asset_id_from_url(body.source_glb_url)
         if aid:

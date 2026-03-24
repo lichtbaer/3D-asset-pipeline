@@ -19,3 +19,8 @@ def get_animation_provider(key: str) -> BaseAnimationProvider:
 def list_animation_providers() -> list[BaseAnimationProvider]:
     """Liefert alle registrierten Animation-Provider."""
     return list(ANIMATION_PROVIDER_REGISTRY.values())
+
+
+def list_available_keys() -> list[str]:
+    """Liefert die Keys aller registrierten Animation-Provider."""
+    return list(ANIMATION_PROVIDER_REGISTRY.keys())

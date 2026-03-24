@@ -104,3 +104,8 @@ def get_rigging_provider(key: str) -> BaseRiggingProvider:
 def list_rigging_providers() -> list[BaseRiggingProvider]:
     """Listet alle registrierten Rigging-Provider."""
     return list(RIGGING_PROVIDER_REGISTRY.values())
+
+
+def list_available_keys() -> list[str]:
+    """Liefert die Keys aller registrierten Rigging-Provider."""
+    return list(RIGGING_PROVIDER_REGISTRY.keys())
