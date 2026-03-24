@@ -30,3 +30,8 @@ def get_provider(key: str) -> MeshProvider:
     if key not in MESH_PROVIDERS:
         raise ValueError(f"Unknown mesh provider: {key}")
     return MESH_PROVIDERS[key]
+
+
+def list_available_keys() -> list[str]:
+    """Liefert die Keys aller registrierten Mesh-Provider."""
+    return list(MESH_PROVIDERS.keys())

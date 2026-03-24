@@ -20,6 +20,16 @@ class Settings(BaseSettings):
     ALLOWED_ORIGINS: str = "http://localhost:5173"
     CORS_ORIGINS: str | None = None
 
+    # Timeouts (Sekunden)
+    IMAGE_DOWNLOAD_TIMEOUT_S: int = 60
+    MESH_GENERATION_TIMEOUT_S: int = 300
+
+    # Max. Dateigröße für heruntergeladene Bilder (Bytes)
+    IMAGE_DOWNLOAD_MAX_SIZE: int = 50 * 1024 * 1024  # 50 MB
+
+    # Datenbank-Query-Timeout (Millisekunden)
+    DB_STATEMENT_TIMEOUT_MS: int = 30000
+
     @field_validator("API_KEY", mode="before")
     @classmethod
     def _strip_api_key(cls, v: str | None) -> str | None:

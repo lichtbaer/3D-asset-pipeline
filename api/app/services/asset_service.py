@@ -761,8 +761,21 @@ def delete_asset(asset_id: str, permanent: bool = False) -> bool:
     if not asset_path.exists():
         return False
     if permanent:
+        # Audit-Log: Dateien und Gesamtgröße erfassen vor dem Löschen
+        files: list[str] = []
+        total_size = 0
+        for f in asset_path.rglob("*"):
+            if f.is_file():
+                files.append(f.name)
+                total_size += f.stat().st_size
+        logger.info(
+            "Asset %s permanent gelöscht — %d Dateien, %.2f MB (%s)",
+            asset_id,
+            len(files),
+            total_size / (1024 * 1024),
+            ", ".join(files[:10]) + ("..." if len(files) > 10 else ""),
+        )
         shutil.rmtree(asset_path)
-        logger.info("Asset %s permanent gelöscht", asset_id)
     else:
         soft_delete_asset(asset_id)
     return True

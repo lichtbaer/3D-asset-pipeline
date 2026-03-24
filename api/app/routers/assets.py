@@ -1,6 +1,7 @@
 """Asset-API: persistente Speicherung von Pipeline-Outputs."""
 
 import asyncio
+import logging
 import time
 import uuid
 from pathlib import Path
@@ -78,6 +79,8 @@ from app.services.mesh_processing_service import (
     simplify as mesh_simplify,
 )
 from app.services.texture_baking_service import run_bake_sync
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/assets", tags=["assets"])
 
@@ -732,9 +735,18 @@ async def delete_assets_batch(body: BatchDeleteRequest):
     Gibt Anzahl gelöschter Assets zurück.
     """
     deleted = 0
+    deleted_ids: list[str] = []
     for aid in body.asset_ids:
         if asset_service.delete_asset(aid, permanent=body.permanent):
             deleted += 1
+            deleted_ids.append(aid)
+    logger.info(
+        "Batch-Delete: %d/%d Assets gelöscht (permanent=%s) — %s",
+        deleted,
+        len(body.asset_ids),
+        body.permanent,
+        ", ".join(deleted_ids[:10]) + ("..." if len(deleted_ids) > 10 else ""),
+    )
     return {"deleted_count": deleted}
 
 

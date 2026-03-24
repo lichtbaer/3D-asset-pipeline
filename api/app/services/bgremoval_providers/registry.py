@@ -28,3 +28,8 @@ def get_provider(key: str) -> BgRemovalProvider:
 def list_providers() -> list[BgRemovalProvider]:
     """Liefert alle registrierten Background-Removal-Provider."""
     return list(BGREMOVAL_PROVIDERS.values())
+
+
+def list_available_keys() -> list[str]:
+    """Liefert die Keys aller registrierten BgRemoval-Provider."""
+    return list(BGREMOVAL_PROVIDERS.keys())
