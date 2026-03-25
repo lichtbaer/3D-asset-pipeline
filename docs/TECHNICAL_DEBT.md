@@ -1,6 +1,6 @@
 # Technical Debt Audit
 
-Erstellt: 2026-03-15
+Erstellt: 2026-03-15 · **Letzte Code-Prüfung der offenen Punkte: 2026-03-25**
 
 ## Behobene Befunde
 
@@ -74,10 +74,12 @@ als CI-Schritt im Frontend-Job hinzugefuegt.
 
 ## Offene Befunde
 
+*Nachstehende Einschaetzungen wurden am **2026-03-25** gegen den aktuellen Stand im Repo geprueft (Zeilenzahlen: `wc -l`, Frontend-Tests: `frontend/src/__tests__/`, Backend: `api/pyproject.toml` + `api/app/routers/assets.py`).*
+
 ### Hoch
 
 #### 2. Frontend-Testabdeckung
-Nur 3 Testdateien (`agents.test.ts`, `useChat.test.ts`, `useAssetFromUrl.test.tsx`) bei ca. 100 Komponenten.
+Weiterhin **3** Vitest-Dateien unter `frontend/src/__tests__/` (`agents.test.ts`, `useChat.test.ts`, `useAssetFromUrl.test.tsx`); die Zahl der Komponenten/Seiten ist gross — die relative Unterversorgung bleibt.
 
 **Empfehlung:** Tests fuer kritische Komponenten priorisieren:
 - `AssetDetailModal`
@@ -90,46 +92,49 @@ Nur 3 Testdateien (`agents.test.ts`, `useChat.test.ts`, `useAssetFromUrl.test.ts
 ### Mittel
 
 #### 6. Uebergrosse Komponenten und Services
-Mehrere Dateien sind zu gross und sollten aufgeteilt werden:
+Mehrere Dateien sind zu gross und sollten aufgeteilt werden (Stand 2026-03-25):
 
 | Datei | Zeilen | Prioritaet |
 |-------|--------|------------|
-| `frontend/src/pages/PipelinePage.tsx` | 1.369 | Kritisch |
-| `frontend/src/pages/AssetLibrary.tsx` | 861 | Kritisch |
-| `frontend/src/components/assets/AssetDetailModal.tsx` | 829 | Kritisch |
-| `api/app/routers/generation.py` | 1.019 | Hoch |
-| `api/app/services/asset_service.py` | 962 | Hoch |
-| `api/app/routers/assets.py` | 798 | Hoch |
+| `frontend/src/pages/PipelinePage.tsx` | ~1.411 | Kritisch |
+| `frontend/src/pages/AssetLibrary.tsx` | ~862 | Kritisch |
+| `frontend/src/components/assets/AssetDetailModal.tsx` | ~832 | Kritisch |
+| `api/app/routers/generation.py` | ~1.071 | Hoch |
+| `api/app/services/asset_service.py` | ~923 | Hoch |
+| `api/app/routers/assets.py` | ~810 | Hoch |
 
 **Empfehlung:** Logik in Sub-Komponenten/Sub-Services extrahieren.
 
 #### 7. Backend Coverage-Omits
-7 kritische Dateien sind von der Coverage-Messung ausgeschlossen (`pyproject.toml`):
-- `app/main.py`, `app/routers/generation.py`, `app/services/mesh_generation.py`
-- `app/services/animation_generation.py`, `app/services/bgremoval.py`
-- `app/services/mesh_export_service.py`
+In `api/pyproject.toml` sind **deutlich mehr** Pfade von Coverage ausgeschlossen als frueher nur unter „7 Dateien“ subsumiert. Auszug (vollstaendige Liste siehe `[tool.coverage.run] omit`):
 
-**Empfehlung:** Omits schrittweise entfernen und Tests ergaenzen.
+- Kern/Orchestrierung: `app/main.py`, `app/logging_config.py`, `app/database.py`
+- Router: `app/routers/generation.py`, `app/routers/sketchfab.py`, `app/routers/storage.py`
+- Services: u. a. `mesh_generation.py`, `animation_generation.py`, `rigging_generation.py`, `bgremoval.py`, `mesh_export_service.py`
+- Provider-Bloecke: `app/services/bgremoval_providers/*`, `app/services/image_providers/picsart.py`, `app/providers/animation/*`, `app/providers/rigging/blender_rigify.py`, `app/providers/rigging/unirig_local.py`
+- Sonstiges: `alembic/*`, `*/__init__.py`
+
+**Empfehlung:** Omits schrittweise entfernen und Tests ergaenzen; technische Schuld ist hier **groesser** als die alte „7-Dateien“-Formulierung suggerierte.
 
 #### 8. In-Memory Job State (Texture Baking)
-`api/app/routers/assets.py` speichert Texture-Baking-Jobs in einem `dict` im Speicher. State geht bei Server-Neustart verloren.
+**Weiterhin aktuell:** `api/app/routers/assets.py` nutzt `_texture_bake_jobs: dict[str, dict[str, Any]]` (Zeilenbereich ~87 ff.); Status laeuft nur im Prozessspeicher, Neustart verwirft offene Jobs.
 
-**Empfehlung:** In die Datenbank (GenerationJob) migrieren.
+**Empfehlung:** In die Datenbank (z. B. eigenes Job-Modell oder Erweiterung von `GenerationJob`) migrieren.
 
 #### 4b. model_key Deprecation (offen)
-`model_key` in `api/app/models/generation_job.py:23` als deprecated markiert, aber noch vom Frontend aktiv genutzt (8 Dateien). Backward-Compat-Mapping in `api/app/schemas/generation.py:17-46`.
+**Teilweise entschaerft im Frontend, API-Schicht bleibt:** Spalte `model_key` in `api/app/models/generation_job.py` weiterhin deprecated (nullable Alias). Im Frontend tritt `model_key` praktisch nur noch in `frontend/src/api/generation.ts` auf (optional + Fallback `provider_key ?? model_key`). **Nicht** mehr „8 Frontend-Dateien“. Backend: `api/app/schemas/generation.py` (Compat + `resolve_provider_and_params`), `api/app/routers/generation.py` (u. a. Deprecation-Header `X-Deprecated`, Lesen `job.model_key`).
 
-**Empfehlung:** Frontend auf `provider_key` umstellen, dann `model_key` entfernen.
+**Empfehlung:** API-Clients und Responses konsequent auf `provider_key` umstellen, Legacy-Felder und Mapping nach Migration entfernen.
 
 ---
 
 ### Niedrig
 
 #### 10. `type: ignore` in main.py
-`api/app/main.py:35` hat `# type: ignore[arg-type]` fuer `_rate_limit_exceeded_handler`. Bekannte slowapi-Limitation.
+**Weiterhin aktuell:** `api/app/main.py` Zeile ~35 — `# type: ignore[arg-type]` fuer `_rate_limit_exceeded_handler`. Bekannte slowapi-Limitation.
 
 #### 11. Print-Logging in Blender-Skripten
-2 Skripte in `api/scripts/` mit `print()`-Aufrufen statt `logging.getLogger()`.
+**Weiterhin aktuell:** `api/scripts/blender_rig_human.py` und `api/scripts/blender_bake_textures.py` nutzen `print()` (teilweise `file=sys.stderr`).
 
 **Empfehlung:** Akzeptabel fuer Blender-Subprozesse.
 
@@ -144,7 +149,7 @@ Mehrere Dateien sind zu gross und sollten aufgeteilt werden:
 - JSON-strukturiertes Logging mit Rotation im Backend
 - Saubere `__all__`-Exports, keine Wildcard-Imports
 - CI/CD vorhanden (`.github/workflows/test.yml`)
-- 28 Backend-Testdateien mit guter Abdeckung
+- **23** Testdateien (`test_*.py`) unter `api/tests/`; **28** Python-Dateien inkl. `conftest.py` und `__init__.py` (Stand 2026-03-25)
 - Alembic-Migrationen ordentlich versioniert
 - API-Versioning unter `/api/v1/` (neu)
 - Pydantic-basierte Settings mit `.env`-Support (neu)
