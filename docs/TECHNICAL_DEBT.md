@@ -1,6 +1,6 @@
 # Technical Debt Audit
 
-Erstellt: 2026-03-15 · **Letzte Code-Prüfung der offenen Punkte: 2026-03-25**
+Erstellt: 2026-03-15 · **Letzte Code-Prüfung der offenen Punkte: 2026-03-25** · **Behebungsplan ergänzt: 2026-03-25**
 
 ## Behobene Befunde
 
@@ -137,6 +137,92 @@ In `api/pyproject.toml` sind **deutlich mehr** Pfade von Coverage ausgeschlossen
 **Weiterhin aktuell:** `api/scripts/blender_rig_human.py` und `api/scripts/blender_bake_textures.py` nutzen `print()` (teilweise `file=sys.stderr`).
 
 **Empfehlung:** Akzeptabel fuer Blender-Subprozesse.
+
+---
+
+## Behebungsplan (offene Punkte)
+
+Ziel: technische Schuld **inkrementell** abbauen — kleine, reviewbare Schritte, keine „alles auf einmal“-Migration.
+
+### Reihenfolge und Abhaengigkeiten
+
+| Phase | Thema | Befund-ID | Abhaengigkeiten |
+|-------|--------|-----------|-----------------|
+| **1** | `provider_key` / Ende `model_key`-Compat | 4b | Keine harte Abhaengigkeit; vor grossen API-Aenderungen sinnvoll |
+| **2** | Texture-Bake-Jobs persistent | 8 | Eigenes DB-Modell + Migration; unabhaengig von Phase 1 |
+| **3** | Frontend-Tests ausbauen | 2 | Parallel zu Phase 4/5 moeglich |
+| **4** | Coverage-Omits schließen | 7 | Am effizientesten **nach** gezielten Tests pro Modul; koppelt mit Phase 3/5 |
+| **5** | Grosse Dateien zerlegen | 6 | Erleichtert Phase 3 und 4 fuer betroffene Bereiche |
+| **6** | Niedrig (optional) | 10, 11 | Keine Blocker |
+
+---
+
+### Phase 1: `model_key` bereinigen (4b)
+
+1. **Vertrag festlegen:** Responses und Clients nutzen nur noch `provider_key`; `model_key` in Responses als deprecated dokumentieren oder in einem Release entfernen (Breaking-Change nur mit Versionssprung oder kurzer Uebergangsphase).
+2. **Frontend:** `frontend/src/api/generation.ts` — Anfragen nur mit `provider_key` bauen; optionale Felder fuer `model_key` entfernen, sobald Backend keine Alt-Clients mehr braucht.
+3. **Backend:** `ImageGenerateRequest` / `resolve_provider_and_params` — Compat-Pfad nur behalten, solange externe Clients existieren; danach Feld `model_key` und Key-Map entfernen.
+4. **Datenbank:** Spalte `model_key` in `generation_job` nach Datenmigration (`UPDATE ... SET` wo noetig) und Bestaetigung, dass nichts mehr liest, per Alembic droppen oder als reines Legacy lassen (dokumentierter Endzustand).
+5. **Router:** `X-Deprecated`-Header und Lesepfade `job.model_key` entfernen, wenn Spalte weg ist.
+
+**Erfolgskriterium:** Ein klarer API-Pfad nur noch `provider_key`; keine doppelte Semantik in Schema und DB.
+
+---
+
+### Phase 2: Texture-Bake-Jobs persistent (8)
+
+1. **Modell:** Neues ORM-Modell z. B. `TextureBakeJob` (id, asset_id, status, Timestamps, Fehlertext, ggf. Metadaten) oder Erweiterung eines bestehenden Job-Musters — **nicht** in `GenerationJob` zwangsweise mischen, wenn sich die Felder unterscheiden.
+2. **Migration:** Alembic-Revision; bestehende In-Memory-Jobs koennen bei Deploy verworfen werden (akzeptiert) oder kurz Dual-Write (optional).
+3. **Router:** `_texture_bake_jobs` durch DB-Zugriffe ersetzen; Background-Task aktualisiert Zeilen statt Dict-Eintraegen.
+4. **API:** Start- und Status-Endpoints unveraendert halten oder nur minimal anpassen (job_id bleibt UUID-String).
+5. **Tests:** Integrationstest: Start → Status polling → Abschluss/Fehler (ggf. mit Mock fuer `run_bake_sync`).
+
+**Erfolgskriterium:** Nach API-Neustart sind nur noch in der DB gespeicherte Jobs abfragbar; keine verlorenen Status fuer laufende Deploys (oder dokumentierte Einschraenkung fuer die Uebergangsphase).
+
+---
+
+### Phase 3: Frontend-Tests (2)
+
+1. **Setup:** Bestehendes Vitest-Setup in `frontend/src/__tests__/` nutzen; React Testing Library fuer Komponenten.
+2. **Reihenfolge:** Zuerst **reine Logik** (Hooks, Utils), dann **kritische UI**:
+   - `AssetDetailModal` — Speichern, Fehlerpfade (Mocks fuer API).
+   - `SketchfabImportModal` — oeffnen/schliessen, Submit-Flow mit Mock.
+   - `PipelineStepper` (`frontend/src/components/ui/PipelineStepper.tsx`) — Navigation/Zustaende zwischen Steps.
+   - `JobStatus` / `JobErrorBlock` — Zustaende pending/done/failed.
+3. **CI:** Bereits `npm run test` in `.github/workflows/test.yml` — nur Coverage-Qualitaet steigern, kein Pipeline-Change noetig.
+
+**Erfolgskriterium:** Mindestens diese vier Bereiche haben mindestens einen sinnvollen Test; keine Regression bei Refactors in Phase 5.
+
+---
+
+### Phase 4: Coverage-Omits reduzieren (7)
+
+1. **Priorisierung nach Risiko:** Zuerst Router/Services, die Geschaeftslogik tragen (`generation.py`, `assets.py`-Teile, `mesh_generation.py`), dann extern schwer testbare Provider (optional weiter omit oder Contract-Tests).
+2. **Vorgehen pro Datei:** Eintrag aus `[tool.coverage.run] omit` in `api/pyproject.toml` entfernen → Tests schreiben bis Coverage wieder >= Schwelle (aktuell `--cov-fail-under=70`).
+3. **`__init__.py` und `alembic/*`:** Meist dauerhaft omit-bleibend; nicht zwingend Ziel von Phase 4.
+4. **Provider-Globs:** Entweder Integrationstests mit Mocks oder gezielte Unit-Tests pro Provider-Datei; Globs schrittweise verkleinern.
+
+**Erfolgskriterium:** Omits-Liste messbar verkuerzt; keine dauerhafte Coverage-Unterkante unterschritten.
+
+---
+
+### Phase 5: Grosse Dateien zerlegen (6)
+
+1. **Frontend:** `PipelinePage.tsx` — Tabs/Step-Logik in Hooks (`usePipelineSteps`) und Unterkomponenten (`PipelineImageTab`, …); CSS pro Teil auslagern wo sinnvoll.
+2. **Frontend:** `AssetLibrary.tsx` — Filter/Grid/Modal in eigene Dateien.
+3. **Frontend:** `AssetDetailModal.tsx` — Bereiche (Metadaten, Steps, Export) als Subkomponenten.
+4. **Backend:** `generation.py` — Router nach Ressource oder Feature splitten (`generation_image.py`, …) und in `main`/`routers/__init__.py` einbinden.
+5. **Backend:** `asset_service.py` — thematische Module (z. B. Metadaten vs. Dateioperationen) mit duennem Fassaden-Import.
+6. **Backend:** `assets.py` — Texture-Bake-Routen nach `routers/texture_bake.py` verschieben, sobald Phase 2 stabil ist (optional gekoppelt).
+
+**Erfolgskriterium:** Keine Datei > ca. 500–700 Zeilen ohne triftigen Grund; Reviews werden einfacher.
+
+---
+
+### Phase 6: Niedrig (optional)
+
+- **10 — `type: ignore`:** slowapi-Version pruefen, Stubs suchen, oder duenner Wrapper um den Handler, der mypy befriedigt; nur wenn Aufwand gering.
+- **11 — Blender `print()`:** Belassen oder minimale Hilfsfunktion `log_info`/`log_err`, die auf stderr schreibt — keine zwingende Aenderung.
 
 ---
 
