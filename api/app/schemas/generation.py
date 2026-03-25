@@ -69,7 +69,6 @@ class ImageJobStatusResponse(BaseModel):
     error_type: str | None = None
     error_detail: str | None = None
     provider_key: str
-    model_key: str  # Deprecated alias for provider_key
     created_at: datetime
     updated_at: datetime | None = None
     asset_id: UUID | None = None

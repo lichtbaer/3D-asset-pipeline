@@ -103,8 +103,9 @@ def _extract_asset_id_from_url(url: str) -> UUID | None:
 async def _update_job(
     job_id: str,
     status: str,
-    result_url: str | None,
+    result_path: str | None,
     error_msg: str | None = None,
+    *,
     error_type: str | None = None,
     error_detail: str | None = None,
 ) -> None:
@@ -112,7 +113,7 @@ async def _update_job(
     if status == "processing":
         await _job_svc.start(job_id)
     elif status == "done":
-        await _job_svc.complete(job_id, result_url=result_url)
+        await _job_svc.complete(job_id, result_url=result_path)
     elif status == "failed":
         await _job_svc.fail(
             job_id,
@@ -125,8 +126,9 @@ async def _update_job(
 async def _update_glb_job(
     job_id: str,
     status: str,
-    glb_file_path: str | None,
+    result_path: str | None,
     error_msg: str | None = None,
+    *,
     error_type: str | None = None,
     error_detail: str | None = None,
 ) -> None:
@@ -134,7 +136,7 @@ async def _update_glb_job(
     if status == "processing":
         await _job_svc.start(job_id)
     elif status == "done":
-        await _job_svc.complete(job_id, glb_file_path=glb_file_path)
+        await _job_svc.complete(job_id, glb_file_path=result_path)
     elif status == "failed":
         await _job_svc.fail(
             job_id,
@@ -160,8 +162,9 @@ async def _update_mesh_job_bgremoval(
 async def _update_bgremoval_job(
     job_id: str,
     status: str,
-    result_url: str | None,
+    result_path: str | None,
     error_msg: str | None = None,
+    *,
     error_type: str | None = None,
     error_detail: str | None = None,
 ) -> None:
@@ -171,8 +174,8 @@ async def _update_bgremoval_job(
     elif status == "done":
         await _job_svc.complete(
             job_id,
-            result_url=result_url,
-            bgremoval_result_url=result_url,
+            result_url=result_path,
+            bgremoval_result_url=result_path,
         )
     elif status == "failed":
         await _job_svc.fail(
@@ -278,7 +281,7 @@ async def get_image_job_status(
     if not job:
         raise_api_error(404, "Job nicht gefunden", code="JOB_NOT_FOUND")
 
-    provider_key = job.provider_key or job.model_key or ""
+    provider_key = job.provider_key or ""
     return ImageJobStatusResponse(
         job_id=job.id,
         status=job.status,
@@ -287,7 +290,6 @@ async def get_image_job_status(
         error_type=job.error_type,
         error_detail=job.error_detail,
         provider_key=provider_key,
-        model_key=provider_key,
         created_at=job.created_at,
         updated_at=job.updated_at,
         asset_id=job.asset_id,
@@ -392,7 +394,7 @@ async def retry_image_job(
     if job.status != "failed":
         raise_api_error(400, "Nur fehlgeschlagene Jobs können erneut versucht werden", code="INVALID_STATE")
 
-    provider_key = job.provider_key or job.model_key or ""
+    provider_key = job.provider_key or ""
     params = {"width": 1024, "height": 1024, "count": 1}
 
     new_job = GenerationJob(

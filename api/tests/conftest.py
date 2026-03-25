@@ -5,6 +5,7 @@ Pytest-Fixtures für Purzel ML Asset Pipeline Tests.
 - Mock-Provider: Externe API-Calls werden gemockt (respx)
 """
 
+import asyncio
 import json
 import os
 import tempfile
@@ -18,6 +19,7 @@ from fastapi.testclient import TestClient
 _test_tmp = Path(tempfile.gettempdir()) / "purzel-test"
 _test_tmp.mkdir(parents=True, exist_ok=True)
 (_test_tmp / "logs").mkdir(exist_ok=True)
+
 # Überschreiben für Tests (nicht setdefault, damit Docker-Env ignoriert wird)
 os.environ["LOG_PATH"] = str(_test_tmp / "logs")
 os.environ["ASSETS_STORAGE_PATH"] = str(_test_tmp / "assets")
@@ -26,6 +28,14 @@ os.environ["MESH_STORAGE_PATH"] = str(_test_tmp / "meshes")
 os.environ["BGREMOVAL_STORAGE_PATH"] = str(_test_tmp / "bgremoval")
 os.environ["ANIMATION_STORAGE_PATH"] = str(_test_tmp / "animations")
 os.environ["IMAGE_STORAGE_PATH"] = str(_test_tmp / "images")
+
+
+@pytest.fixture(scope="session")
+def postgres_reachable() -> bool:
+    """True wenn DATABASE_URL erreichbar (für Tests mit DB-Persistenz)."""
+    from app.database import check_db_connection
+
+    return asyncio.run(check_db_connection())
 
 
 @pytest.fixture

@@ -1,6 +1,6 @@
 # Technical Debt Audit
 
-Erstellt: 2026-03-15
+Erstellt: 2026-03-15 · **Letzte Code-Prüfung der offenen Punkte: 2026-03-25** · **Behebungsplan ergänzt: 2026-03-25** · **Prioritäten teilweise umgesetzt: 2026-03-25**
 
 ## Behobene Befunde
 
@@ -70,68 +70,152 @@ und in AssetDetailModal importiert.
 Backend hatte `pip-audit` in der CI-Pipeline, Frontend nicht. `npm audit --audit-level=high`
 als CI-Schritt im Frontend-Job hinzugefuegt.
 
+#### ~~25. Texture-Bake-Jobs persistent~~ (behoben)
+Tabelle `texture_bake_job`, ORM `TextureBakeJob`, Router `assets.py` nutzt AsyncSession statt In-Memory-Dict.
+Alembic: `20260325120000_texture_bake_job_drop_model_key.py`. CI: Postgres-Service + `alembic upgrade head` vor pytest.
+
+#### ~~26. generation_job.model_key Spalte entfernt~~ (behoben)
+Spalte `model_key` aus `generation_job` per derselben Migration entfernt. `ImageJobStatusResponse` liefert nur noch `provider_key`.
+Frontend `generation.ts` ohne `model_key`-Typ/Fallback. **Verbleibend:** `ImageGenerateRequest.model_key` + `resolve_provider_and_params` fuer **eingehende** Alt-JSON-Requests; Header `X-Deprecated` bei POST mit `model_key`.
+
 ---
 
 ## Offene Befunde
 
+*Nachstehende Einschaetzungen wurden am **2026-03-25** gegen den aktuellen Stand im Repo geprueft; Zahlen zu Tests siehe aktuelle `frontend/src/__tests__/` und `api/tests/`.*
+
 ### Hoch
 
 #### 2. Frontend-Testabdeckung
-Nur 3 Testdateien (`agents.test.ts`, `useChat.test.ts`, `useAssetFromUrl.test.tsx`) bei ca. 100 Komponenten.
+**4** Testdateien unter `frontend/src/__tests__/` (u. a. `PipelineStepper.test.tsx` neu); die Zahl der Komponenten bleibt gross — weiter ausbauen.
 
 **Empfehlung:** Tests fuer kritische Komponenten priorisieren:
 - `AssetDetailModal`
 - `SketchfabImportModal`
-- `PipelineStepper`
-- Job-Status-Komponenten
+- ~~`PipelineStepper`~~ (Basis-Tests vorhanden)
+- Job-Status-Komponenten (`JobStatus`, `JobErrorBlock`)
 
 ---
 
 ### Mittel
 
 #### 6. Uebergrosse Komponenten und Services
-Mehrere Dateien sind zu gross und sollten aufgeteilt werden:
+Mehrere Dateien sind zu gross und sollten aufgeteilt werden (Stand 2026-03-25):
 
 | Datei | Zeilen | Prioritaet |
 |-------|--------|------------|
-| `frontend/src/pages/PipelinePage.tsx` | 1.369 | Kritisch |
-| `frontend/src/pages/AssetLibrary.tsx` | 861 | Kritisch |
-| `frontend/src/components/assets/AssetDetailModal.tsx` | 829 | Kritisch |
-| `api/app/routers/generation.py` | 1.019 | Hoch |
-| `api/app/services/asset_service.py` | 962 | Hoch |
-| `api/app/routers/assets.py` | 798 | Hoch |
+| `frontend/src/pages/PipelinePage.tsx` | ~1.411 | Kritisch |
+| `frontend/src/pages/AssetLibrary.tsx` | ~862 | Kritisch |
+| `frontend/src/components/assets/AssetDetailModal.tsx` | ~832 | Kritisch |
+| `api/app/routers/generation.py` | ~1.071 | Hoch |
+| `api/app/services/asset_service.py` | ~923 | Hoch |
+| `api/app/routers/assets.py` | ~810 | Hoch |
 
 **Empfehlung:** Logik in Sub-Komponenten/Sub-Services extrahieren.
 
 #### 7. Backend Coverage-Omits
-7 kritische Dateien sind von der Coverage-Messung ausgeschlossen (`pyproject.toml`):
-- `app/main.py`, `app/routers/generation.py`, `app/services/mesh_generation.py`
-- `app/services/animation_generation.py`, `app/services/bgremoval.py`
-- `app/services/mesh_export_service.py`
+In `api/pyproject.toml` sind **deutlich mehr** Pfade von Coverage ausgeschlossen als frueher nur unter „7 Dateien“ subsumiert. Auszug (vollstaendige Liste siehe `[tool.coverage.run] omit`):
 
-**Empfehlung:** Omits schrittweise entfernen und Tests ergaenzen.
+- Kern/Orchestrierung: `app/main.py`, `app/logging_config.py`, `app/database.py`
+- Router: `app/routers/generation.py`, `app/routers/sketchfab.py`, `app/routers/storage.py`
+- Services: u. a. `mesh_generation.py`, `animation_generation.py`, `rigging_generation.py`, `bgremoval.py`, `mesh_export_service.py`
+- Provider-Bloecke: `app/services/bgremoval_providers/*`, `app/services/image_providers/picsart.py`, `app/providers/animation/*`, `app/providers/rigging/blender_rigify.py`, `app/providers/rigging/unirig_local.py`
+- Sonstiges: `alembic/*`, `*/__init__.py`
 
-#### 8. In-Memory Job State (Texture Baking)
-`api/app/routers/assets.py` speichert Texture-Baking-Jobs in einem `dict` im Speicher. State geht bei Server-Neustart verloren.
+**Empfehlung:** Omits schrittweise entfernen und Tests ergaenzen; technische Schuld ist hier **groesser** als die alte „7-Dateien“-Formulierung suggerierte.
 
-**Empfehlung:** In die Datenbank (GenerationJob) migrieren.
+#### ~~8. In-Memory Job State (Texture Baking)~~ → siehe Befund ~~25~~ (behoben)
 
-#### 4b. model_key Deprecation (offen)
-`model_key` in `api/app/models/generation_job.py:23` als deprecated markiert, aber noch vom Frontend aktiv genutzt (8 Dateien). Backward-Compat-Mapping in `api/app/schemas/generation.py:17-46`.
+#### 4b. model_key in **Request**-Body (optional, Restarbeit)
+**Erledigt fuer DB und Job-Status-Response:** keine Spalte mehr, kein `model_key` in `ImageJobStatusResponse`.
 
-**Empfehlung:** Frontend auf `provider_key` umstellen, dann `model_key` entfernen.
+**Offen (niedrige Prioritaet):** Externe Clients koennen POST `/generate/image` noch mit `model_key` + Top-Level-Params senden (`ImageGenerateRequest`, `resolve_provider_and_params`, `X-Deprecated`-Header). Entfernen sobald keine Alt-Clients mehr erwartet werden.
 
 ---
 
 ### Niedrig
 
 #### 10. `type: ignore` in main.py
-`api/app/main.py:35` hat `# type: ignore[arg-type]` fuer `_rate_limit_exceeded_handler`. Bekannte slowapi-Limitation.
+**Weiterhin aktuell:** `api/app/main.py` Zeile ~35 — `# type: ignore[arg-type]` fuer `_rate_limit_exceeded_handler`. Bekannte slowapi-Limitation.
 
 #### 11. Print-Logging in Blender-Skripten
-2 Skripte in `api/scripts/` mit `print()`-Aufrufen statt `logging.getLogger()`.
+**Weiterhin aktuell:** `api/scripts/blender_rig_human.py` und `api/scripts/blender_bake_textures.py` nutzen `print()` (teilweise `file=sys.stderr`).
 
 **Empfehlung:** Akzeptabel fuer Blender-Subprozesse.
+
+---
+
+## Behebungsplan (offene Punkte)
+
+Ziel: technische Schuld **inkrementell** abbauen — kleine, reviewbare Schritte, keine „alles auf einmal“-Migration.
+
+### Reihenfolge und Abhaengigkeiten
+
+| Phase | Thema | Befund-ID | Abhaengigkeiten |
+|-------|--------|-----------|-----------------|
+| **1** | `provider_key` / Ende `model_key`-Compat | 4b | Keine harte Abhaengigkeit; vor grossen API-Aenderungen sinnvoll |
+| **2** | Texture-Bake-Jobs persistent | 8 | Eigenes DB-Modell + Migration; unabhaengig von Phase 1 |
+| **3** | Frontend-Tests ausbauen | 2 | Parallel zu Phase 4/5 moeglich |
+| **4** | Coverage-Omits schließen | 7 | Am effizientesten **nach** gezielten Tests pro Modul; koppelt mit Phase 3/5 |
+| **5** | Grosse Dateien zerlegen | 6 | Erleichtert Phase 3 und 4 fuer betroffene Bereiche |
+| **6** | Niedrig (optional) | 10, 11 | Keine Blocker |
+
+---
+
+### Phase 1: `model_key` bereinigen (4b)
+
+**Stand 2026-03-25:** Punkte 1–2–4–5 fuer **Response/DB/Frontend** erledigt (siehe Befund ~~26~~). Verbleibend: Schritt 3 — `model_key` aus **Request**-Schema und Mapping entfernen, wenn Alt-Clients weg sind.
+
+---
+
+### Phase 2: Texture-Bake-Jobs persistent (8)
+
+**Stand 2026-03-25:** Umgesetzt (Befund ~~25~~). Integrationstest `test_texture_bake_job_persisted_and_status` laeuft mit Postgres (CI); lokal ohne DB `pytest.skip`.
+
+---
+
+### Phase 3: Frontend-Tests (2)
+
+1. **Setup:** Bestehendes Vitest-Setup in `frontend/src/__tests__/` nutzen; React Testing Library fuer Komponenten.
+2. **Reihenfolge:** Zuerst **reine Logik** (Hooks, Utils), dann **kritische UI**:
+   - `AssetDetailModal` — Speichern, Fehlerpfade (Mocks fuer API).
+   - `SketchfabImportModal` — oeffnen/schliessen, Submit-Flow mit Mock.
+   - ~~`PipelineStepper`~~ — Basis-Tests in `PipelineStepper.test.tsx`.
+   - `JobStatus` / `JobErrorBlock` — Zustaende pending/done/failed.
+3. **CI:** Bereits `npm run test` in `.github/workflows/test.yml` — nur Coverage-Qualitaet steigern, kein Pipeline-Change noetig.
+
+**Erfolgskriterium:** Mindestens diese vier Bereiche haben mindestens einen sinnvollen Test; keine Regression bei Refactors in Phase 5.
+
+---
+
+### Phase 4: Coverage-Omits reduzieren (7)
+
+1. **Priorisierung nach Risiko:** Zuerst Router/Services, die Geschaeftslogik tragen (`generation.py`, `assets.py`-Teile, `mesh_generation.py`), dann extern schwer testbare Provider (optional weiter omit oder Contract-Tests).
+2. **Vorgehen pro Datei:** Eintrag aus `[tool.coverage.run] omit` in `api/pyproject.toml` entfernen → Tests schreiben bis Coverage wieder >= Schwelle (aktuell `--cov-fail-under=70`).
+3. **`__init__.py` und `alembic/*`:** Meist dauerhaft omit-bleibend; nicht zwingend Ziel von Phase 4.
+4. **Provider-Globs:** Entweder Integrationstests mit Mocks oder gezielte Unit-Tests pro Provider-Datei; Globs schrittweise verkleinern.
+
+**Erfolgskriterium:** Omits-Liste messbar verkuerzt; keine dauerhafte Coverage-Unterkante unterschritten.
+
+---
+
+### Phase 5: Grosse Dateien zerlegen (6)
+
+1. **Frontend:** `PipelinePage.tsx` — Tabs/Step-Logik in Hooks (`usePipelineSteps`) und Unterkomponenten (`PipelineImageTab`, …); CSS pro Teil auslagern wo sinnvoll.
+2. **Frontend:** `AssetLibrary.tsx` — Filter/Grid/Modal in eigene Dateien.
+3. **Frontend:** `AssetDetailModal.tsx` — Bereiche (Metadaten, Steps, Export) als Subkomponenten.
+4. **Backend:** `generation.py` — Router nach Ressource oder Feature splitten (`generation_image.py`, …) und in `main`/`routers/__init__.py` einbinden.
+5. **Backend:** `asset_service.py` — thematische Module (z. B. Metadaten vs. Dateioperationen) mit duennem Fassaden-Import.
+6. **Backend:** `assets.py` — Texture-Bake-Routen nach `routers/texture_bake.py` verschieben, sobald Phase 2 stabil ist (optional gekoppelt).
+
+**Erfolgskriterium:** Keine Datei > ca. 500–700 Zeilen ohne triftigen Grund; Reviews werden einfacher.
+
+---
+
+### Phase 6: Niedrig (optional)
+
+- **10 — `type: ignore`:** slowapi-Version pruefen, Stubs suchen, oder duenner Wrapper um den Handler, der mypy befriedigt; nur wenn Aufwand gering.
+- **11 — Blender `print()`:** Belassen oder minimale Hilfsfunktion `log_info`/`log_err`, die auf stderr schreibt — keine zwingende Aenderung.
 
 ---
 
@@ -144,7 +228,7 @@ Mehrere Dateien sind zu gross und sollten aufgeteilt werden:
 - JSON-strukturiertes Logging mit Rotation im Backend
 - Saubere `__all__`-Exports, keine Wildcard-Imports
 - CI/CD vorhanden (`.github/workflows/test.yml`)
-- 28 Backend-Testdateien mit guter Abdeckung
+- **23** Testdateien (`test_*.py`) unter `api/tests/`; **28** Python-Dateien inkl. `conftest.py` und `__init__.py` (Stand 2026-03-25)
 - Alembic-Migrationen ordentlich versioniert
 - API-Versioning unter `/api/v1/` (neu)
 - Pydantic-basierte Settings mit `.env`-Support (neu)
