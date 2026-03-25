@@ -192,3 +192,46 @@ def test_permanent_delete(client: TestClient):
     assert r2.status_code == 204
     r3 = client.get(f"/assets/{asset_id}")
     assert r3.status_code == 404
+
+
+def test_texture_bake_job_persisted_and_status(
+    client: TestClient,
+    sample_asset: str,
+    monkeypatch: pytest.MonkeyPatch,
+    postgres_reachable: bool,
+):
+    """POST texture/bake legt DB-Job an; Status abrufbar (Bake via Mock)."""
+    if not postgres_reachable:
+        pytest.skip("PostgreSQL nicht erreichbar (lokal ohne DB)")
+    from app.services import asset_service
+
+    asset_dir = asset_service.get_asset_dir(sample_asset)
+    (asset_dir / "mesh_target.glb").write_bytes(b"x")
+
+    def fake_run_bake_sync(**_kwargs: object) -> str:
+        return "mesh_baked_mesh_target.glb"
+
+    monkeypatch.setattr("app.routers.assets.run_bake_sync", fake_run_bake_sync)
+
+    r = client.post(
+        f"/assets/{sample_asset}/texture/bake",
+        json={
+            "source_mesh": "mesh.glb",
+            "target_mesh": "mesh_target.glb",
+            "resolution": 512,
+            "bake_types": ["diffuse"],
+        },
+    )
+    assert r.status_code == 202
+    job_id = r.json()["job_id"]
+    assert len(job_id) == 36
+
+    r2 = client.get(f"/assets/{sample_asset}/texture/bake/status/{job_id}")
+    assert r2.status_code == 200
+    data = r2.json()
+    assert data["job_id"] == job_id
+    assert data["status"] in ("pending", "processing", "done", "failed")
+
+    other = "00000000-0000-0000-0000-000000000000"
+    r3 = client.get(f"/assets/{other}/texture/bake/status/{job_id}")
+    assert r3.status_code == 404

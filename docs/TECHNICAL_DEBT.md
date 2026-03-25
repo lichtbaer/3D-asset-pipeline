@@ -1,6 +1,6 @@
 # Technical Debt Audit
 
-Erstellt: 2026-03-15 · **Letzte Code-Prüfung der offenen Punkte: 2026-03-25** · **Behebungsplan ergänzt: 2026-03-25**
+Erstellt: 2026-03-15 · **Letzte Code-Prüfung der offenen Punkte: 2026-03-25** · **Behebungsplan ergänzt: 2026-03-25** · **Prioritäten teilweise umgesetzt: 2026-03-25**
 
 ## Behobene Befunde
 
@@ -70,22 +70,30 @@ und in AssetDetailModal importiert.
 Backend hatte `pip-audit` in der CI-Pipeline, Frontend nicht. `npm audit --audit-level=high`
 als CI-Schritt im Frontend-Job hinzugefuegt.
 
+#### ~~25. Texture-Bake-Jobs persistent~~ (behoben)
+Tabelle `texture_bake_job`, ORM `TextureBakeJob`, Router `assets.py` nutzt AsyncSession statt In-Memory-Dict.
+Alembic: `20260325120000_texture_bake_job_drop_model_key.py`. CI: Postgres-Service + `alembic upgrade head` vor pytest.
+
+#### ~~26. generation_job.model_key Spalte entfernt~~ (behoben)
+Spalte `model_key` aus `generation_job` per derselben Migration entfernt. `ImageJobStatusResponse` liefert nur noch `provider_key`.
+Frontend `generation.ts` ohne `model_key`-Typ/Fallback. **Verbleibend:** `ImageGenerateRequest.model_key` + `resolve_provider_and_params` fuer **eingehende** Alt-JSON-Requests; Header `X-Deprecated` bei POST mit `model_key`.
+
 ---
 
 ## Offene Befunde
 
-*Nachstehende Einschaetzungen wurden am **2026-03-25** gegen den aktuellen Stand im Repo geprueft (Zeilenzahlen: `wc -l`, Frontend-Tests: `frontend/src/__tests__/`, Backend: `api/pyproject.toml` + `api/app/routers/assets.py`).*
+*Nachstehende Einschaetzungen wurden am **2026-03-25** gegen den aktuellen Stand im Repo geprueft; Zahlen zu Tests siehe aktuelle `frontend/src/__tests__/` und `api/tests/`.*
 
 ### Hoch
 
 #### 2. Frontend-Testabdeckung
-Weiterhin **3** Vitest-Dateien unter `frontend/src/__tests__/` (`agents.test.ts`, `useChat.test.ts`, `useAssetFromUrl.test.tsx`); die Zahl der Komponenten/Seiten ist gross — die relative Unterversorgung bleibt.
+**4** Testdateien unter `frontend/src/__tests__/` (u. a. `PipelineStepper.test.tsx` neu); die Zahl der Komponenten bleibt gross — weiter ausbauen.
 
 **Empfehlung:** Tests fuer kritische Komponenten priorisieren:
 - `AssetDetailModal`
 - `SketchfabImportModal`
-- `PipelineStepper`
-- Job-Status-Komponenten
+- ~~`PipelineStepper`~~ (Basis-Tests vorhanden)
+- Job-Status-Komponenten (`JobStatus`, `JobErrorBlock`)
 
 ---
 
@@ -116,15 +124,12 @@ In `api/pyproject.toml` sind **deutlich mehr** Pfade von Coverage ausgeschlossen
 
 **Empfehlung:** Omits schrittweise entfernen und Tests ergaenzen; technische Schuld ist hier **groesser** als die alte „7-Dateien“-Formulierung suggerierte.
 
-#### 8. In-Memory Job State (Texture Baking)
-**Weiterhin aktuell:** `api/app/routers/assets.py` nutzt `_texture_bake_jobs: dict[str, dict[str, Any]]` (Zeilenbereich ~87 ff.); Status laeuft nur im Prozessspeicher, Neustart verwirft offene Jobs.
+#### ~~8. In-Memory Job State (Texture Baking)~~ → siehe Befund ~~25~~ (behoben)
 
-**Empfehlung:** In die Datenbank (z. B. eigenes Job-Modell oder Erweiterung von `GenerationJob`) migrieren.
+#### 4b. model_key in **Request**-Body (optional, Restarbeit)
+**Erledigt fuer DB und Job-Status-Response:** keine Spalte mehr, kein `model_key` in `ImageJobStatusResponse`.
 
-#### 4b. model_key Deprecation (offen)
-**Teilweise entschaerft im Frontend, API-Schicht bleibt:** Spalte `model_key` in `api/app/models/generation_job.py` weiterhin deprecated (nullable Alias). Im Frontend tritt `model_key` praktisch nur noch in `frontend/src/api/generation.ts` auf (optional + Fallback `provider_key ?? model_key`). **Nicht** mehr „8 Frontend-Dateien“. Backend: `api/app/schemas/generation.py` (Compat + `resolve_provider_and_params`), `api/app/routers/generation.py` (u. a. Deprecation-Header `X-Deprecated`, Lesen `job.model_key`).
-
-**Empfehlung:** API-Clients und Responses konsequent auf `provider_key` umstellen, Legacy-Felder und Mapping nach Migration entfernen.
+**Offen (niedrige Prioritaet):** Externe Clients koennen POST `/generate/image` noch mit `model_key` + Top-Level-Params senden (`ImageGenerateRequest`, `resolve_provider_and_params`, `X-Deprecated`-Header). Entfernen sobald keine Alt-Clients mehr erwartet werden.
 
 ---
 
@@ -159,25 +164,13 @@ Ziel: technische Schuld **inkrementell** abbauen — kleine, reviewbare Schritte
 
 ### Phase 1: `model_key` bereinigen (4b)
 
-1. **Vertrag festlegen:** Responses und Clients nutzen nur noch `provider_key`; `model_key` in Responses als deprecated dokumentieren oder in einem Release entfernen (Breaking-Change nur mit Versionssprung oder kurzer Uebergangsphase).
-2. **Frontend:** `frontend/src/api/generation.ts` — Anfragen nur mit `provider_key` bauen; optionale Felder fuer `model_key` entfernen, sobald Backend keine Alt-Clients mehr braucht.
-3. **Backend:** `ImageGenerateRequest` / `resolve_provider_and_params` — Compat-Pfad nur behalten, solange externe Clients existieren; danach Feld `model_key` und Key-Map entfernen.
-4. **Datenbank:** Spalte `model_key` in `generation_job` nach Datenmigration (`UPDATE ... SET` wo noetig) und Bestaetigung, dass nichts mehr liest, per Alembic droppen oder als reines Legacy lassen (dokumentierter Endzustand).
-5. **Router:** `X-Deprecated`-Header und Lesepfade `job.model_key` entfernen, wenn Spalte weg ist.
-
-**Erfolgskriterium:** Ein klarer API-Pfad nur noch `provider_key`; keine doppelte Semantik in Schema und DB.
+**Stand 2026-03-25:** Punkte 1–2–4–5 fuer **Response/DB/Frontend** erledigt (siehe Befund ~~26~~). Verbleibend: Schritt 3 — `model_key` aus **Request**-Schema und Mapping entfernen, wenn Alt-Clients weg sind.
 
 ---
 
 ### Phase 2: Texture-Bake-Jobs persistent (8)
 
-1. **Modell:** Neues ORM-Modell z. B. `TextureBakeJob` (id, asset_id, status, Timestamps, Fehlertext, ggf. Metadaten) oder Erweiterung eines bestehenden Job-Musters — **nicht** in `GenerationJob` zwangsweise mischen, wenn sich die Felder unterscheiden.
-2. **Migration:** Alembic-Revision; bestehende In-Memory-Jobs koennen bei Deploy verworfen werden (akzeptiert) oder kurz Dual-Write (optional).
-3. **Router:** `_texture_bake_jobs` durch DB-Zugriffe ersetzen; Background-Task aktualisiert Zeilen statt Dict-Eintraegen.
-4. **API:** Start- und Status-Endpoints unveraendert halten oder nur minimal anpassen (job_id bleibt UUID-String).
-5. **Tests:** Integrationstest: Start → Status polling → Abschluss/Fehler (ggf. mit Mock fuer `run_bake_sync`).
-
-**Erfolgskriterium:** Nach API-Neustart sind nur noch in der DB gespeicherte Jobs abfragbar; keine verlorenen Status fuer laufende Deploys (oder dokumentierte Einschraenkung fuer die Uebergangsphase).
+**Stand 2026-03-25:** Umgesetzt (Befund ~~25~~). Integrationstest `test_texture_bake_job_persisted_and_status` laeuft mit Postgres (CI); lokal ohne DB `pytest.skip`.
 
 ---
 
@@ -187,7 +180,7 @@ Ziel: technische Schuld **inkrementell** abbauen — kleine, reviewbare Schritte
 2. **Reihenfolge:** Zuerst **reine Logik** (Hooks, Utils), dann **kritische UI**:
    - `AssetDetailModal` — Speichern, Fehlerpfade (Mocks fuer API).
    - `SketchfabImportModal` — oeffnen/schliessen, Submit-Flow mit Mock.
-   - `PipelineStepper` (`frontend/src/components/ui/PipelineStepper.tsx`) — Navigation/Zustaende zwischen Steps.
+   - ~~`PipelineStepper`~~ — Basis-Tests in `PipelineStepper.test.tsx`.
    - `JobStatus` / `JobErrorBlock` — Zustaende pending/done/failed.
 3. **CI:** Bereits `npm run test` in `.github/workflows/test.yml` — nur Coverage-Qualitaet steigern, kein Pipeline-Change noetig.
 
