@@ -9,6 +9,20 @@ on:
 jobs:
   backend:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: purzel
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U user -d purzel"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
     defaults:
       run:
         working-directory: api
@@ -24,8 +38,14 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Run Alembic migrations
+        env:
+          DATABASE_URL: postgresql+asyncpg://user:password@localhost:5432/purzel
+        run: alembic upgrade head
+
       - name: Run pytest with coverage
         env:
+          DATABASE_URL: postgresql+asyncpg://user:password@localhost:5432/purzel
           LOG_PATH: /tmp/purzel-test/logs
           ASSETS_STORAGE_PATH: /tmp/purzel-test/assets
           PRESETS_STORAGE_PATH: /tmp/purzel-test/presets
@@ -34,6 +54,8 @@ jobs:
           pytest tests/ --cov=app --cov-report=term-missing --cov-fail-under=70
 
       - name: Run mypy
+        env:
+          DATABASE_URL: postgresql+asyncpg://user:password@localhost:5432/purzel
         run: python -m mypy app --strict
 
       - name: Run ruff
