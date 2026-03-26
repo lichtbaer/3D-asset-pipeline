@@ -4,6 +4,7 @@ API-Dokumentation: https://sketchfab.com/developers/data-api/v3
 """
 
 import asyncio
+import json
 import logging
 import re
 import zipfile
@@ -102,7 +103,7 @@ class SketchfabService:
                 try:
                     err_json = response.json()
                     err_msg = err_json.get("detail", err_json.get("error", err_body))
-                except Exception:
+                except (ValueError, json.JSONDecodeError):
                     logger.debug("Sketchfab error response not JSON")
                     err_msg = err_body
                 raise RuntimeError(f"Sketchfab Upload fehlgeschlagen: {err_msg}")
@@ -190,7 +191,7 @@ class SketchfabService:
                 try:
                     err_json = resp.json()
                     err = err_json.get("detail", err_json.get("error", err))
-                except Exception:
+                except (ValueError, json.JSONDecodeError):
                     pass
                 raise RuntimeError(f"Sketchfab Download fehlgeschlagen: {err}")
 
@@ -258,7 +259,7 @@ class SketchfabService:
                 )
                 if resp.status_code == 200:
                     return cast(dict[str, Any], resp.json())
-        except Exception as e:
+        except (httpx.HTTPStatusError, httpx.RequestError) as e:
             logger.debug("Sketchfab Model-Info nicht abrufbar: %s", e)
         return None
 
@@ -274,7 +275,7 @@ class SketchfabService:
                 try:
                     err_json = resp.json()
                     err = err_json.get("detail", err_json.get("error", err))
-                except Exception:
+                except (ValueError, json.JSONDecodeError):
                     pass
                 raise RuntimeError(f"Sketchfab Me/Models fehlgeschlagen: {err}")
 
@@ -342,7 +343,7 @@ def _extract_and_convert_to_glb(zip_bytes: bytes, target_dir: Path) -> Path | No
                 mesh.export(str(out_path))
                 _cleanup_extract(extract_dir)
                 return out_path
-            except Exception as e:
+            except (ValueError, OSError) as e:
                 logger.warning("glTF-Konvertierung fehlgeschlagen: %s", e)
                 _cleanup_extract(extract_dir)
 
@@ -363,7 +364,7 @@ def _extract_and_convert_to_glb(zip_bytes: bytes, target_dir: Path) -> Path | No
                     mesh.export(str(out_path))
                     _cleanup_extract(extract_dir)
                     return out_path
-            except Exception as e:
+            except (ValueError, OSError) as e:
                 logger.warning("OBJ-Konvertierung fehlgeschlagen: %s", e)
                 _cleanup_extract(extract_dir)
 
@@ -376,7 +377,7 @@ def _cleanup_extract(extract_dir: Path) -> None:
         import shutil
 
         shutil.rmtree(extract_dir, ignore_errors=True)
-    except Exception:
+    except OSError:
         pass
 
 

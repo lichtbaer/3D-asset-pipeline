@@ -23,7 +23,7 @@ def _build_registry() -> dict[str, BaseRiggingProvider]:
             from app.providers.rigging.unirig_provider import UniRigProvider
 
             registry["unirig"] = UniRigProvider()
-        except Exception as e:
+        except (ImportError, ValueError, OSError, RuntimeError) as e:
             logger.warning(
                 "UniRig-Provider nicht geladen: %s — Provider aus Registry ausgeschlossen",
                 e,
@@ -66,7 +66,7 @@ def _build_registry() -> dict[str, BaseRiggingProvider]:
                     )
                 else:
                     registry["unirig-local"] = UniRigLocalProvider()
-    except Exception as e:
+    except (ImportError, ValueError, OSError, RuntimeError) as e:
         logger.warning(
             "UniRig (Lokal) nicht geladen: %s — Provider aus Registry ausgeschlossen",
             e,
@@ -82,7 +82,7 @@ def _build_registry() -> dict[str, BaseRiggingProvider]:
         logger.warning(
             "Blender nicht gefunden — blender-rigify Provider aus Registry ausgeschlossen"
         )
-    except Exception as e:
+    except (ImportError, ValueError, OSError, RuntimeError) as e:
         logger.warning(
             "blender-rigify nicht geladen: %s — Provider aus Registry ausgeschlossen",
             e,

@@ -37,7 +37,7 @@ export interface ProcessingResult {
   output_file: string;
   processing: {
     operation: string;
-    params: Record<string, unknown>;
+    params: Record<string, string | number | boolean | null>;
     source_file: string;
     output_file: string;
     processed_at: string;

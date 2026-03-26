@@ -17,7 +17,7 @@ from app.core.rate_limit import limiter
 from app.core.security import verify_api_key
 from app.database import check_db_connection
 from app.logging_config import setup_logging
-from app.routers import agents, assets, generation, presets, sketchfab, storage
+from app.routers import agents, assets, generation, presets, sketchfab, storage, texture_bake
 
 setup_logging()
 
@@ -38,6 +38,7 @@ _v1 = APIRouter(prefix="/api/v1")
 _v1.include_router(agents.router)
 _v1.include_router(generation.router)
 _v1.include_router(assets.router)
+_v1.include_router(texture_bake.router)
 _v1.include_router(presets.router)
 _v1.include_router(sketchfab.router)
 _v1.include_router(storage.router)

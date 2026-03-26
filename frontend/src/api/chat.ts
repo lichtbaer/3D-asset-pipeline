@@ -6,9 +6,17 @@ export interface ChatMessage {
   timestamp: string;
 }
 
+export interface ChatActionParams {
+  prompt?: string;
+  tags?: string[];
+  tab?: string;
+  asset_id?: string;
+  [key: string]: string | string[] | number | boolean | null | undefined;
+}
+
 export interface ChatAction {
   type: "optimize_prompt" | "suggest_tags" | "assess_quality" | "open_tab";
-  params: Record<string, unknown>;
+  params: ChatActionParams;
 }
 
 export interface ChatResponse {

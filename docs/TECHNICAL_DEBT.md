@@ -1,6 +1,6 @@
 # Technical Debt Audit
 
-Erstellt: 2026-03-15 · **Letzte Code-Prüfung der offenen Punkte: 2026-03-25** · **Behebungsplan ergänzt: 2026-03-25** · **Prioritäten teilweise umgesetzt: 2026-03-25**
+Erstellt: 2026-03-15 · **Letzte Code-Prüfung der offenen Punkte: 2026-03-26** · **Behebungsplan ergänzt: 2026-03-25** · **Prioritäten teilweise umgesetzt: 2026-03-26**
 
 ## Behobene Befunde
 
@@ -78,6 +78,32 @@ Alembic: `20260325120000_texture_bake_job_drop_model_key.py`. CI: Postgres-Servi
 Spalte `model_key` aus `generation_job` per derselben Migration entfernt. `ImageJobStatusResponse` liefert nur noch `provider_key`.
 Frontend `generation.ts` ohne `model_key`-Typ/Fallback. **Verbleibend:** `ImageGenerateRequest.model_key` + `resolve_provider_and_params` fuer **eingehende** Alt-JSON-Requests; Header `X-Deprecated` bei POST mit `model_key`.
 
+#### ~~27. Tote Frontend-Komponenten (Duplikate)~~ (behoben)
+Vier Dateien in `frontend/src/components/pipeline/` waren unbenutzt — aeltere Versionen, die durch erweiterte
+Implementierungen in `pipeline/rigging/` und `pipeline/animation/` ersetzt wurden:
+`RiggingForm.tsx`, `RiggingJobStatus.tsx`, `AnimationForm.tsx`, `AnimationJobStatus.tsx` geloescht.
+
+#### ~~28. Duplizierte `_extract_asset_id_from_url`~~ (behoben)
+Identische Funktion existierte in `api/app/routers/generation.py` und `api/app/services/job_service.py`.
+Konsolidiert: kanonische Definition in `job_service.py` (umbenannt zu `extract_asset_id_from_url`),
+Import in `generation.py`.
+
+#### ~~29. Callback-Alias-Duplikation in generation.py~~ (behoben)
+`_update_mesh_job` und `_update_rigging_job` waren Aliase fuer `_update_glb_job`. Aliase entfernt,
+alle Aufrufstellen nutzen direkt `_update_glb_job`.
+
+#### ~~30. Breite `except Exception`-Klauseln~~ (behoben)
+29 Stellen mit `except Exception` im Backend auf spezifische Typen umgestellt
+(`httpx.HTTPStatusError`, `httpx.RequestError`, `OSError`, `ValueError`, `json.JSONDecodeError`, etc.).
+Verbleibend: 1 bewusster Catch-All in `job_error_handler.py` (dokumentiert) und 2 Stellen in
+Provider-Wrappern (`hf_inference.py`, `replicate_provider.py`) wo externe SDKs unvorhersehbare
+Exception-Typen werfen.
+
+#### ~~31. Schwache TypeScript-Typisierung `Record<string, unknown>`~~ (behoben)
+24+ Stellen mit `Record<string, unknown>` in Frontend-API-Clients und Komponenten durch spezifische
+Interfaces ersetzt (`ProviderParams`, `ImageGenerationParams`, `MeshProviderParams`, etc.) oder durch
+den restriktiveren Typ `Record<string, string | number | boolean | null>` fuer dynamische Provider-Parameter.
+
 ---
 
 ## Offene Befunde
@@ -99,19 +125,17 @@ Frontend `generation.ts` ohne `model_key`-Typ/Fallback. **Verbleibend:** `ImageG
 
 ### Mittel
 
-#### 6. Uebergrosse Komponenten und Services
-Mehrere Dateien sind zu gross und sollten aufgeteilt werden (Stand 2026-03-25):
+#### ~~6. Uebergrosse Komponenten und Services~~ (behoben)
+Alle sechs Dateien wurden aufgeteilt (Stand 2026-03-26):
 
-| Datei | Zeilen | Prioritaet |
-|-------|--------|------------|
-| `frontend/src/pages/PipelinePage.tsx` | ~1.411 | Kritisch |
-| `frontend/src/pages/AssetLibrary.tsx` | ~862 | Kritisch |
-| `frontend/src/components/assets/AssetDetailModal.tsx` | ~832 | Kritisch |
-| `api/app/routers/generation.py` | ~1.071 | Hoch |
-| `api/app/services/asset_service.py` | ~923 | Hoch |
-| `api/app/routers/assets.py` | ~810 | Hoch |
-
-**Empfehlung:** Logik in Sub-Komponenten/Sub-Services extrahieren.
+| Datei | Vorher | Nachher | Extrahiert in |
+|-------|--------|---------|---------------|
+| `PipelinePage.tsx` | ~1.411 | ~47 | `usePipelineState.ts` (Hook) + 6 Tab-Komponenten in `pipeline/tabs/` |
+| `AssetLibrary.tsx` | ~862 | ~464 | `AssetFilterBar.tsx`, `AssetGrid.tsx` |
+| `AssetDetailModal.tsx` | ~832 | ~516 | `AssetFilesPreviews.tsx`, `AssetVerwaltung.tsx`, `AssetPipelineActions.tsx` |
+| `generation.py` | ~1.060 | ~45 | 6 Sub-Router (`generation_image.py`, `_bgremoval`, `_mesh`, `_rigging`, `_animation`, `_jobs`) |
+| `asset_service.py` | ~923 | ~595 | `asset_persistence.py`, `asset_import.py` |
+| `assets.py` | ~854 | ~672 | `texture_bake.py` |
 
 #### 7. Backend Coverage-Omits
 In `api/pyproject.toml` sind **deutlich mehr** Pfade von Coverage ausgeschlossen als frueher nur unter „7 Dateien“ subsumiert. Auszug (vollstaendige Liste siehe `[tool.coverage.run] omit`):
@@ -134,6 +158,12 @@ In `api/pyproject.toml` sind **deutlich mehr** Pfade von Coverage ausgeschlossen
 ---
 
 ### Niedrig
+
+#### 32. Provider-Verzeichnis-Inkonsistenz
+Image/BgRemoval/Mesh-Provider liegen unter `api/app/services/*_providers/`, Animation/Rigging-Provider
+unter `api/app/providers/*/`. Kein einheitliches Muster.
+
+**Empfehlung:** Alle Provider nach `api/app/providers/` konsolidieren (grosser Refactor, niedrige Dringlichkeit).
 
 #### 10. `type: ignore` in main.py
 **Weiterhin aktuell:** `api/app/main.py` Zeile ~35 — `# type: ignore[arg-type]` fuer `_rate_limit_exceeded_handler`. Bekannte slowapi-Limitation.
@@ -158,7 +188,7 @@ Ziel: technische Schuld **inkrementell** abbauen — kleine, reviewbare Schritte
 | **3** | Frontend-Tests ausbauen | 2 | Parallel zu Phase 4/5 moeglich |
 | **4** | Coverage-Omits schließen | 7 | Am effizientesten **nach** gezielten Tests pro Modul; koppelt mit Phase 3/5 |
 | **5** | Grosse Dateien zerlegen | 6 | Erleichtert Phase 3 und 4 fuer betroffene Bereiche |
-| **6** | Niedrig (optional) | 10, 11 | Keine Blocker |
+| **6** | Niedrig (optional) | 10, 11, 32 | Keine Blocker |
 
 ---
 
@@ -201,14 +231,8 @@ Ziel: technische Schuld **inkrementell** abbauen — kleine, reviewbare Schritte
 
 ### Phase 5: Grosse Dateien zerlegen (6)
 
-1. **Frontend:** `PipelinePage.tsx` — Tabs/Step-Logik in Hooks (`usePipelineSteps`) und Unterkomponenten (`PipelineImageTab`, …); CSS pro Teil auslagern wo sinnvoll.
-2. **Frontend:** `AssetLibrary.tsx` — Filter/Grid/Modal in eigene Dateien.
-3. **Frontend:** `AssetDetailModal.tsx` — Bereiche (Metadaten, Steps, Export) als Subkomponenten.
-4. **Backend:** `generation.py` — Router nach Ressource oder Feature splitten (`generation_image.py`, …) und in `main`/`routers/__init__.py` einbinden.
-5. **Backend:** `asset_service.py` — thematische Module (z. B. Metadaten vs. Dateioperationen) mit duennem Fassaden-Import.
-6. **Backend:** `assets.py` — Texture-Bake-Routen nach `routers/texture_bake.py` verschieben, sobald Phase 2 stabil ist (optional gekoppelt).
-
-**Erfolgskriterium:** Keine Datei > ca. 500–700 Zeilen ohne triftigen Grund; Reviews werden einfacher.
+**Stand 2026-03-26:** Alle sechs Dateien aufgeteilt (siehe Befund ~~6~~).
+Neue Dateien liegen jeweils unter 350 Zeilen; die duennen Fassaden-Dateien unter 50 Zeilen.
 
 ---
 
@@ -216,6 +240,7 @@ Ziel: technische Schuld **inkrementell** abbauen — kleine, reviewbare Schritte
 
 - **10 — `type: ignore`:** slowapi-Version pruefen, Stubs suchen, oder duenner Wrapper um den Handler, der mypy befriedigt; nur wenn Aufwand gering.
 - **11 — Blender `print()`:** Belassen oder minimale Hilfsfunktion `log_info`/`log_err`, die auf stderr schreibt — keine zwingende Aenderung.
+- **32 — Provider-Verzeichnisse:** Alle Provider nach `api/app/providers/` konsolidieren; grosser Refactor, niedrige Dringlichkeit.
 
 ---
 

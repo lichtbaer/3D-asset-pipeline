@@ -4,6 +4,7 @@ import asyncio
 from pathlib import Path
 from typing import Any
 
+import httpx
 from fastapi import APIRouter, HTTPException, Request
 from pydantic_ai import BinaryContent
 
@@ -88,7 +89,7 @@ async def optimize_prompt(
     agent = get_prompt_agent()
     try:
         result = await agent.run(_build_prompt_message(body))
-    except Exception as e:
+    except (httpx.HTTPStatusError, httpx.RequestError, ValueError, RuntimeError) as e:
         raise_api_error(
             502,
             "Modell-Fehler",
@@ -172,7 +173,7 @@ async def suggest_tags(
     agent = get_tagging_agent()
     try:
         result = await agent.run(run_input)
-    except Exception as e:
+    except (httpx.HTTPStatusError, httpx.RequestError, ValueError, RuntimeError) as e:
         raise_api_error(502, "Modell-Fehler", detail=str(e), code="MODEL_ERROR", chain=e)
     output = result.output
     if output is None:
@@ -276,7 +277,7 @@ async def assess_quality(
             include_mesh_analysis=body.include_mesh_analysis,
             include_vision=body.include_vision,
         )
-    except Exception as e:
+    except (httpx.HTTPStatusError, httpx.RequestError, ValueError, RuntimeError) as e:
         raise_api_error(502, "Modell-Fehler", detail=str(e), code="MODEL_ERROR", chain=e)
 
     if output is None:
@@ -368,7 +369,7 @@ async def recommend_workflow(
     agent = get_workflow_agent()
     try:
         result = await agent.run(message)
-    except Exception as e:
+    except (httpx.HTTPStatusError, httpx.RequestError, ValueError, RuntimeError) as e:
         raise_api_error(502, "Modell-Fehler", detail=str(e), code="MODEL_ERROR", chain=e)
 
     output = result.output
@@ -441,7 +442,7 @@ async def chat(request: Request, body: ChatRequest) -> ChatResponseModel:
     agent = get_chat_agent()
     try:
         result = await agent.run(user_message)
-    except Exception as e:
+    except (httpx.HTTPStatusError, httpx.RequestError, ValueError, RuntimeError) as e:
         raise_api_error(502, "Modell-Fehler", detail=str(e), code="MODEL_ERROR", chain=e)
     output = result.output
     if output is None:

@@ -5,7 +5,6 @@ Nutzt AssetPaths und MetadataService für zentralisierte Pfad- und Metadata-Logi
 """
 
 import asyncio
-import json
 import logging
 import re
 import shutil
@@ -14,13 +13,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-import httpx
 from pydantic import BaseModel, Field
 
-from app.config.storage import (
-    ASSETS_STORAGE_PATH,
-    BGREMOVAL_STORAGE_PATH,
-)
+from app.config.storage import ASSETS_STORAGE_PATH
 from app.core.asset_paths import AssetPaths
 from app.services.metadata_service import get_metadata_service
 
@@ -510,209 +505,14 @@ def update_metadata_fields(asset_id: str, fields: dict[str, Any]) -> None:
     get_metadata_service().update(asset_id, **fields)
 
 
-async def _download_bytes(url: str) -> bytes:
-    """Lädt URL herunter, gibt Bytes zurück."""
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        response = await client.get(url)
-        response.raise_for_status()
-        return response.content
-
-
-def _resolve_local_path_from_url(url: str) -> Path | None:
-    """
-    Prüft ob URL auf lokale Static-Datei zeigt (z.B. /static/bgremoval/X.png).
-    Gibt lokalen Pfad zurück oder None.
-    """
-    if "/static/bgremoval/" in url:
-        # http://localhost:8000/static/bgremoval/{job_id}.png oder /static/bgremoval/...
-        parts = url.rstrip("/").split("/")
-        if parts:
-            filename = parts[-1]
-            if filename:
-                path = BGREMOVAL_STORAGE_PATH / filename
-                if path.exists():
-                    return path
-    return None
-
-
-async def persist_image_job(
-    job_id: str,
-    asset_id: str,
-    provider_key: str,
-    prompt: str,
-    result_url: str,
-    negative_prompt: str | None = None,
-    width: int | None = None,
-    height: int | None = None,
-) -> None:
-    """
-    Speichert Bild-Job-Output im Asset-Ordner.
-    Lädt Bild von result_url herunter (PicsArt/extern).
-    """
-    try:
-        image_bytes = await _download_bytes(result_url)
-    except Exception as e:
-        logger.warning("Bild-Download für Asset fehlgeschlagen: %s", e)
-        return
-
-    step_data: dict[str, Any] = {
-        "job_id": job_id,
-        "provider_key": provider_key,
-        "prompt": prompt,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-    }
-    if negative_prompt:
-        step_data["negative_prompt"] = negative_prompt
-    if width is not None:
-        step_data["width"] = width
-    if height is not None:
-        step_data["height"] = height
-
-    await update_step(
-        asset_id,
-        "image",
-        step_data,
-        file_bytes=image_bytes,
-        filename="image_original.png",
-    )
-    logger.info("Asset %s: image step persisted", asset_id)
-
-
-async def persist_bgremoval_job(
-    job_id: str,
-    asset_id: str,
-    provider_key: str,
-    source_file: str,
-    result_url: str,
-) -> None:
-    """
-    Speichert BgRemoval-Job-Output im Asset-Ordner.
-    Nutzt lokale Datei falls URL auf /static/bgremoval zeigt, sonst Download.
-    """
-    local_path = _resolve_local_path_from_url(result_url)
-    if local_path:
-        file_bytes = local_path.read_bytes()
-    else:
-        try:
-            file_bytes = await _download_bytes(result_url)
-        except Exception as e:
-            logger.warning("BgRemoval-Download für Asset fehlgeschlagen: %s", e)
-            return
-
-    step_data = {
-        "job_id": job_id,
-        "provider_key": provider_key,
-        "source_file": source_file,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-    }
-
-    await update_step(
-        asset_id,
-        "bgremoval",
-        step_data,
-        file_bytes=file_bytes,
-        filename="image_bgremoved.png",
-    )
-    logger.info("Asset %s: bgremoval step persisted", asset_id)
-
-
-async def persist_mesh_job(
-    job_id: str,
-    asset_id: str,
-    provider_key: str,
-    source_file: str,
-    glb_file_path: str,
-) -> None:
-    """
-    Speichert Mesh-Job-Output im Asset-Ordner.
-    Kopiert GLB von MESH_STORAGE_PATH.
-    """
-    src = Path(glb_file_path)
-    if not src.exists():
-        logger.warning("GLB-Datei nicht gefunden: %s", glb_file_path)
-        return
-
-    file_bytes = src.read_bytes()
-    step_data = {
-        "job_id": job_id,
-        "provider_key": provider_key,
-        "source_file": source_file,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-    }
-
-    await update_step(
-        asset_id,
-        "mesh",
-        step_data,
-        file_bytes=file_bytes,
-        filename="mesh.glb",
-    )
-    logger.info("Asset %s: mesh step persisted", asset_id)
-
-
-async def persist_rigging_job(
-    job_id: str,
-    asset_id: str,
-    provider_key: str,
-    source_file: str,
-    glb_file_path: str,
-) -> None:
-    """
-    Speichert Rigging-Job-Output im Asset-Ordner.
-    Kopiert rigged GLB nach mesh_rigged.glb.
-    """
-    src = Path(glb_file_path)
-    if not src.exists():
-        logger.warning("Rigged GLB nicht gefunden: %s", glb_file_path)
-        return
-
-    file_bytes = src.read_bytes()
-    step_data = {
-        "job_id": job_id,
-        "provider_key": provider_key,
-        "source_file": source_file,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-    }
-
-    await update_step(
-        asset_id,
-        "rigging",
-        step_data,
-        file_bytes=file_bytes,
-        filename="mesh_rigged.glb",
-    )
-    logger.info("Asset %s: rigging step persisted", asset_id)
-
-
-async def persist_animation_job(
-    job_id: str,
-    asset_id: str,
-    provider_key: str,
-    motion_prompt: str,
-    source_file: str,
-    animated_bytes: bytes,
-    filename: str = "mesh_animated.glb",
-) -> None:
-    """
-    Speichert Animation-Job-Output im Asset-Ordner.
-    filename: mesh_animated.glb oder mesh_animated.fbx (je nach Provider-Ausgabe).
-    """
-    step_data: dict[str, Any] = {
-        "job_id": job_id,
-        "provider_key": provider_key,
-        "motion_prompt": motion_prompt,
-        "source_file": source_file,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-    }
-
-    await update_step(
-        asset_id,
-        "animation",
-        step_data,
-        file_bytes=animated_bytes,
-        filename=filename,
-    )
-    logger.info("Asset %s: animation step persisted", asset_id)
+# --- Re-exports from asset_persistence for backwards compatibility ---
+from app.services.asset_persistence import (  # noqa: E402, F401
+    persist_animation_job,
+    persist_bgremoval_job,
+    persist_image_job,
+    persist_mesh_job,
+    persist_rigging_job,
+)
 
 
 def soft_delete_asset(asset_id: str) -> bool:
@@ -788,136 +588,8 @@ def get_or_create_asset_id(existing_asset_id: str | None) -> str:
     return create_asset()
 
 
-def create_asset_from_image_upload(
-    file_bytes: bytes,
-    filename: str,
-    name: str | None = None,
-) -> str:
-    """
-    Erstellt Asset aus hochgeladenem Bild.
-    Speichert Bild als image_original.{ext}, metadata mit source: upload.
-    """
-    asset_id = create_asset()
-    paths = AssetPaths(asset_id)
-    ext = Path(filename).suffix.lower() or ".png"
-    if ext not in (".jpg", ".jpeg", ".png", ".webp"):
-        ext = ".png"
-    target_filename = f"image_original{ext}"
-    paths.processing_file(target_filename).write_bytes(file_bytes)
-
-    display_name = name or Path(filename).stem
-    now = datetime.now(timezone.utc).isoformat()
-    step_data: dict[str, Any] = {
-        "job_id": "",
-        "provider_key": "upload",
-        "file": target_filename,
-        "generated_at": now,
-        "source": "upload",
-        "original_filename": filename,
-        "uploaded_at": now,
-        "name": display_name,
-    }
-
-    meta = get_metadata_service().read(asset_id)
-    meta["steps"]["image"] = step_data
-    meta["source"] = "upload"
-    meta["original_filename"] = filename
-    meta["uploaded_at"] = now
-    meta["updated_at"] = now
-    get_metadata_service().write(asset_id, meta)
-    return asset_id
-
-
-def create_asset_from_mesh_upload(
-    file_bytes: bytes,
-    filename: str,
-    name: str | None = None,
-    mtl_bytes: bytes | None = None,
-    mtl_filename: str | None = None,
-) -> str:
-    """
-    Erstellt Asset aus hochgeladenem 3D-Modell.
-    Konvertiert STL/OBJ/PLY zu GLB via trimesh, speichert Original als mesh_original.{ext}.
-    """
-    import tempfile
-    import zipfile
-    from io import BytesIO
-
-    import trimesh
-
-    asset_id = create_asset()
-    paths = AssetPaths(asset_id)
-    ext = Path(filename).suffix.lower()
-
-    # Original behalten
-    original_ext = ext or ".glb"
-    original_filename = f"mesh_original{original_ext}"
-    paths.processing_file(original_filename).write_bytes(file_bytes)
-
-    # Temp-Verzeichnis für Laden (OBJ braucht ggf. MTL im selben Ordner)
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tmp = Path(tmpdir)
-        load_path: Path
-
-        if ext == ".zip":
-            with zipfile.ZipFile(BytesIO(file_bytes), "r") as zf:
-                zf.extractall(tmp)
-            obj_files = list(tmp.rglob("*.obj"))
-            if not obj_files:
-                raise ValueError("ZIP enthält keine OBJ-Datei")
-            load_path = obj_files[0]
-        else:
-            mesh_path = tmp / filename
-            mesh_path.write_bytes(file_bytes)
-            if mtl_bytes and mtl_filename:
-                (tmp / mtl_filename).write_bytes(mtl_bytes)
-            load_path = mesh_path
-
-        try:
-            scene = trimesh.load(str(load_path), force="mesh")
-        except Exception as e:
-            raise ValueError(f"3D-Modell konnte nicht geladen werden: {e}") from e
-
-        # Scene oder einzelnes Mesh zu einem Mesh zusammenführen
-        if isinstance(scene, trimesh.Scene):
-            meshes = list(scene.geometry.values())
-            if not meshes:
-                raise ValueError("3D-Modell enthält keine Meshes")
-                mesh = trimesh.util.concatenate(meshes)
-        elif isinstance(scene, trimesh.Trimesh):
-            mesh = scene
-        else:
-            raise ValueError("Unbekanntes 3D-Format")
-
-        glb_data = mesh.export(file_type="glb")
-        if isinstance(glb_data, dict):
-            paths.mesh.write_bytes(json.dumps(glb_data).encode("utf-8"))
-        elif isinstance(glb_data, str):
-            paths.mesh.write_bytes(glb_data.encode("utf-8"))
-        else:
-            paths.mesh.write_bytes(glb_data)
-
-    display_name = name or Path(filename).stem
-    now = datetime.now(timezone.utc).isoformat()
-    original_format = ext.lstrip(".") if ext else "glb"
-    step_data: dict[str, Any] = {
-        "job_id": "",
-        "provider_key": "upload",
-        "file": "mesh.glb",
-        "generated_at": now,
-        "source": "upload",
-        "original_filename": filename,
-        "original_format": original_format,
-        "uploaded_at": now,
-        "name": display_name,
-    }
-
-    meta = get_metadata_service().read(asset_id)
-    meta["steps"]["mesh"] = step_data
-    meta["source"] = "upload"
-    meta["original_filename"] = filename
-    meta["original_format"] = original_format
-    meta["uploaded_at"] = now
-    meta["updated_at"] = now
-    get_metadata_service().write(asset_id, meta)
-    return asset_id
+# --- Re-exports from asset_import for backwards compatibility ---
+from app.services.asset_import import (  # noqa: E402, F401
+    create_asset_from_image_upload,
+    create_asset_from_mesh_upload,
+)

@@ -1,9 +1,10 @@
 import { apiClient } from "./client.js";
+import type { ProviderParamValue } from "./generation.js";
 
 export interface PresetStep {
   step: string;
   provider: string | null;
-  params: Record<string, unknown>;
+  params: Record<string, ProviderParamValue>;
 }
 
 export interface Preset {
@@ -31,7 +32,7 @@ export interface ExecutionPlanItem {
   step_index: number;
   step: string;
   provider: string | null;
-  params: Record<string, unknown>;
+  params: Record<string, ProviderParamValue>;
   status: "skipped" | "applicable";
   reason: string | null;
 }

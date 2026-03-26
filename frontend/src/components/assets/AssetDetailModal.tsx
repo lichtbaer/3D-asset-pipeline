@@ -9,25 +9,24 @@ import {
   deleteAssetStep,
   type AssetStepData,
 } from "../../api/assets.js";
-import { TagSuggestionBanner } from "./TagSuggestionBanner.js";
 import { useToast } from "../ui/ToastContext.js";
 import { usePipelineStore } from "../../store/PipelineStore.js";
 import { useFocusTrap } from "../../hooks/useFocusTrap.js";
 import { useEscapeKey } from "../../hooks/useEscapeKey.js";
 import { useBodyScrollLock } from "../../hooks/useBodyScrollLock.js";
-import { MeshViewer } from "../viewer/MeshViewer.js";
 import {
   MeshProcessingPanel,
   ProcessingResultsList,
 } from "./MeshProcessingPanel.js";
 import { ExportPanel } from "./ExportPanel.js";
-import { ImageProcessingList } from "./ImageProcessingList.js";
-import { ImageEditor } from "../pipeline/ImageEditor.js";
 import { SketchfabPanel } from "./SketchfabPanel.js";
 import { QualityAnalysisPanel } from "./QualityAnalysisPanel.js";
 import { SavePresetModal } from "../presets/SavePresetModal.js";
 import { ApplyPresetModal } from "../presets/ApplyPresetModal.js";
 import { getUrlForFirstApplicableStep } from "../../utils/presetNavigation.js";
+import { AssetFilesPreviews } from "./AssetFilesPreviews.js";
+import { AssetVerwaltung } from "./AssetVerwaltung.js";
+import { AssetPipelineActions } from "./AssetPipelineActions.js";
 
 function formatDate(iso: string): string {
   try {
@@ -307,139 +306,26 @@ export function AssetDetailModal({
           {formatDate(data.updated_at)}
         </p>
 
-        <section className="asset-modal__files">
-          <h3>Dateien</h3>
-          <div className="asset-modal__previews">
-            {hasImage && imageFile && (
-              <div className="asset-modal__preview-item asset-modal__step-block">
-                <img
-                  src={getAssetFileUrl(data.asset_id, imageFile)}
-                  alt="Originalbild"
-                  className="asset-modal__preview-img"
-                />
-                <p className="asset-modal__preview-label">Bild (Original)</p>
-                <a
-                  href={getAssetFileUrl(data.asset_id, imageFile)}
-                  download
-                  className="asset-modal__download"
-                >
-                  Download
-                </a>
-                <button
-                  type="button"
-                  className="asset-modal__step-delete"
-                  onClick={() => handleStepDeleteClick("image", "Bild")}
-                >
-                  Step löschen
-                </button>
-              </div>
-            )}
-            {hasBgremoval && bgremovalFile && (
-              <div className="asset-modal__preview-item asset-modal__step-block">
-                <div className="asset-modal__checkerboard">
-                  <img
-                    src={getAssetFileUrl(data.asset_id, bgremovalFile)}
-                    alt="Freigestellt"
-                    className="asset-modal__preview-img"
-                  />
-                </div>
-                <p className="asset-modal__preview-label">Freigestellt</p>
-                <a
-                  href={getAssetFileUrl(data.asset_id, bgremovalFile)}
-                  download
-                  className="asset-modal__download"
-                >
-                  Download
-                </a>
-                <button
-                  type="button"
-                  className="asset-modal__step-delete"
-                  onClick={() => handleStepDeleteClick("bgremoval", "Freistellung")}
-                >
-                  Step löschen
-                </button>
-              </div>
-            )}
-            {hasMesh && meshUrl && (
-              <div className="asset-modal__preview-item asset-modal__step-block">
-                <MeshViewer glbUrl={meshUrl} height={450} />
-                <p className="asset-modal__preview-label">mesh.glb</p>
-                <a
-                  href={meshUrl}
-                  download
-                  className="asset-modal__download"
-                >
-                  Download GLB
-                </a>
-                <button
-                  type="button"
-                  className="asset-modal__step-delete"
-                  onClick={() => handleStepDeleteClick("mesh", "Mesh")}
-                >
-                  Step löschen
-                </button>
-              </div>
-            )}
-            {hasRigging && riggedUrl && (
-              <div className="asset-modal__preview-item asset-modal__step-block">
-                <MeshViewer glbUrl={riggedUrl} height={450} />
-                <p className="asset-modal__preview-label">mesh_rigged.glb</p>
-                <a
-                  href={riggedUrl}
-                  download
-                  className="asset-modal__download"
-                >
-                  Download rigged GLB
-                </a>
-                <button
-                  type="button"
-                  className="asset-modal__step-delete"
-                  onClick={() => handleStepDeleteClick("rigging", "Rigging")}
-                >
-                  Step löschen
-                </button>
-              </div>
-            )}
-            {hasAnimation && animationUrl && (
-              <div className="asset-modal__preview-item asset-modal__step-block">
-                <p className="asset-modal__preview-label">🎬 Animation</p>
-                {motionPrompt && (
-                  <p className="asset-modal__motion-prompt">
-                    Motion: {motionPrompt}
-                  </p>
-                )}
-                <a
-                  href={animationUrl}
-                  download
-                  className="asset-modal__download"
-                >
-                  Download {animationFile ?? "Animation"}
-                </a>
-                <button
-                  type="button"
-                  className="asset-modal__step-delete"
-                  onClick={() => handleStepDeleteClick("animation", "Animation")}
-                >
-                  Step löschen
-                </button>
-              </div>
-            )}
-          </div>
-          {(data.image_processing?.length ?? 0) > 0 && (
-            <ImageProcessingList
-              assetId={data.asset_id}
-              imageProcessing={data.image_processing ?? []}
-            />
-          )}
-          {(hasImage || hasBgremoval) && (
-            <ImageEditor
-              assetId={data.asset_id}
-              onUseForMesh={(imageUrl) =>
-                handleAction("mesh", imageUrl, data.asset_id)
-              }
-            />
-          )}
-        </section>
+        <AssetFilesPreviews
+          data={data}
+          steps={steps}
+          hasImage={hasImage}
+          hasBgremoval={hasBgremoval}
+          hasMesh={hasMesh}
+          hasRigging={hasRigging}
+          hasAnimation={hasAnimation}
+          imageFile={imageFile}
+          bgremovalFile={bgremovalFile}
+          imageUrl={imageUrl}
+          bgremovalUrl={bgremovalUrl}
+          meshUrl={meshUrl}
+          riggedUrl={riggedUrl}
+          animationFile={animationFile}
+          animationUrl={animationUrl}
+          motionPrompt={motionPrompt}
+          handleStepDeleteClick={handleStepDeleteClick}
+          handleAction={handleAction}
+        />
 
         {hasMesh && (
           <>
@@ -491,149 +377,28 @@ export function AssetDetailModal({
           </>
         )}
 
-        <section className="asset-modal__verwaltung">
-          <h3>Verwaltung</h3>
-          <div className="asset-modal__verwaltung-name">
-            <label className="asset-modal__verwaltung-label" htmlFor="asset-name">
-              Name:
-            </label>
-            <input
-              id="asset-name"
-              type="text"
-              className="asset-modal__name-input"
-              placeholder="Asset-Name..."
-              value={nameInput}
-              onChange={(e) => setNameInput(e.target.value)}
-              onBlur={(e) => {
-                const v = e.target.value.trim() || null;
-                void saveMeta({ name: v });
-              }}
-            />
-          </div>
-          <div className="asset-modal__verwaltung-tags">
-            <label className="asset-modal__verwaltung-label">Tags:</label>
-            <div className="asset-modal__tag-actions">
-              <button
-                type="button"
-                className="btn btn--ghost btn--sm"
-                onClick={() => setShowAiTagSuggestions((v) => !v)}
-                aria-pressed={showAiTagSuggestions}
-              >
-                🤖 Tags vorschlagen
-              </button>
-            </div>
-            {showAiTagSuggestions && (
-              <TagSuggestionBanner
-                assetId={assetId}
-                includeImageAnalysis={true}
-                enabled={showAiTagSuggestions}
-                onAssetUpdate={() => {
-                  void queryClient.invalidateQueries({
-                    queryKey: ["asset", assetId],
-                  });
-                  onAssetUpdate?.();
-                }}
-                onDismiss={() => setShowAiTagSuggestions(false)}
-              />
-            )}
-            <div className="asset-modal__tag-chips">
-              {currentTags.map((t) => (
-                <span key={t} className="asset-modal__tag-chip">
-                  {t}{" "}
-                  <button
-                    type="button"
-                    onClick={() => removeTag(t)}
-                    aria-label={`Tag ${t} entfernen`}
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-            </div>
-            <div className="asset-modal__tag-input-wrap">
-              <input
-                type="text"
-                className="asset-modal__tag-input"
-                placeholder="+ Tag eingeben..."
-                value={tagInput}
-                onChange={(e) => {
-                  setTagInput(e.target.value);
-                  setShowTagSuggestions(true);
-                }}
-                onFocus={() => setShowTagSuggestions(true)}
-                onBlur={() =>
-                  setTimeout(() => setShowTagSuggestions(false), 150)
-                }
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    const v = tagInput.trim();
-                    if (v) addTag(v);
-                    else if (tagSuggestions[0]) addTag(tagSuggestions[0]);
-                  }
-                }}
-              />
-              {showTagSuggestions && tagSuggestions.length > 0 && (
-                <ul className="asset-modal__tag-suggestions">
-                  {tagSuggestions.slice(0, 8).map((t) => (
-                    <li key={t}>
-                      <button
-                        type="button"
-                        onClick={() => addTag(t)}
-                      >
-                        {t}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
-          <div className="asset-modal__verwaltung-rating">
-            <label className="asset-modal__verwaltung-label">Rating:</label>
-            <span className="asset-modal__stars">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <button
-                  key={i}
-                  type="button"
-                  className="asset-modal__star"
-                  onClick={() => void saveMeta({ rating: i })}
-                  aria-label={`${i} Sterne`}
-                >
-                  {i <= (data.rating ?? 0) ? "★" : "☆"}
-                </button>
-              ))}
-            </span>
-          </div>
-          <div className="asset-modal__verwaltung-notes">
-            <label className="asset-modal__verwaltung-label" htmlFor="asset-notes">
-              Notiz:
-            </label>
-            <textarea
-              id="asset-notes"
-              className="asset-modal__notes-input"
-              placeholder="Notizen zum Asset..."
-              value={notesInput}
-              onChange={(e) => setNotesInput(e.target.value)}
-              onBlur={(e) => {
-                const v = e.target.value.trim();
-                void saveMeta({ notes: v || null });
-              }}
-            />
-          </div>
-          <div className="asset-modal__verwaltung-favorit">
-            <button
-              type="button"
-              className={`asset-modal__favorit-btn ${
-                data.favorited ? "asset-modal__favorit-btn--on" : ""
-              }`}
-              onClick={() =>
-                void saveMeta({ favorited: !(data.favorited ?? false) })
-              }
-            >
-              {data.favorited ? "♥ Als Favorit markiert" : "♡ Als Favorit markieren"}
-            </button>
-          </div>
-        </section>
+        <AssetVerwaltung
+          data={data}
+          currentTags={currentTags}
+          allTags={allTags}
+          nameInput={nameInput}
+          setNameInput={setNameInput}
+          notesInput={notesInput}
+          setNotesInput={setNotesInput}
+          saveMeta={saveMeta}
+          addTag={addTag}
+          removeTag={removeTag}
+          tagInput={tagInput}
+          setTagInput={setTagInput}
+          showTagSuggestions={showTagSuggestions}
+          setShowTagSuggestions={setShowTagSuggestions}
+          tagSuggestions={tagSuggestions}
+          showAiTagSuggestions={showAiTagSuggestions}
+          setShowAiTagSuggestions={setShowAiTagSuggestions}
+          assetId={assetId}
+          onAssetUpdate={onAssetUpdate}
+          queryClient={queryClient}
+        />
 
         <section className="asset-modal__meta">
           <h3>Metadaten</h3>
@@ -670,100 +435,19 @@ export function AssetDetailModal({
           </button>
         </section>
 
-        <section className="asset-modal__actions">
-          <h3>Pipeline-Weiterführung</h3>
-          <div className="asset-modal__action-buttons">
-            {hasImage && imageUrl && !hasBgremoval && (
-              <button
-                type="button"
-                className="btn btn--outline"
-                onClick={() =>
-                  handleAction("bgremoval", imageUrl, data.asset_id)
-                }
-              >
-                → Freistellen
-              </button>
-            )}
-            {(hasImage || hasBgremoval) &&
-              !hasMesh &&
-              (bgremovalUrl ?? imageUrl) && (
-                <button
-                  type="button"
-                  className="btn btn--outline"
-                  onClick={() =>
-                    handleAction(
-                      "mesh",
-                      bgremovalUrl ?? imageUrl ?? "",
-                      data.asset_id
-                    )
-                  }
-                >
-                  → Als Mesh-Input
-                </button>
-              )}
-            {hasMesh && (
-              <>
-                <button
-                  type="button"
-                  className="btn btn--outline"
-                  onClick={() =>
-                    handleAction("rigging", meshUrl ?? "", data.asset_id)
-                  }
-                >
-                  → Riggen
-                </button>
-                <button
-                  type="button"
-                  className="btn btn--outline"
-                  onClick={() =>
-                    handleAction("mesh-processing", meshUrl ?? "", data.asset_id)
-                  }
-                >
-                  → Mesh-Processing
-                </button>
-              </>
-            )}
-            {hasRigging && (
-              <>
-                <button
-                  type="button"
-                  className="btn btn--outline"
-                  onClick={() => {
-                    const glbUrl =
-                      steps.rigging && "file" in steps.rigging
-                        ? getAssetFileUrl(
-                            data.asset_id,
-                            String(steps.rigging.file)
-                          )
-                        : meshUrl ?? "";
-                    if (glbUrl) {
-                      handleAction("animation", glbUrl, data.asset_id);
-                    }
-                  }}
-                >
-                  → Animieren
-                </button>
-                <button
-                  type="button"
-                  className="btn btn--outline"
-                  onClick={() =>
-                    handleAction("rigging", meshUrl ?? "", data.asset_id)
-                  }
-                >
-                  → Riggen (erneut)
-                </button>
-              </>
-            )}
-            {hasImage &&
-              hasBgremoval &&
-              hasMesh &&
-              (hasRigging || hasAnimation) && (
-                <p className="asset-modal__all-done">
-                  Alle Schritte vorhanden. Nutze die Download-Links oben.
-                </p>
-              )}
-          </div>
-        </section>
+        <AssetPipelineActions
+          data={data}
+          steps={steps}
+          hasImage={!!hasImage}
+          hasBgremoval={!!hasBgremoval}
+          hasMesh={!!hasMesh}
+          hasRigging={!!hasRigging}
+          hasAnimation={!!hasAnimation}
+          imageUrl={imageUrl}
+          bgremovalUrl={bgremovalUrl}
+          meshUrl={meshUrl}
+          handleAction={handleAction}
+        />
       </div>
 
       {showSavePreset && (

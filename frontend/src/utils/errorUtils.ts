@@ -14,7 +14,7 @@ export function extractErrorMessage(
       if (
         res.detail &&
         typeof res.detail === "object" &&
-        "message" in (res.detail as Record<string, unknown>)
+        "message" in (res.detail as Record<string, string | number | boolean | null>)
       ) {
         return String((res.detail as { message: unknown }).message);
       }
