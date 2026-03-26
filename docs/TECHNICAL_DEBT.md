@@ -125,19 +125,17 @@ den restriktiveren Typ `Record<string, string | number | boolean | null>` fuer d
 
 ### Mittel
 
-#### 6. Uebergrosse Komponenten und Services
-Mehrere Dateien sind zu gross und sollten aufgeteilt werden (Stand 2026-03-25):
+#### ~~6. Uebergrosse Komponenten und Services~~ (behoben)
+Alle sechs Dateien wurden aufgeteilt (Stand 2026-03-26):
 
-| Datei | Zeilen | Prioritaet |
-|-------|--------|------------|
-| `frontend/src/pages/PipelinePage.tsx` | ~1.411 | Kritisch |
-| `frontend/src/pages/AssetLibrary.tsx` | ~862 | Kritisch |
-| `frontend/src/components/assets/AssetDetailModal.tsx` | ~832 | Kritisch |
-| `api/app/routers/generation.py` | ~1.071 | Hoch |
-| `api/app/services/asset_service.py` | ~923 | Hoch |
-| `api/app/routers/assets.py` | ~810 | Hoch |
-
-**Empfehlung:** Logik in Sub-Komponenten/Sub-Services extrahieren.
+| Datei | Vorher | Nachher | Extrahiert in |
+|-------|--------|---------|---------------|
+| `PipelinePage.tsx` | ~1.411 | ~47 | `usePipelineState.ts` (Hook) + 6 Tab-Komponenten in `pipeline/tabs/` |
+| `AssetLibrary.tsx` | ~862 | ~464 | `AssetFilterBar.tsx`, `AssetGrid.tsx` |
+| `AssetDetailModal.tsx` | ~832 | ~516 | `AssetFilesPreviews.tsx`, `AssetVerwaltung.tsx`, `AssetPipelineActions.tsx` |
+| `generation.py` | ~1.060 | ~45 | 6 Sub-Router (`generation_image.py`, `_bgremoval`, `_mesh`, `_rigging`, `_animation`, `_jobs`) |
+| `asset_service.py` | ~923 | ~595 | `asset_persistence.py`, `asset_import.py` |
+| `assets.py` | ~854 | ~672 | `texture_bake.py` |
 
 #### 7. Backend Coverage-Omits
 In `api/pyproject.toml` sind **deutlich mehr** Pfade von Coverage ausgeschlossen als frueher nur unter „7 Dateien“ subsumiert. Auszug (vollstaendige Liste siehe `[tool.coverage.run] omit`):
@@ -233,14 +231,8 @@ Ziel: technische Schuld **inkrementell** abbauen — kleine, reviewbare Schritte
 
 ### Phase 5: Grosse Dateien zerlegen (6)
 
-1. **Frontend:** `PipelinePage.tsx` — Tabs/Step-Logik in Hooks (`usePipelineSteps`) und Unterkomponenten (`PipelineImageTab`, …); CSS pro Teil auslagern wo sinnvoll.
-2. **Frontend:** `AssetLibrary.tsx` — Filter/Grid/Modal in eigene Dateien.
-3. **Frontend:** `AssetDetailModal.tsx` — Bereiche (Metadaten, Steps, Export) als Subkomponenten.
-4. **Backend:** `generation.py` — Router nach Ressource oder Feature splitten (`generation_image.py`, …) und in `main`/`routers/__init__.py` einbinden.
-5. **Backend:** `asset_service.py` — thematische Module (z. B. Metadaten vs. Dateioperationen) mit duennem Fassaden-Import.
-6. **Backend:** `assets.py` — Texture-Bake-Routen nach `routers/texture_bake.py` verschieben, sobald Phase 2 stabil ist (optional gekoppelt).
-
-**Erfolgskriterium:** Keine Datei > ca. 500–700 Zeilen ohne triftigen Grund; Reviews werden einfacher.
+**Stand 2026-03-26:** Alle sechs Dateien aufgeteilt (siehe Befund ~~6~~).
+Neue Dateien liegen jeweils unter 350 Zeilen; die duennen Fassaden-Dateien unter 50 Zeilen.
 
 ---
 
