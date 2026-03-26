@@ -28,7 +28,7 @@ export interface AnimationFormProps {
     source_glb_url: string;
     motion_prompt: string;
     provider_key: string;
-    params?: Record<string, unknown>;
+    params?: Record<string, string | number | boolean | null>;
   }) => void;
   disabled: boolean;
 }

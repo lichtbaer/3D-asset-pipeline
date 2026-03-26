@@ -596,7 +596,7 @@ async def _run_texture_bake_task(
         asset_service.append_texture_baking_entry(asset_id, entry)
     except (BlenderNotAvailableError, TextureBakingError, TextureBakingTimeoutError) as e:
         await _set_job_failed(str(e))
-    except Exception as e:
+    except (ValueError, OSError, RuntimeError) as e:
         await _set_job_failed(str(e))
 
 

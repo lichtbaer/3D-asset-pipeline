@@ -93,7 +93,7 @@ async def handle_provider_errors(
             "RuntimeError", e,
             update_job_callback,
         )
-    except Exception as e:
+    except Exception as e:  # Intentional catch-all: final safety net for unexpected errors
         await _fail_job(
             logger,
             f"{operation_name} Fehler",

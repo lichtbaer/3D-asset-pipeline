@@ -23,7 +23,7 @@ _RESULT_URL_JOB_TYPES = frozenset({"image", "bgremoval", "sketchfab_upload"})
 _GLB_JOB_TYPES = frozenset({"mesh", "rigging", "animation"})
 
 
-def _extract_asset_id_from_url(url: str) -> UUID | None:
+def extract_asset_id_from_url(url: str) -> UUID | None:
     """Extrahiert asset_id aus /assets/{asset_id}/files/... URL."""
     m = re.search(r"/assets/([0-9a-fA-F-]{36})/files/", url)
     if m:
@@ -53,7 +53,7 @@ async def _persist_job_completion(job_id: str) -> None:
             if src_job and src_job.asset_id:
                 asset_id_str = str(src_job.asset_id)
         if not asset_id_str and job.source_image_url:
-            aid = _extract_asset_id_from_url(job.source_image_url or "")
+            aid = extract_asset_id_from_url(job.source_image_url or "")
             if aid:
                 asset_id_str = str(aid)
 

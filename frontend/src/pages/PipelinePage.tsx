@@ -30,6 +30,7 @@ import {
 import {
   getImageProviders,
   type ImageProvider,
+  type ProviderParamValue,
 } from "../api/generation.js";
 import {
   startImageCompare,
@@ -774,14 +775,14 @@ export function PipelinePage() {
     source_glb_url: string;
     motion_prompt: string;
     provider_key: string;
-    params?: Record<string, unknown>;
+    params?: Record<string, ProviderParamValue>;
     asset_id?: string;
   }) => {
     const payload: {
       source_glb_url: string;
       motion_prompt: string;
       provider_key: string;
-      params?: Record<string, unknown>;
+      params?: Record<string, ProviderParamValue>;
       asset_id?: string;
     } = { ...req };
     const effectiveAssetId = activeAssetId ?? urlAssetId ?? req.asset_id ?? undefined;
@@ -803,14 +804,14 @@ export function PipelinePage() {
   const handleMeshSubmit = (req: {
     source_image_url: string;
     provider_key: string;
-    params: Record<string, unknown>;
+    params: Record<string, ProviderParamValue>;
     auto_bgremoval?: boolean;
     bgremoval_provider_key?: string;
   }) => {
     const payload: {
       source_image_url: string;
       provider_key: string;
-      params: Record<string, unknown>;
+      params: Record<string, ProviderParamValue>;
       auto_bgremoval?: boolean;
       bgremoval_provider_key?: string;
       asset_id?: string;

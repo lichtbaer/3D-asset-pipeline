@@ -1,11 +1,13 @@
 import { apiClient } from "./client.js";
 import { toAbsoluteUrl, createRetryFn } from "./utils.js";
 
+import type { ProviderParamValue, ProviderParamSchema } from "./generation.js";
+
 export interface MeshGenerationRequest {
   source_image_url: string;
   source_job_id?: string;
   provider_key: string;
-  params: Record<string, unknown>;
+  params: Record<string, ProviderParamValue>;
   auto_bgremoval?: boolean;
   bgremoval_provider_key?: string;
   asset_id?: string;
@@ -31,8 +33,8 @@ export interface MeshJob {
 export interface MeshProvider {
   key: string;
   display_name: string;
-  default_params: Record<string, unknown>;
-  param_schema: Record<string, unknown>;
+  default_params: Record<string, ProviderParamValue>;
+  param_schema: ProviderParamSchema;
 }
 
 interface PostGenerateMeshResponse {

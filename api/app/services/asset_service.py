@@ -551,7 +551,7 @@ async def persist_image_job(
     """
     try:
         image_bytes = await _download_bytes(result_url)
-    except Exception as e:
+    except (httpx.HTTPStatusError, httpx.RequestError, OSError) as e:
         logger.warning("Bild-Download für Asset fehlgeschlagen: %s", e)
         return
 
@@ -595,7 +595,7 @@ async def persist_bgremoval_job(
     else:
         try:
             file_bytes = await _download_bytes(result_url)
-        except Exception as e:
+        except (httpx.HTTPStatusError, httpx.RequestError, OSError) as e:
             logger.warning("BgRemoval-Download für Asset fehlgeschlagen: %s", e)
             return
 
@@ -875,7 +875,7 @@ def create_asset_from_mesh_upload(
 
         try:
             scene = trimesh.load(str(load_path), force="mesh")
-        except Exception as e:
+        except (ValueError, OSError, RuntimeError) as e:
             raise ValueError(f"3D-Modell konnte nicht geladen werden: {e}") from e
 
         # Scene oder einzelnes Mesh zu einem Mesh zusammenführen

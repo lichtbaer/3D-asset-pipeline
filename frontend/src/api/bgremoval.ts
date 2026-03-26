@@ -1,5 +1,6 @@
 import { apiClient } from "./client.js";
 import { toAbsoluteUrl, createRetryFn } from "./utils.js";
+import type { ProviderParamValue, ProviderParamSchema } from "./generation.js";
 
 export interface BgRemovalRequest {
   source_image_url: string;
@@ -32,8 +33,8 @@ export interface BgRemovalJob {
 export interface BgRemovalProvider {
   key: string;
   display_name: string;
-  default_params?: Record<string, unknown>;
-  param_schema: Record<string, unknown>;
+  default_params?: Record<string, ProviderParamValue>;
+  param_schema: ProviderParamSchema;
 }
 
 interface PostBgRemovalResponse {

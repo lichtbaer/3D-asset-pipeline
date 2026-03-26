@@ -23,7 +23,7 @@ export interface AssetListItem {
 
 export interface ProcessingEntry {
   operation: string;
-  params: Record<string, unknown>;
+  params: Record<string, string | number | boolean | null>;
   source_file: string;
   output_file: string;
   processed_at: string;
@@ -39,7 +39,7 @@ export interface SketchfabUploadInfo {
 
 export interface ImageProcessingEntry {
   operation: string;
-  params: Record<string, unknown>;
+  params: Record<string, string | number | boolean | null>;
   source_file: string;
   output_file: string;
   processed_at: string;

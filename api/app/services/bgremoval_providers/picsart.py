@@ -74,7 +74,7 @@ class PicsArtBgRemovalProvider(BgRemovalProvider):
                 try:
                     err_json = response.json()
                     error_detail = err_json.get("message", err_json.get("error", str(err_json)))
-                except Exception:
+                except (ValueError, KeyError):
                     logger.debug("PicsArt bgremoval error response not JSON")
                 raise RuntimeError(
                     f"PicsArt Remove Background Fehler ({response.status_code}): {error_detail}"

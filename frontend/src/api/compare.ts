@@ -1,4 +1,4 @@
-import { postGenerateImage } from "./generation.js";
+import { postGenerateImage, type ProviderParamValue } from "./generation.js";
 import { postGenerateMesh } from "./mesh.js";
 
 export interface CompareImageRequest {
@@ -14,8 +14,8 @@ export interface CompareMeshRequest {
   source_image_url: string;
   provider_key_a: string;
   provider_key_b: string;
-  params_a?: Record<string, unknown>;
-  params_b?: Record<string, unknown>;
+  params_a?: Record<string, ProviderParamValue>;
+  params_b?: Record<string, ProviderParamValue>;
 }
 
 /**

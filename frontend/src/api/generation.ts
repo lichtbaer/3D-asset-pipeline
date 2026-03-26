@@ -96,11 +96,29 @@ export async function getAvailableModels(): Promise<GetAvailableModelsResponse> 
   return data;
 }
 
+/** Primitive value types accepted by provider parameters. */
+export type ProviderParamValue = string | number | boolean | null;
+
+/** A JSON-Schema-like descriptor returned by the backend for provider parameters. */
+export interface ProviderParamSchema {
+  type?: string;
+  properties?: Record<string, {
+    type: string;
+    minimum?: number;
+    maximum?: number;
+    default?: string | number;
+    description?: string;
+    enum?: (string | number)[];
+  }>;
+  required?: string[];
+  [key: string]: unknown;
+}
+
 export interface ImageProvider {
   key: string;
   display_name: string;
-  default_params: Record<string, unknown>;
-  param_schema: Record<string, unknown>;
+  default_params: Record<string, ProviderParamValue>;
+  param_schema: ProviderParamSchema;
 }
 
 interface GetImageProvidersResponse {

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import type { MeshProvider } from "../../api/mesh.js";
 import type { BgRemovalProvider } from "../../api/bgremoval.js";
+import type { ProviderParamValue } from "../../api/generation.js";
 import { InlineError } from "../../components/ui/InlineError.js";
 import { Tooltip } from "../../components/ui/Tooltip.js";
 import { useFormValidation } from "../../hooks/useFormValidation.js";
@@ -29,7 +30,7 @@ export interface MeshFormProps {
   onSubmit: (req: {
     source_image_url: string;
     provider_key: string;
-    params: Record<string, unknown>;
+    params: Record<string, ProviderParamValue>;
     auto_bgremoval?: boolean;
     bgremoval_provider_key?: string;
   }) => void;
@@ -90,7 +91,7 @@ export function MeshForm({
   disabled,
 }: MeshFormProps) {
   const [providerKey, setProviderKey] = useState("");
-  const [params, setParams] = useState<Record<string, unknown>>({});
+  const [params, setParams] = useState<Record<string, ProviderParamValue>>({});
   const [autoBgRemoval, setAutoBgRemoval] = useState(false);
   const [bgRemovalProviderKey, setBgRemovalProviderKey] = useState("");
 
@@ -127,7 +128,7 @@ export function MeshForm({
     const req: {
       source_image_url: string;
       provider_key: string;
-      params: Record<string, unknown>;
+      params: Record<string, ProviderParamValue>;
       auto_bgremoval?: boolean;
       bgremoval_provider_key?: string;
     } = {

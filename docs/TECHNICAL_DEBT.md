@@ -1,6 +1,6 @@
 # Technical Debt Audit
 
-Erstellt: 2026-03-15 · **Letzte Code-Prüfung der offenen Punkte: 2026-03-25** · **Behebungsplan ergänzt: 2026-03-25** · **Prioritäten teilweise umgesetzt: 2026-03-25**
+Erstellt: 2026-03-15 · **Letzte Code-Prüfung der offenen Punkte: 2026-03-26** · **Behebungsplan ergänzt: 2026-03-25** · **Prioritäten teilweise umgesetzt: 2026-03-26**
 
 ## Behobene Befunde
 
@@ -78,6 +78,32 @@ Alembic: `20260325120000_texture_bake_job_drop_model_key.py`. CI: Postgres-Servi
 Spalte `model_key` aus `generation_job` per derselben Migration entfernt. `ImageJobStatusResponse` liefert nur noch `provider_key`.
 Frontend `generation.ts` ohne `model_key`-Typ/Fallback. **Verbleibend:** `ImageGenerateRequest.model_key` + `resolve_provider_and_params` fuer **eingehende** Alt-JSON-Requests; Header `X-Deprecated` bei POST mit `model_key`.
 
+#### ~~27. Tote Frontend-Komponenten (Duplikate)~~ (behoben)
+Vier Dateien in `frontend/src/components/pipeline/` waren unbenutzt — aeltere Versionen, die durch erweiterte
+Implementierungen in `pipeline/rigging/` und `pipeline/animation/` ersetzt wurden:
+`RiggingForm.tsx`, `RiggingJobStatus.tsx`, `AnimationForm.tsx`, `AnimationJobStatus.tsx` geloescht.
+
+#### ~~28. Duplizierte `_extract_asset_id_from_url`~~ (behoben)
+Identische Funktion existierte in `api/app/routers/generation.py` und `api/app/services/job_service.py`.
+Konsolidiert: kanonische Definition in `job_service.py` (umbenannt zu `extract_asset_id_from_url`),
+Import in `generation.py`.
+
+#### ~~29. Callback-Alias-Duplikation in generation.py~~ (behoben)
+`_update_mesh_job` und `_update_rigging_job` waren Aliase fuer `_update_glb_job`. Aliase entfernt,
+alle Aufrufstellen nutzen direkt `_update_glb_job`.
+
+#### ~~30. Breite `except Exception`-Klauseln~~ (behoben)
+29 Stellen mit `except Exception` im Backend auf spezifische Typen umgestellt
+(`httpx.HTTPStatusError`, `httpx.RequestError`, `OSError`, `ValueError`, `json.JSONDecodeError`, etc.).
+Verbleibend: 1 bewusster Catch-All in `job_error_handler.py` (dokumentiert) und 2 Stellen in
+Provider-Wrappern (`hf_inference.py`, `replicate_provider.py`) wo externe SDKs unvorhersehbare
+Exception-Typen werfen.
+
+#### ~~31. Schwache TypeScript-Typisierung `Record<string, unknown>`~~ (behoben)
+24+ Stellen mit `Record<string, unknown>` in Frontend-API-Clients und Komponenten durch spezifische
+Interfaces ersetzt (`ProviderParams`, `ImageGenerationParams`, `MeshProviderParams`, etc.) oder durch
+den restriktiveren Typ `Record<string, string | number | boolean | null>` fuer dynamische Provider-Parameter.
+
 ---
 
 ## Offene Befunde
@@ -135,6 +161,12 @@ In `api/pyproject.toml` sind **deutlich mehr** Pfade von Coverage ausgeschlossen
 
 ### Niedrig
 
+#### 32. Provider-Verzeichnis-Inkonsistenz
+Image/BgRemoval/Mesh-Provider liegen unter `api/app/services/*_providers/`, Animation/Rigging-Provider
+unter `api/app/providers/*/`. Kein einheitliches Muster.
+
+**Empfehlung:** Alle Provider nach `api/app/providers/` konsolidieren (grosser Refactor, niedrige Dringlichkeit).
+
 #### 10. `type: ignore` in main.py
 **Weiterhin aktuell:** `api/app/main.py` Zeile ~35 — `# type: ignore[arg-type]` fuer `_rate_limit_exceeded_handler`. Bekannte slowapi-Limitation.
 
@@ -158,7 +190,7 @@ Ziel: technische Schuld **inkrementell** abbauen — kleine, reviewbare Schritte
 | **3** | Frontend-Tests ausbauen | 2 | Parallel zu Phase 4/5 moeglich |
 | **4** | Coverage-Omits schließen | 7 | Am effizientesten **nach** gezielten Tests pro Modul; koppelt mit Phase 3/5 |
 | **5** | Grosse Dateien zerlegen | 6 | Erleichtert Phase 3 und 4 fuer betroffene Bereiche |
-| **6** | Niedrig (optional) | 10, 11 | Keine Blocker |
+| **6** | Niedrig (optional) | 10, 11, 32 | Keine Blocker |
 
 ---
 
@@ -216,6 +248,7 @@ Ziel: technische Schuld **inkrementell** abbauen — kleine, reviewbare Schritte
 
 - **10 — `type: ignore`:** slowapi-Version pruefen, Stubs suchen, oder duenner Wrapper um den Handler, der mypy befriedigt; nur wenn Aufwand gering.
 - **11 — Blender `print()`:** Belassen oder minimale Hilfsfunktion `log_info`/`log_err`, die auf stderr schreibt — keine zwingende Aenderung.
+- **32 — Provider-Verzeichnisse:** Alle Provider nach `api/app/providers/` konsolidieren; grosser Refactor, niedrige Dringlichkeit.
 
 ---
 

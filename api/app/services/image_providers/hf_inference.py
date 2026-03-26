@@ -99,7 +99,7 @@ class HFInferenceImageProvider(ImageProvider):
             )
         except (HFModelNotAvailableError, HFInferenceError):
             raise
-        except Exception as e:
+        except Exception as e:  # Safety net: _call_api normalises, but asyncio.to_thread may add its own
             raise HFInferenceError(status_code=500, body=str(e)) from e
 
         IMAGE_STORAGE_PATH.mkdir(parents=True, exist_ok=True)
@@ -133,7 +133,9 @@ class HFInferenceImageProvider(ImageProvider):
                 width=width,
                 height=height,
             )
-        except Exception as e:
+        except (HFModelNotAvailableError, HFInferenceError):
+            raise
+        except Exception as e:  # HF client raises unpredictable exception types
             err_lower = str(e).lower()
             if any(
                 kw in err_lower

@@ -50,6 +50,6 @@ async def check_db_connection() -> bool:
         async with engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
         return True
-    except Exception:
+    except OSError:
         logger.debug("DB health check failed", exc_info=True)
         return False

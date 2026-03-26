@@ -5,6 +5,7 @@ import os
 from datetime import datetime, timezone
 from uuid import UUID
 
+import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -167,7 +168,7 @@ async def _run_sketchfab_upload(
             },
         )
         await update_job("done", result_url=result.url)
-    except Exception as e:
+    except (httpx.HTTPStatusError, httpx.RequestError, RuntimeError, OSError) as e:
         await update_job("failed", error_msg=str(e))
 
 

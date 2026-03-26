@@ -1,5 +1,4 @@
 import os
-import re
 from pathlib import Path
 from uuid import UUID
 
@@ -71,7 +70,7 @@ from app.services.image_providers import list_providers
 from app.services.image_providers.registry import (
     list_available_keys as list_image_available_keys,
 )
-from app.services.job_service import get_job_service
+from app.services.job_service import extract_asset_id_from_url, get_job_service
 from app.services.mesh_generation import (
     run_mesh_generation,
     run_mesh_generation_with_auto_bgremoval,
@@ -89,15 +88,7 @@ router = APIRouter(prefix="/generate", tags=["generation"])
 _job_svc = get_job_service()
 
 
-def _extract_asset_id_from_url(url: str) -> UUID | None:
-    """Extrahiert asset_id aus /assets/{asset_id}/files/... URL."""
-    m = re.search(r"/assets/([0-9a-fA-F-]{36})/files/", url)
-    if m:
-        try:
-            return UUID(m.group(1))
-        except ValueError:
-            pass
-    return None
+_extract_asset_id_from_url = extract_asset_id_from_url
 
 
 async def _update_job(
@@ -144,10 +135,6 @@ async def _update_glb_job(
             error_type=error_type,
             error_detail=error_detail,
         )
-
-
-_update_mesh_job = _update_glb_job
-_update_rigging_job = _update_glb_job
 
 
 async def _update_mesh_job_bgremoval(
@@ -586,7 +573,7 @@ async def create_mesh_generation(
             params,
             body.auto_bgremoval,
             body.bgremoval_provider_key,
-            _update_mesh_job,
+            _update_glb_job,
             _update_mesh_job_bgremoval,
         )
     else:
@@ -596,7 +583,7 @@ async def create_mesh_generation(
             body.source_image_url,
             body.provider_key,
             params,
-            _update_mesh_job,
+            _update_glb_job,
         )
 
     return MeshGenerateResponse(job_id=job.id, status="pending")
@@ -685,7 +672,7 @@ async def retry_mesh_job(
         source_image_url,
         provider_key,
         params,
-        _update_mesh_job,
+        _update_glb_job,
     )
 
     return MeshGenerateResponse(job_id=new_job.id, status="pending")
@@ -751,7 +738,7 @@ async def create_rigging(
         body.source_glb_url,
         body.provider_key,
         str(asset_id) if asset_id else None,
-        _update_rigging_job,
+        _update_glb_job,
     )
 
     return RiggingGenerateResponse(job_id=job.id, status="pending")
@@ -880,7 +867,7 @@ async def create_animation(
         body.motion_prompt,
         body.provider_key,
         str(asset_id) if asset_id else None,
-        _update_mesh_job,
+        _update_glb_job,
     )
 
     return AnimationGenerateResponse(job_id=job.id, status="pending")
@@ -1067,7 +1054,7 @@ async def retry_animation_job(
         job.prompt or "",
         job.provider_key or "hy-motion",
         str(job.asset_id) if job.asset_id else None,
-        _update_mesh_job,
+        _update_glb_job,
     )
 
     return AnimationGenerateResponse(job_id=new_job.id, status="pending")

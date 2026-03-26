@@ -121,7 +121,7 @@ class PicsArtImageProvider(ImageProvider):
                 try:
                     err_json = response.json()
                     error_detail = err_json.get("message", str(err_json))
-                except Exception:
+                except (ValueError, KeyError):
                     logger.debug("PicsArt error response not JSON")
                 raise RuntimeError(
                     f"PicsArt API Fehler ({response.status_code}): {error_detail}"

@@ -133,7 +133,7 @@ async def run_mesh_generation(
             error_type=type(e).__name__,
             error_detail=err,
         )
-    except Exception as e:
+    except (ValueError, OSError, RuntimeError) as e:
         log_job_error(
             logger,
             "Unerwarteter Fehler bei Mesh-Generierung",

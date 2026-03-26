@@ -91,7 +91,9 @@ class ReplicateImageProvider(ImageProvider):
 
         try:
             output = await replicate.async_run(model, input=input_params)
-        except Exception as e:
+        except (ReplicateModelError, ReplicateAPIError):
+            raise
+        except Exception as e:  # replicate SDK raises unpredictable exception types
             err_lower = str(e).lower()
             if any(
                 kw in err_lower
