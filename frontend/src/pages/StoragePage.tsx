@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getStorageStats, purgeDeleted } from "../api/storage.js";
 import { DeleteAssetDialog } from "../components/assets/DeleteAssetDialog.js";
+import { ProvidersHealthDashboard } from "../components/providers/ProvidersHealthDashboard.js";
 
 const BREAKDOWN_LABELS: Record<string, string> = {
   images: "Bilder",
@@ -144,6 +145,8 @@ export function StoragePage() {
           </div>
         </>
       )}
+
+      <ProvidersHealthDashboard />
 
       {showPurgeDialog && stats && stats.deleted_count > 0 && (
         <DeleteAssetDialog
