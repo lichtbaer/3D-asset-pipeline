@@ -30,6 +30,12 @@ class Settings(BaseSettings):
     # Datenbank-Query-Timeout (Millisekunden)
     DB_STATEMENT_TIMEOUT_MS: int = 30000
 
+    # Provider-Retry-Konfiguration
+    # Maximale Anzahl Versuche (1 = kein Retry)
+    PROVIDER_MAX_RETRIES: int = 3
+    # Basis-Wartezeit in Sekunden (verdoppelt sich pro Versuch)
+    PROVIDER_RETRY_BACKOFF_S: float = 5.0
+
     @field_validator("API_KEY", mode="before")
     @classmethod
     def _strip_api_key(cls, v: str | None) -> str | None:

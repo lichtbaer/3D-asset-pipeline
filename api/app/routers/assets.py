@@ -35,6 +35,9 @@ from app.schemas.image_processing import (
 )
 from app.schemas.mesh_processing import (
     ClipFloorRequest,
+    LodGenerateRequest,
+    LodGenerateResponse,
+    LodResult,
     MeshAnalysis,
     RemoveComponentsRequest,
     RepairRequest,
@@ -64,6 +67,9 @@ from app.services.mesh_processing_service import (
 )
 from app.services.mesh_processing_service import (
     repair as mesh_repair,
+)
+from app.services.mesh_processing_service import (
+    generate_lods as mesh_generate_lods,
 )
 from app.services.mesh_processing_service import (
     simplify as mesh_simplify,
@@ -510,6 +516,29 @@ async def process_remove_components(asset_id: str, body: RemoveComponentsRequest
         return result
     except FileNotFoundError as e:
         raise_api_error(404, "Asset nicht gefunden", detail=str(e), code="ASSET_NOT_FOUND", chain=e)
+
+
+@router.post("/{asset_id}/lods", response_model=LodGenerateResponse)
+async def generate_lods(asset_id: str, body: LodGenerateRequest):
+    """
+    Generiert Level-of-Detail-Varianten des Meshes.
+
+    Erzeugt mesh_lod0.glb (höchste Qualität) bis mesh_lodN.glb (niedrigste Qualität).
+    Verwendet Open3D Quadric-Decimation — keine neuen Abhängigkeiten.
+    """
+    safe_asset_path(asset_id, body.source_file)
+    if not asset_service.get_asset(asset_id):
+        raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
+    try:
+        lod_data = mesh_generate_lods(asset_id, body.source_file, body.ratios)
+        return LodGenerateResponse(
+            lods=[LodResult(**lod) for lod in lod_data],
+            source_file=body.source_file,
+        )
+    except FileNotFoundError as e:
+        raise_api_error(404, "Mesh-Datei nicht gefunden", detail=str(e), code="ASSET_NOT_FOUND", chain=e)
+    except ValueError as e:
+        raise_api_error(422, "Ungültige LOD-Parameter", detail=str(e), code="VALIDATION_ERROR", chain=e)
 
 
 @router.delete("/{asset_id}/files/{filename}", status_code=204)

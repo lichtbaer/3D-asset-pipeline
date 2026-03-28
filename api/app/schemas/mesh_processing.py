@@ -67,6 +67,43 @@ class RemoveComponentsRequest(BaseModel):
     )
 
 
+class LodGenerateRequest(BaseModel):
+    """Request für POST /assets/{asset_id}/lods."""
+
+    source_file: str = Field(..., description="Quell-Mesh, z.B. mesh.glb")
+    ratios: list[float] = Field(
+        default=[1.0, 0.5, 0.25],
+        min_length=1,
+        max_length=8,
+        description="Reduktionsfaktoren je LOD-Stufe (0.0–1.0). "
+                    "LOD0=1.0 (Original), LOD1=0.5 (50%), LOD2=0.25 (25%)",
+    )
+
+    @field_validator("ratios")
+    @classmethod
+    def validate_ratios(cls, v: list[float]) -> list[float]:
+        for r in v:
+            if not (0.0 < r <= 1.0):
+                raise ValueError(f"Alle Ratios müssen in (0, 1] liegen, erhalten: {r}")
+        return v
+
+
+class LodResult(BaseModel):
+    """Einzelnes LOD-Ergebnis."""
+
+    level: int = Field(description="LOD-Stufe (0 = höchste Qualität)")
+    output_file: str = Field(description="Dateiname, z.B. mesh_lod0.glb")
+    ratio: float = Field(description="Angewendeter Reduktionsfaktor")
+    actual_faces: int = Field(description="Tatsächliche Face-Anzahl nach Decimation")
+
+
+class LodGenerateResponse(BaseModel):
+    """Response für POST /assets/{asset_id}/lods."""
+
+    lods: list[LodResult]
+    source_file: str
+
+
 class ProcessingResult(BaseModel):
     """Response für simplify/repair."""
 

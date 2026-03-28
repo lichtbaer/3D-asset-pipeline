@@ -246,6 +246,95 @@ def clip_floor(
     }
 
 
+def generate_lods(
+    asset_id: str,
+    source_file: str,
+    ratios: list[float] | None = None,
+) -> list[dict[str, Any]]:
+    """
+    Generiert Level-of-Detail-Varianten eines Meshes.
+
+    Jede LOD-Stufe wird als separate Datei gespeichert:
+      mesh_lod0.glb  — höchste Qualität (1.0 = Original-Faceanzahl)
+      mesh_lod1.glb  — mittlere Qualität
+      mesh_lod2.glb  — niedrigste Qualität
+
+    Args:
+        asset_id: UUID des Assets.
+        source_file: Dateiname des Quell-Meshes (z.B. ``mesh.glb``).
+        ratios: Liste von Reduktionsfaktoren (0.0–1.0) je LOD-Stufe.
+                Standard: [1.0, 0.5, 0.25]
+
+    Returns:
+        Liste von Dicts mit Dateinamen und Face-Anzahlen je LOD-Stufe.
+    """
+    if ratios is None:
+        ratios = [1.0, 0.5, 0.25]
+    if not ratios:
+        raise ValueError("ratios darf nicht leer sein")
+    for r in ratios:
+        if not (0.0 < r <= 1.0):
+            raise ValueError(f"Alle Ratio-Werte müssen in (0, 1] liegen, erhalten: {r}")
+
+    source_path = _asset_mesh_path(asset_id, source_file)
+    mesh = o3d.io.read_triangle_mesh(str(source_path))
+    original_faces = len(mesh.triangles)
+
+    processed_at = datetime.now(timezone.utc).isoformat()
+    lod_results: list[dict[str, Any]] = []
+    asset_dir = asset_service.get_asset_dir(asset_id)
+
+    for level, ratio in enumerate(ratios):
+        target_faces = max(1, int(original_faces * ratio))
+        output_filename = f"mesh_lod{level}.glb"
+        output_path = asset_dir / output_filename
+
+        if ratio >= 1.0:
+            # LOD0: Original-Qualität — Kopie des Quell-Meshes
+            import shutil
+            shutil.copy2(str(source_path), str(output_path))
+            actual_faces = original_faces
+        else:
+            lod_mesh = mesh.simplify_quadric_decimation(
+                target_number_of_triangles=target_faces
+            )
+            o3d.io.write_triangle_mesh(str(output_path), lod_mesh)
+            actual_faces = len(lod_mesh.triangles)
+
+        entry: dict[str, Any] = {
+            "operation": "lod",
+            "params": {
+                "level": level,
+                "ratio": ratio,
+                "target_faces": target_faces,
+                "actual_faces": actual_faces,
+            },
+            "source_file": source_file,
+            "output_file": output_filename,
+            "processed_at": processed_at,
+        }
+        asset_service.append_processing_entry(asset_id, entry)
+        lod_results.append(
+            {
+                "level": level,
+                "output_file": output_filename,
+                "ratio": ratio,
+                "actual_faces": actual_faces,
+            }
+        )
+        logger.info(
+            "Asset %s: LOD%d %s -> %s (ratio=%.2f, faces=%d)",
+            asset_id,
+            level,
+            source_file,
+            output_filename,
+            ratio,
+            actual_faces,
+        )
+
+    return lod_results
+
+
 def remove_small_components(
     asset_id: str,
     source_file: str,
