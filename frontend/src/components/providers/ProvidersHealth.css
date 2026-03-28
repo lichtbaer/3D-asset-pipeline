@@ -1,0 +1,136 @@
+/* Provider Health Dashboard */
+
+.providers-health {
+  padding: var(--space-lg);
+}
+
+.providers-health--loading,
+.providers-health--error {
+  color: var(--text);
+  font-size: var(--font-size-sm);
+}
+
+.providers-health__header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+.providers-health__title {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--text-h);
+  margin: 0;
+}
+
+.providers-health__meta {
+  font-size: var(--font-size-xs);
+  color: var(--text);
+}
+
+.providers-health__group {
+  margin-bottom: var(--space-xl);
+}
+
+.providers-health__group-title {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--text-h);
+  margin: 0 0 var(--space-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.providers-health__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+}
+
+.providers-health__th {
+  text-align: left;
+  padding: var(--space-xs) var(--space-sm);
+  border-bottom: 1px solid var(--border);
+  font-weight: 500;
+  color: var(--text);
+}
+
+.providers-health__row:hover {
+  background: var(--code-bg);
+}
+
+.providers-health__cell {
+  padding: var(--space-xs) var(--space-sm);
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.providers-health__cell--name {
+  font-weight: 500;
+  color: var(--text-h);
+}
+
+.providers-health__key {
+  font-size: var(--font-size-xs);
+  color: var(--text);
+  font-weight: 400;
+}
+
+.providers-health__reason {
+  font-size: var(--font-size-xs);
+  color: var(--color-warning);
+}
+
+/* Provider Health Badge */
+.provider-health-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 100px;
+}
+
+.provider-health-badge--sm {
+  padding: 2px 6px;
+}
+
+.provider-health-badge--lg {
+  padding: 2px 8px;
+  font-size: var(--font-size-xs);
+  border: 1px solid transparent;
+}
+
+.provider-health-badge__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.provider-health-badge__label {
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+}
+
+/* Status colors */
+.provider-health-badge--healthy .provider-health-badge__dot { background: var(--color-success); }
+.provider-health-badge--healthy.provider-health-badge--lg {
+  background: var(--color-success-bg);
+  border-color: var(--color-success);
+  color: var(--color-success);
+}
+
+.provider-health-badge--degraded .provider-health-badge__dot { background: var(--color-warning); }
+.provider-health-badge--degraded.provider-health-badge--lg {
+  background: var(--color-warning-bg);
+  border-color: var(--color-warning);
+  color: var(--color-warning);
+}
+
+.provider-health-badge--unavailable .provider-health-badge__dot { background: var(--color-error); }
+.provider-health-badge--unavailable.provider-health-badge--lg {
+  background: var(--color-error-bg);
+  border-color: var(--color-error-border);
+  color: var(--color-error);
+}

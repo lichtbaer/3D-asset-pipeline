@@ -10,6 +10,7 @@ from app.routers import (
     generation_image,
     generation_jobs,
     generation_mesh,
+    generation_pipeline,
     generation_rigging,
 )
 from app.services.bgremoval_providers.registry import (
@@ -31,6 +32,7 @@ router.include_router(generation_mesh.router)
 router.include_router(generation_rigging.router)
 router.include_router(generation_animation.router)
 router.include_router(generation_jobs.router)
+router.include_router(generation_pipeline.router)
 
 
 @router.get("/providers")

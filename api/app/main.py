@@ -17,7 +17,7 @@ from app.core.rate_limit import limiter
 from app.core.security import verify_api_key
 from app.database import check_db_connection
 from app.logging_config import setup_logging
-from app.routers import agents, assets, generation, presets, sketchfab, storage, texture_bake
+from app.routers import agents, assets, generation, presets, providers_health, sketchfab, storage, texture_bake
 
 setup_logging()
 
@@ -42,6 +42,7 @@ _v1.include_router(texture_bake.router)
 _v1.include_router(presets.router)
 _v1.include_router(sketchfab.router)
 _v1.include_router(storage.router)
+_v1.include_router(providers_health.router)
 app.include_router(_v1, dependencies=_api_auth)
 app.mount("/static/meshes", StaticFiles(directory=str(MESH_STORAGE_PATH)), name="meshes")
 app.mount(
