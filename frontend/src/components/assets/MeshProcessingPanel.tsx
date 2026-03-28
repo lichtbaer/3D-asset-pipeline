@@ -12,8 +12,10 @@ import {
 import {
   getAssetFileUrl,
   deleteAssetFile,
+  generateLods,
   startTextureBake,
   getTextureBakeStatus,
+  type LodResult,
   type TextureBakingEntry,
 } from "../../api/assets.js";
 import { MeshViewer } from "../viewer/MeshViewer.js";
@@ -152,6 +154,18 @@ export function MeshProcessingPanel({
         min_component_ratio: ratio,
       });
     },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["asset", assetId] });
+      queryClient.invalidateQueries({ queryKey: ["mesh-sources", assetId] });
+    },
+  });
+
+  const lodMutation = useMutation({
+    mutationFn: () =>
+      generateLods(assetId, {
+        source_file: effectiveSource,
+        ratios: [1.0, 0.5, 0.25],
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["asset", assetId] });
       queryClient.invalidateQueries({ queryKey: ["mesh-sources", assetId] });
@@ -404,6 +418,45 @@ export function MeshProcessingPanel({
               : "Kleine Teile entfernen"}
           </button>
         </div>
+      </div>
+
+      <div className="mesh-processing__lod">
+        <h4>Level of Detail (LOD)</h4>
+        <p className="mesh-processing__info">
+          ℹ Erzeugt 3 Varianten: LOD0 (Original), LOD1 (50%), LOD2 (25% Faces).
+          Optimal für Game-Engine-Workflows.
+        </p>
+        <button
+          type="button"
+          className="btn btn--outline"
+          onClick={() => lodMutation.mutate()}
+          disabled={lodMutation.isPending}
+        >
+          {lodMutation.isPending ? "LODs generieren…" : "LODs generieren"}
+        </button>
+        {lodMutation.isError && (
+          <p className="mesh-processing__error">
+            Fehler: {lodMutation.error instanceof Error ? lodMutation.error.message : "Unbekannter Fehler"}
+          </p>
+        )}
+        {lodMutation.isSuccess && lodMutation.data && (
+          <ul className="mesh-processing__results-list">
+            {lodMutation.data.lods.map((lod: LodResult) => (
+              <li key={lod.level} className="mesh-processing__result-item mesh-processing__result-item--inline">
+                <span className="mesh-processing__result-label">
+                  LOD{lod.level}: {lod.output_file} — {lod.actual_faces.toLocaleString("de-DE")} Faces ({Math.round(lod.ratio * 100)}%)
+                </span>
+                <a
+                  href={getAssetFileUrl(assetId, lod.output_file)}
+                  download
+                  className="asset-modal__download"
+                >
+                  Download
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       {showTextureBaking && (

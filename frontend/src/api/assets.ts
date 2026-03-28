@@ -365,3 +365,31 @@ export async function getTextureBakeStatus(
   );
   return data;
 }
+
+export interface LodRequest {
+  source_file: string;
+  ratios?: number[];
+}
+
+export interface LodResult {
+  level: number;
+  output_file: string;
+  ratio: number;
+  actual_faces: number;
+}
+
+export interface LodGenerateResponse {
+  lods: LodResult[];
+  source_file: string;
+}
+
+export async function generateLods(
+  assetId: string,
+  req: LodRequest
+): Promise<LodGenerateResponse> {
+  const { data } = await apiClient.post<LodGenerateResponse>(
+    `/assets/${assetId}/lods`,
+    req
+  );
+  return data;
+}
