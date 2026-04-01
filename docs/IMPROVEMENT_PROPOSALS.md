@@ -236,6 +236,115 @@ Externe Systeme können nicht automatisch auf Job-Completion reagieren.
 
 ---
 
+## D — Neue Funktionale Features (2026-04-01)
+
+### PURZEL-FEAT-008: Image-to-Image Generation ⚠ Normal
+Nutzer können nur per Textprompt starten. Für iterative Verfeinerung oder Style-Transfer
+ist img2img nötig — Replicate (FLUX Dev, SDXL) und HF Inference unterstützen es nativ.
+
+**Maßnahme:**
+- `ImageGenerateRequest`: optionales Feld `reference_image_url: str | None`
+- `ReplicateImageProvider`: bei gesetztem `reference_image_url` → `input_params["image"]` befüllen
+- `HFInferenceProvider`: `client.image_to_image()` statt `text_to_image()`
+- `ImageProvider`-Basisklasse: Signatur um `reference_image_url` erweitern
+- Frontend `PromptForm`: Drag-Drop-Zone für Referenzbild, neuer `img2img_strength`-Slider (0.0–1.0)
+
+**Betroffene Dateien:** `api/app/schemas/generation.py`, `api/app/services/image_providers/base.py`,
+`replicate_provider.py`, `hf_inference.py`, `frontend/src/components/generation/PromptForm.tsx`
+**Aufwand:** ~3–4 Tage
+
+---
+
+### PURZEL-FEAT-009: Auto Quality Gate nach Mesh-Generierung ⚠ Normal
+`QualityAgent` existiert, wird aber nur manuell aufgerufen. Meshes mit High-Severity-Issues
+(fehlende Gliedmaßen, Floor-Artefakte) fließen still in den Rigging-Step, der dann
+kryptisch fehlschlägt.
+
+**Maßnahme:**
+- Nach erfolgreicher Mesh-Generierung in `generation_mesh.py`: automatisch `quality_agent.run()`
+  mit Vorschau-URL + Mesh-Kennzahlen aufrufen
+- `QualityAssessment` in Asset-Metadaten persistieren: `quality_score`, `rigging_suitable`,
+  `quality_issues` (JSON) via `metadata_service.py`
+- Frontend: farbiger Badge in `AssetGrid`-Karte (rot/gelb/grün) + Detail in `AssetDetailModal`
+- Konfigurierbar: `auto_quality_check: bool` in `MeshGenerateRequest`; bei `rigging_suitable=false`
+  → Warnung im Rigging-Tab (kein Hard-Block, Nutzer kann übersteuern)
+
+**Keine neuen Dependencies** (QualityAgent bereits vorhanden)
+**Aufwand:** ~2–3 Tage
+
+---
+
+### PURZEL-FEAT-010: Globale Job-Queue-Ansicht ⚠ Normal
+Alle Jobs sind nur per-Asset sichtbar. Kein Überblick über laufende / fehlgeschlagene Jobs
+quer über alle Assets — besonders schmerzhaft bei Pipeline-Automation (FEAT-001).
+
+**Maßnahme:**
+- Neuer Endpoint `GET /api/v1/jobs` in `generation_jobs.py`:
+  Filter-Parameter `status`, `job_type`, `since` (ISO-Datetime), `limit`, `offset`
+- Paginierte Response mit `job_id`, `asset_id`, `job_type`, `status`, `provider_key`,
+  `created_at`, `error_detail`
+- Frontend: `JobQueuePanel`-Komponente in `StoragePage.tsx`
+  - Tabelle mit Status-Badge, Asset-Link, Provider, Zeitstempel, Fehlertext
+  - Filter-Chips: All / Running / Failed / Done
+  - Auto-Refresh alle 10 s
+
+**Aufwand:** ~2–3 Tage
+
+---
+
+### PURZEL-FEAT-011: Retry mit Original-Parametern ⚠ Normal
+Bei Job-Fehler müssen alle Parameter (Prompt, Provider, Dimensionen) manuell neu eingegeben
+werden. `GenerationJob` speichert bereits alle relevanten Felder — die Information liegt vor,
+wird aber nicht genutzt.
+
+**Maßnahme:**
+- Neuer Endpoint `POST /api/v1/jobs/{job_id}/retry` in `generation_jobs.py`:
+  liest Original-Job aus DB, erstellt neuen Job desselben `job_type` mit identischen Parametern
+  (Original bleibt erhalten → Verlauf vollständig)
+- Frontend: „Erneut versuchen"-Button in `JobErrorBlock.tsx`
+  Klick → neue `job_id` → SSE-Subscription wie normaler Job-Start
+- Optional: „Retry mit angepassten Parametern" öffnet Formular vorausgefüllt
+
+**Aufwand:** ~1–2 Tage
+
+---
+
+### PURZEL-FEAT-012: Prompt-Verlauf & Favoriten ⚠ Low
+Nutzer wiederholen ähnliche Prompts, tippen sie aber jedes Mal neu.
+Prompt-Agent-Varianten gehen nach Page-Reload verloren.
+
+**Maßnahme:**
+- Neue DB-Tabelle `prompt_history`:
+  `id`, `prompt_text`, `enhanced_prompt` (nullable), `provider_key`, `used_count`,
+  `is_favorite`, `created_at`
+- Alembic-Migration
+- Endpoints: `GET /api/v1/prompts/history`, `POST` (auto bei Job-Start),
+  `PATCH /{id}/favorite`, `DELETE /{id}`
+- Frontend: Dropdown-Overlay unter Prompt-Textarea in `PromptForm.tsx`
+  „Zuletzt verwendet" + Favoriten-Stern; Klick → Prompt übernehmen
+
+**Aufwand:** ~2–3 Tage
+
+---
+
+### PURZEL-FEAT-013: Blender Vorschau-Render ⚠ Low
+Asset-Thumbnails basieren auf Three.js-Canvas-Screenshots (auflösungsbegrenzt,
+GPU-abhängig, nur interaktiv). Für Batch-Workflows fehlen automatisch generierte
+Vorschaubilder vollständig.
+
+**Maßnahme:**
+- Neues Blender-Skript `api/scripts/blender_render_preview.py`:
+  GLB laden, HDRI-Beleuchtung setzen, 512×512 PNG mit EEVEE (~5 s) oder Cycles (~30 s)
+  rendern, unter `storage/assets/{asset_id}/preview.png` speichern
+- Neuer Endpoint `POST /api/v1/assets/{id}/render-preview` → startet Blender-Subprocess
+  (analog zu `texture_bake.py`-Muster)
+- Auto-Trigger: optionales Flag nach erfolgreicher Mesh-Generierung
+- Frontend: `preview.png` in `AssetGrid`-Karte statt dynamischem Three.js-Canvas
+
+**Abhängigkeit:** Blender-Docker-Profil (`--profile tools`) | **Aufwand:** ~3–4 Tage
+
+---
+
 ## Prioritäts-Übersicht
 
 | # | Issue | Typ | Prio | Aufwand |
@@ -254,11 +363,17 @@ Externe Systeme können nicht automatisch auf Job-Completion reagieren.
 | — | Batch-Generierung | Feature | Normal | 3–4 Tage |
 | — | Provider-Health-Dashboard | Feature | Normal | 2–3 Tage |
 | — | Asset-Export-Paket | Feature | Normal | 2–3 Tage |
+| — | Image-to-Image Generation | Feature | Normal | 3–4 Tage |
+| — | Auto Quality Gate | Feature | Normal | 2–3 Tage |
+| — | Globale Job-Queue-Ansicht | Feature | Normal | 2–3 Tage |
+| — | Retry mit Original-Parametern | Feature | Normal | 1–2 Tage |
 | — | SVG Icons | UX | Low | 1–2 Tage |
 | — | Dark Mode Toggle | UX | Low | 2–3 Tage |
 | — | HomePage Dashboard | UX | Low | 3–4 Tage |
 | — | Cost/Usage-Tracking | Feature | Low | 3–4 Tage |
 | — | LOD-Generierung | Feature | Low | 2–3 Tage |
 | — | Webhook-Integration | Feature | Low | 3–4 Tage |
+| — | Prompt-Verlauf & Favoriten | Feature | Low | 2–3 Tage |
+| — | Blender Vorschau-Render | Feature | Low | 3–4 Tage |
 
-**Gesamtaufwand geschätzt:** ~55–80 Entwicklungstage
+**Gesamtaufwand geschätzt:** ~68–99 Entwicklungstage
