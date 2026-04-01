@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { ImageIcon, ScissorsIcon, CubeIcon, BoneIcon, FilmIcon } from "../icons/index.js";
 import type { AssetListItem } from "../../api/assets.js";
+import { renderAssetPreview } from "../../api/assets.js";
 
 function formatDate(iso: string): string {
   try {
@@ -10,6 +12,30 @@ function formatDate(iso: string): string {
   } catch {
     return iso;
   }
+}
+
+function QualityBadge({ qualityGate }: { qualityGate: import("../../api/assets.js").QualityGate | null | undefined }) {
+  if (!qualityGate) return null;
+  const color =
+    qualityGate.rigging_suitable
+      ? qualityGate.score >= 7
+        ? "var(--color-success, #2e7d32)"
+        : "var(--color-warning, #f59e0b)"
+      : "var(--color-error, #c62828)";
+  const label = qualityGate.rigging_suitable ? `Q${qualityGate.score}` : `Q${qualityGate.score}!`;
+  const title = qualityGate.rigging_suitable
+    ? `Qualitätsbewertung: ${qualityGate.score}/10`
+    : `Qualitätsbewertung: ${qualityGate.score}/10 — Rigging nicht empfohlen`;
+  return (
+    <span
+      className="asset-card__quality-badge"
+      style={{ color, borderColor: color }}
+      title={title}
+      aria-label={title}
+    >
+      {label}
+    </span>
+  );
 }
 
 function StepBadges({ steps }: { steps: Record<string, { file?: string }> }) {
@@ -147,6 +173,7 @@ function AssetCardActions({
   isTrashView,
   onNavigate,
   onClick,
+  onPreviewRendered,
 }: {
   asset: AssetListItem;
   isTrashView: boolean;
@@ -154,7 +181,9 @@ function AssetCardActions({
   onDelete: (e: React.MouseEvent, assetId: string) => void;
   onTrashAction: (e: React.MouseEvent, assetId: string) => void;
   onClick: (e: React.MouseEvent) => void;
+  onPreviewRendered?: (assetId: string) => void;
 }) {
+  const [isRendering, setIsRendering] = useState(false);
   const hasMesh = "mesh" in asset.steps && asset.steps.mesh?.file;
   const hasRigging = "rigging" in asset.steps && asset.steps.rigging?.file;
 
@@ -162,10 +191,32 @@ function AssetCardActions({
 
   if (!hasMesh && !hasRigging) return null;
 
+  const handleRenderPreview = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsRendering(true);
+    try {
+      await renderAssetPreview(asset.asset_id);
+      onPreviewRendered?.(asset.asset_id);
+    } catch {
+      // Fehler stumm ignorieren — Blender könnte nicht verfügbar sein
+    } finally {
+      setIsRendering(false);
+    }
+  };
+
   return (
     <div className="asset-card__actions" onClick={onClick}>
       {hasMesh && (
         <>
+          <button
+            type="button"
+            className="btn btn--outline btn--sm"
+            onClick={handleRenderPreview}
+            disabled={isRendering}
+            title="Vorschau-PNG rendern (Blender)"
+          >
+            {isRendering ? "Rendert…" : "Vorschau"}
+          </button>
           <button
             type="button"
             className="btn btn--outline btn--sm"
@@ -230,6 +281,7 @@ export interface AssetGridProps {
   handleToggleFavorit: (assetId: string, favorited: boolean) => void;
   setSelectedAssetId: (id: string) => void;
   setTrashActionAsset: (asset: AssetListItem) => void;
+  onPreviewRendered?: (assetId: string) => void;
 }
 
 export function AssetGrid({
@@ -246,6 +298,7 @@ export function AssetGrid({
   handleToggleFavorit,
   setSelectedAssetId,
   setTrashActionAsset,
+  onPreviewRendered,
 }: AssetGridProps) {
   if (displayAssets.length === 0) return null;
 
@@ -326,7 +379,10 @@ export function AssetGrid({
                   onClick={(e) => e.stopPropagation()}
                 />
                 <TagsChips tags={tags} maxVisible={3} />
-                <StepBadges steps={asset.steps} />
+                <div className="asset-card__bottom-row">
+                  <StepBadges steps={asset.steps} />
+                  <QualityBadge qualityGate={asset.quality_gate} />
+                </div>
               </div>
             </button>
             <AssetCardActions
@@ -336,6 +392,7 @@ export function AssetGrid({
               onDelete={handleDeleteClick}
               onTrashAction={handleTrashActionClick}
               onClick={(e) => e.stopPropagation()}
+              onPreviewRendered={onPreviewRendered}
             />
           </div>
         );

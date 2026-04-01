@@ -8,6 +8,14 @@ export interface AssetStepInfo {
   name?: string | null;
 }
 
+export interface QualityGate {
+  score: number;
+  rigging_suitable: boolean;
+  issues: Array<{ type: string; severity: "low" | "medium" | "high"; description: string }>;
+  recommended_actions: Array<{ action: string; reason: string; priority: number }>;
+  checked_after_job?: string;
+}
+
 export interface AssetListItem {
   asset_id: string;
   created_at: string;
@@ -19,6 +27,7 @@ export interface AssetListItem {
   tags?: string[];
   rating?: number | null;
   favorited?: boolean;
+  quality_gate?: QualityGate | null;
 }
 
 export interface ProcessingEntry {
@@ -84,6 +93,7 @@ export interface AssetDetail {
   rating?: number | null;
   notes?: string | null;
   favorited?: boolean;
+  quality_gate?: QualityGate | null;
 }
 
 export interface AssetMetaUpdate {
@@ -392,4 +402,22 @@ export async function generateLods(
     req
   );
   return data;
+}
+
+export async function renderAssetPreview(
+  assetId: string,
+  sourcefile = "mesh.glb",
+  width = 512,
+  height = 512,
+): Promise<{ output_file: string }> {
+  const { data } = await apiClient.post<{ output_file: string }>(
+    `/assets/${assetId}/render-preview`,
+    null,
+    { params: { source_file: sourcefile, width, height } }
+  );
+  return data;
+}
+
+export function getAssetPreviewUrl(assetId: string, baseUrl: string): string {
+  return `${baseUrl}/assets/${assetId}/render-preview`;
 }

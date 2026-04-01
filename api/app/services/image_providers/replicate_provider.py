@@ -79,6 +79,8 @@ class ReplicateImageProvider(ImageProvider):
         width = int(params.get("width", 1024))
         height = int(params.get("height", 1024))
         negative_prompt = params.get("negative_prompt") or None
+        reference_image_url = params.get("reference_image_url") or None
+        img2img_strength = float(params.get("img2img_strength", 0.75))
 
         input_params: dict[str, Any] = {
             "prompt": prompt,
@@ -88,6 +90,10 @@ class ReplicateImageProvider(ImageProvider):
         }
         if negative_prompt:
             input_params["negative_prompt"] = negative_prompt
+        if reference_image_url:
+            # FLUX-Dev und SDXL unterstützen einen image-Input für img2img
+            input_params["image"] = reference_image_url
+            input_params["strength"] = img2img_strength
 
         try:
             output = await replicate.async_run(model, input=input_params)

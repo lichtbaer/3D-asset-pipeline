@@ -29,6 +29,7 @@ class AssetListItem(BaseModel):
     tags: list[str] = Field(default_factory=list)
     rating: int | None = None
     favorited: bool = False
+    quality_gate: dict[str, Any] | None = None
 
 
 class BatchDeleteRequest(BaseModel):
@@ -82,6 +83,7 @@ class AssetDetailResponse(BaseModel):
     rating: int | None = None
     notes: str | None = None
     favorited: bool = False
+    quality_gate: dict[str, Any] | None = None
 
 
 class AssetMetaUpdateRequest(BaseModel):

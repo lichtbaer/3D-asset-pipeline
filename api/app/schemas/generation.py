@@ -20,6 +20,8 @@ class ImageGenerateRequest(BaseModel):
     width: int | None = Field(default=None, alias="width")
     height: int | None = Field(default=None, alias="height")
     negative_prompt: str | None = Field(default=None, alias="negative_prompt")
+    # Image-to-Image: optionales Referenzbild
+    reference_image_url: str | None = None
 
     model_config = {"populate_by_name": True}
 
@@ -44,6 +46,8 @@ class ImageGenerateRequest(BaseModel):
                 "negative_prompt": self.negative_prompt,
                 "count": 1,
             }
+            if self.reference_image_url:
+                params["reference_image_url"] = self.reference_image_url
             return provider_key, params
         # Neues Format
         params = dict(self.params) if self.params else {}
@@ -53,6 +57,8 @@ class ImageGenerateRequest(BaseModel):
             params["height"] = 1024
         if "count" not in params:
             params["count"] = 1
+        if self.reference_image_url and "reference_image_url" not in params:
+            params["reference_image_url"] = self.reference_image_url
         return self.provider_key, params
 
 
@@ -106,6 +112,8 @@ class MeshGenerateRequest(BaseModel):
     auto_bgremoval: bool = False
     bgremoval_provider_key: str = "rembg-local"
     asset_id: str | None = None
+    # Optional: Auto-Qualitätsbewertung nach Mesh-Generierung
+    auto_quality_check: bool = False
 
 
 class MeshProviderInfo(BaseModel):

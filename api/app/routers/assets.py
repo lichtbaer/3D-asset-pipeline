@@ -63,13 +63,13 @@ from app.services.mesh_processing_service import (
     clip_floor as mesh_clip_floor,
 )
 from app.services.mesh_processing_service import (
+    generate_lods as mesh_generate_lods,
+)
+from app.services.mesh_processing_service import (
     remove_small_components as mesh_remove_components,
 )
 from app.services.mesh_processing_service import (
     repair as mesh_repair,
-)
-from app.services.mesh_processing_service import (
-    generate_lods as mesh_generate_lods,
 )
 from app.services.mesh_processing_service import (
     simplify as mesh_simplify,
@@ -158,6 +158,7 @@ async def list_assets(
             tags=a.tags,
             rating=a.rating,
             favorited=a.favorited,
+            quality_gate=a.quality_gate,
         )
         for a in assets
     ]
@@ -286,6 +287,7 @@ async def get_asset(asset_id: str):
         rating=meta.rating,
         notes=meta.notes,
         favorited=meta.favorited,
+        quality_gate=meta.quality_gate,
     )
 
 
@@ -692,6 +694,62 @@ async def delete_asset(asset_id: str, permanent: bool = False):
     deleted = asset_service.delete_asset(asset_id, permanent=permanent)
     if not deleted:
         raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
+
+
+@router.post("/{asset_id}/render-preview")
+async def render_asset_preview(
+    asset_id: str,
+    source_file: str = "mesh.glb",
+    width: int = 512,
+    height: int = 512,
+):
+    """
+    Rendert 512×512 Vorschau-PNG via Blender EEVEE headless.
+    Speichert preview_render.png im Asset-Ordner.
+    Erfordert Blender (--profile tools).
+    """
+    from app.exceptions import (
+        BlenderNotAvailableError,
+        TextureBakingError,
+        TextureBakingTimeoutError,
+    )
+    from app.services.render_preview_service import render_preview_sync
+
+    if not asset_service.get_asset(asset_id):
+        raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
+
+    try:
+        output_file = await asyncio.to_thread(
+            render_preview_sync,
+            asset_id=asset_id,
+            source_file=source_file,
+            width=width,
+            height=height,
+        )
+    except BlenderNotAvailableError as e:
+        raise_api_error(503, "Blender nicht verfügbar", detail=str(e), code="BLENDER_NOT_AVAILABLE", chain=e)
+    except FileNotFoundError as e:
+        raise_api_error(404, "Source-Mesh nicht gefunden", detail=str(e), code="FILE_NOT_FOUND", chain=e)
+    except TextureBakingTimeoutError as e:
+        raise_api_error(504, "Render-Preview Timeout", detail=str(e), code="RENDER_TIMEOUT", chain=e)
+    except TextureBakingError as e:
+        raise_api_error(500, "Render-Preview fehlgeschlagen", detail=str(e), code="RENDER_ERROR", chain=e)
+
+    return {"output_file": output_file}
+
+
+@router.get("/{asset_id}/render-preview")
+async def get_asset_preview(asset_id: str):
+    """Liefert preview_render.png wenn vorhanden."""
+    meta = asset_service.get_asset(asset_id)
+    if not meta:
+        raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
+
+    preview_path = asset_service.get_file_path(asset_id, "preview_render.png")
+    if not preview_path or not preview_path.is_file():
+        raise_api_error(404, "Keine Vorschau vorhanden — bitte zuerst rendern", code="PREVIEW_NOT_FOUND")
+
+    return FileResponse(str(preview_path), media_type="image/png")
 
 
 @router.post("", response_model=CreateAssetResponse)

@@ -77,6 +77,7 @@ class HFInferenceImageProvider(ImageProvider):
         Generiert ein Bild via HF Inference API.
 
         InferenceClient.text_to_image() ist synchron → asyncio.to_thread().
+        Bei reference_image_url: image_to_image() statt text_to_image().
         Gibt statische URL des lokal gespeicherten PNG zurück.
 
         Raises:
@@ -87,6 +88,8 @@ class HFInferenceImageProvider(ImageProvider):
         width = int(params.get("width", 1024))
         height = int(params.get("height", 1024))
         negative_prompt = params.get("negative_prompt") or None
+        reference_image_url = params.get("reference_image_url") or None
+        img2img_strength = float(params.get("img2img_strength", 0.75))
 
         try:
             pil_image = await asyncio.to_thread(
@@ -96,6 +99,8 @@ class HFInferenceImageProvider(ImageProvider):
                 negative_prompt,
                 width,
                 height,
+                reference_image_url,
+                img2img_strength,
             )
         except (HFModelNotAvailableError, HFInferenceError):
             raise
@@ -120,12 +125,26 @@ class HFInferenceImageProvider(ImageProvider):
         negative_prompt: str | None,
         width: int,
         height: int,
+        reference_image_url: str | None = None,
+        img2img_strength: float = 0.75,
     ) -> Image.Image:
         """
         Synchroner HF Inference API-Aufruf.
         Wird via asyncio.to_thread() aufgerufen um Event-Loop nicht zu blockieren.
+        Bei reference_image_url: image_to_image() statt text_to_image().
         """
         try:
+            if reference_image_url:
+                import httpx
+                ref_bytes = httpx.get(reference_image_url, follow_redirects=True, timeout=30).content
+                ref_image = Image.open(io.BytesIO(ref_bytes)).convert("RGB")
+                return self._client.image_to_image(
+                    image=ref_image,
+                    prompt=prompt,
+                    model=model,
+                    negative_prompt=negative_prompt,
+                    strength=img2img_strength,
+                )
             return self._client.text_to_image(
                 prompt=prompt,
                 model=model,

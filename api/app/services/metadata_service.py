@@ -124,6 +124,17 @@ class MetadataService:
             data["updated_at"] = datetime.now(timezone.utc).isoformat()
             self.write(asset_id, data)
 
+    def update_quality_gate(self, asset_id: str, quality_gate: dict[str, Any]) -> None:
+        """Setzt metadata.quality_gate = quality_gate."""
+        with self._lock_for(asset_id):
+            path = AssetPaths(asset_id).metadata
+            if not path.exists():
+                return  # Asset existiert nicht (mehr) — still ignorieren
+            data = self.read(asset_id)
+            data["quality_gate"] = quality_gate
+            data["updated_at"] = datetime.now(timezone.utc).isoformat()
+            self.write(asset_id, data)
+
     def mark_step_done(self, asset_id: str, step: str, data: dict[str, Any]) -> None:
         """Setzt metadata.steps.{step} = data."""
         with self._lock_for(asset_id):

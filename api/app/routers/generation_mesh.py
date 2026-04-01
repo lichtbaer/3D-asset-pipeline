@@ -1,5 +1,6 @@
 """Mesh generation sub-router."""
 
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Request
@@ -32,7 +33,61 @@ from app.services.mesh_generation import (
 from app.services.mesh_providers import MESH_PROVIDERS
 from app.services.mesh_providers import get_provider as get_mesh_provider
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
+
+
+async def _run_quality_gate_bg(job_id: str, asset_id: str) -> None:
+    """Führt Auto-Quality-Gate nach erfolgreichem Mesh-Job aus (Exception-sicher)."""
+    try:
+        from app.core.config import settings
+        if not settings.agent_available:
+            return
+
+        from app.routers.agents import _run_quality_assessment_internal
+        from app.services.metadata_service import get_metadata_service
+
+        assessment = await _run_quality_assessment_internal(asset_id)
+        if assessment is None:
+            return
+
+        gate_data = {
+            "score": assessment.score,
+            "rigging_suitable": assessment.rigging_suitable,
+            "issues": [i.model_dump() for i in assessment.issues],
+            "recommended_actions": [a.model_dump() for a in assessment.recommended_actions],
+            "checked_after_job": job_id,
+        }
+        await __import__("asyncio").to_thread(
+            get_metadata_service().update_quality_gate,
+            asset_id,
+            gate_data,
+        )
+        logger.debug("Quality gate completed for asset %s: score=%d", asset_id, assessment.score)
+    except Exception as exc:  # noqa: BLE001 — darf nie den Mesh-Job blockieren
+        logger.debug("Quality gate failed silently for asset %s: %s", asset_id, exc)
+
+
+def _make_glb_callback_with_quality_gate(asset_id: str):
+    """Erstellt wrapped Callback der nach Mesh-Success das Quality Gate auslöst."""
+    async def _callback(
+        job_id: str,
+        status: str,
+        result_path: str | None,
+        error_msg: str | None = None,
+        *,
+        error_type: str | None = None,
+        error_detail: str | None = None,
+    ) -> None:
+        await _update_glb_job(
+            job_id, status, result_path, error_msg,
+            error_type=error_type, error_detail=error_detail,
+        )
+        if status == "done":
+            await _run_quality_gate_bg(job_id, asset_id)
+
+    return _callback
 
 
 @router.get("/mesh/providers", response_model=MeshProvidersResponse)
@@ -102,6 +157,13 @@ async def create_mesh_generation(
     await session.commit()
     await session.refresh(job)
 
+    # Wähle Callback: mit Quality Gate wenn gewünscht und asset_id bekannt
+    glb_callback = (
+        _make_glb_callback_with_quality_gate(str(asset_id))
+        if body.auto_quality_check and asset_id
+        else _update_glb_job
+    )
+
     if body.auto_bgremoval:
         try:
             get_bgremoval_provider(body.bgremoval_provider_key)
@@ -119,7 +181,7 @@ async def create_mesh_generation(
             params,
             body.auto_bgremoval,
             body.bgremoval_provider_key,
-            _update_glb_job,
+            glb_callback,
             _update_mesh_job_bgremoval,
         )
     else:
@@ -129,7 +191,7 @@ async def create_mesh_generation(
             body.source_image_url,
             body.provider_key,
             params,
-            _update_glb_job,
+            glb_callback,
         )
 
     return MeshGenerateResponse(job_id=job.id, status="pending")

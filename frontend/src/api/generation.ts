@@ -7,6 +7,7 @@ export interface GenerateImageRequest {
   height: number;
   negative_prompt?: string;
   asset_id?: string;
+  reference_image_url?: string | null;
 }
 
 export type GenerationJobStatus = "pending" | "processing" | "done" | "failed";
@@ -38,10 +39,14 @@ interface GetAvailableModelsResponse {
 export async function postGenerateImage(
   req: GenerateImageRequest
 ): Promise<PostGenerateImageResponse> {
-  const { data } = await apiClient.post<PostGenerateImageResponse>(
-    "/generate/image",
-    req
-  );
+  const body: Record<string, unknown> = {
+    prompt: req.prompt,
+    provider_key: req.provider_key,
+    params: { width: req.width, height: req.height, negative_prompt: req.negative_prompt ?? null },
+  };
+  if (req.asset_id) body.asset_id = req.asset_id;
+  if (req.reference_image_url) body.reference_image_url = req.reference_image_url;
+  const { data } = await apiClient.post<PostGenerateImageResponse>("/generate/image", body);
   return {
     job_id: String(data.job_id),
     status: data.status,
@@ -130,4 +135,41 @@ export async function getImageProviders(): Promise<GetImageProvidersResponse> {
     "/generate/image/providers"
   );
   return data;
+}
+
+export interface JobListItem {
+  job_id: string;
+  job_type: string;
+  status: GenerationJobStatus;
+  provider_key: string;
+  prompt: string | null;
+  asset_id: string | null;
+  created_at: string;
+  updated_at: string | null;
+  error_type: string | null;
+}
+
+export interface JobListResponse {
+  jobs: JobListItem[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export async function listJobs(params?: {
+  status?: string;
+  job_type?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<JobListResponse> {
+  const { data } = await apiClient.get<JobListResponse>("/generate/jobs", { params });
+  return {
+    ...data,
+    jobs: data.jobs.map((j) => ({
+      ...j,
+      job_id: String(j.job_id),
+      asset_id: j.asset_id ? String(j.asset_id) : null,
+      status: j.status as GenerationJobStatus,
+    })),
+  };
 }

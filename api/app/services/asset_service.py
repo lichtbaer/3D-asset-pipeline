@@ -56,6 +56,7 @@ class AssetMetadata(BaseModel):
     rating: int | None = None
     notes: str | None = None
     favorited: bool = False
+    quality_gate: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Serialisiert fuer metadata.json — optionale Felder nur wenn gesetzt."""

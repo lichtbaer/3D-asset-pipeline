@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getStorageStats, purgeDeleted } from "../api/storage.js";
 import { DeleteAssetDialog } from "../components/assets/DeleteAssetDialog.js";
 import { ProvidersHealthDashboard } from "../components/providers/ProvidersHealthDashboard.js";
+import { JobQueuePanel } from "../components/jobs/JobQueuePanel.js";
 
 const BREAKDOWN_LABELS: Record<string, string> = {
   images: "Bilder",
@@ -147,6 +148,8 @@ export function StoragePage() {
       )}
 
       <ProvidersHealthDashboard />
+
+      <JobQueuePanel />
 
       {showPurgeDialog && stats && stats.deleted_count > 0 && (
         <DeleteAssetDialog

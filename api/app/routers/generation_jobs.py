@@ -7,6 +7,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,6 +22,48 @@ from app.schemas.generation import (
 )
 
 router = APIRouter()
+
+
+class PromptHistoryItem(BaseModel):
+    prompt: str
+    last_used_at: str
+    use_count: int
+
+
+class PromptHistoryResponse(BaseModel):
+    items: list[PromptHistoryItem]
+
+
+@router.get("/prompts/history", response_model=PromptHistoryResponse)
+async def get_prompt_history(
+    limit: int = Query(default=30, ge=1, le=100, description="Maximale Anzahl Einträge"),
+    session: AsyncSession = Depends(get_session),
+):
+    """Distinct Prompts aus Image-Jobs, sortiert nach letzter Verwendung."""
+    result = await session.execute(
+        select(
+            GenerationJob.prompt,
+            func.max(GenerationJob.created_at).label("last_used_at"),
+            func.count(GenerationJob.id).label("use_count"),
+        )
+        .where(GenerationJob.job_type == "image")
+        .where(GenerationJob.prompt.isnot(None))
+        .where(GenerationJob.prompt != "")
+        .group_by(GenerationJob.prompt)
+        .order_by(func.max(GenerationJob.created_at).desc())
+        .limit(limit)
+    )
+    rows = result.all()
+    return PromptHistoryResponse(
+        items=[
+            PromptHistoryItem(
+                prompt=row.prompt,
+                last_used_at=row.last_used_at.isoformat(),
+                use_count=row.use_count,
+            )
+            for row in rows
+        ]
+    )
 
 
 @router.get("/jobs", response_model=JobListResponse)
