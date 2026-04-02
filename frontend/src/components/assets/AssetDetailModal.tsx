@@ -7,6 +7,7 @@ import {
   getAssetTags,
   patchAssetMeta,
   deleteAssetStep,
+  duplicateAsset,
   type AssetStepData,
 } from "../../api/assets.js";
 import { useToast } from "../ui/ToastContext.js";
@@ -82,6 +83,7 @@ export function AssetDetailModal({
   const [nameInput, setNameInput] = useState("");
   const [showSavePreset, setShowSavePreset] = useState(false);
   const [showApplyPreset, setShowApplyPreset] = useState(false);
+  const [isDuplicating, setIsDuplicating] = useState(false);
   const [stepDeleteModal, setStepDeleteModal] = useState<{
     step: string;
     stepLabel: string;
@@ -185,6 +187,20 @@ export function AssetDetailModal({
 
   const removeTag = (tag: string) => {
     void saveMeta({ tags: currentTags.filter((x) => x !== tag) });
+  };
+
+  const handleDuplicate = async () => {
+    setIsDuplicating(true);
+    try {
+      const result = await duplicateAsset(assetId);
+      void queryClient.invalidateQueries({ queryKey: ["assets"] });
+      addToast(`Asset dupliziert (${result.copied_steps.join(", ")}).`, "success");
+      onAssetUpdate?.();
+    } catch {
+      addToast("Asset konnte nicht dupliziert werden.", "error");
+    } finally {
+      setIsDuplicating(false);
+    }
   };
 
   useEffect(() => {
@@ -291,14 +307,25 @@ export function AssetDetailModal({
           <h2 id="asset-detail-title">
             {data.name ?? `Asset ${data.asset_id.slice(0, 8)}…`}
           </h2>
-          <button
-            type="button"
-            className="asset-modal__close"
-            onClick={onClose}
-            aria-label="Schließen"
-          >
-            ×
-          </button>
+          <div className="asset-modal__header-actions">
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm"
+              onClick={() => void handleDuplicate()}
+              disabled={isDuplicating}
+              title="Asset duplizieren"
+            >
+              {isDuplicating ? "…" : "⎘ Duplizieren"}
+            </button>
+            <button
+              type="button"
+              className="asset-modal__close"
+              onClick={onClose}
+              aria-label="Schließen"
+            >
+              ×
+            </button>
+          </div>
         </header>
 
         <p className="asset-modal__dates">

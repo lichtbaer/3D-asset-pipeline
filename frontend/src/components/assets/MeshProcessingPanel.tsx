@@ -15,8 +15,10 @@ import {
   generateLods,
   startTextureBake,
   getTextureBakeStatus,
+  getMeshStats,
   type LodResult,
   type TextureBakingEntry,
+  type MeshStatsResponse,
 } from "../../api/assets.js";
 import { MeshViewer } from "../viewer/MeshViewer.js";
 import type { ProcessingEntry } from "../../api/assets.js";
@@ -42,6 +44,172 @@ const COMPONENT_RATIO_PRESETS = [
   { value: 0.1, label: "10%" },
   { value: 0.2, label: "20%" },
 ];
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+interface MeshAnalysisLike {
+  vertex_count: number;
+  face_count: number;
+  is_watertight: boolean;
+  is_manifold: boolean;
+  has_duplicate_vertices: boolean;
+  file_size_bytes: number;
+  bounding_box: Record<string, number>;
+}
+
+function MeshStatsTable({ stats }: { stats: MeshAnalysisLike }) {
+  const bb = stats.bounding_box;
+  const sizeX = bb ? ((bb.max_x ?? 0) - (bb.min_x ?? 0)).toFixed(3) : "—";
+  const sizeY = bb ? ((bb.max_y ?? 0) - (bb.min_y ?? 0)).toFixed(3) : "—";
+  const sizeZ = bb ? ((bb.max_z ?? 0) - (bb.min_z ?? 0)).toFixed(3) : "—";
+
+  return (
+    <table className="mesh-processing__stats-table">
+      <tbody>
+        <tr>
+          <th>Vertices</th>
+          <td>{stats.vertex_count.toLocaleString("de-DE")}</td>
+          <th>Faces</th>
+          <td>{stats.face_count.toLocaleString("de-DE")}</td>
+        </tr>
+        <tr>
+          <th>Watertight</th>
+          <td>{stats.is_watertight ? "✓" : "✗"}</td>
+          <th>Manifold</th>
+          <td>{stats.is_manifold ? "✓" : "✗"}</td>
+        </tr>
+        <tr>
+          <th>Duplikate</th>
+          <td>{stats.has_duplicate_vertices ? "ja" : "nein"}</td>
+          <th>Dateigröße</th>
+          <td>{formatBytes(stats.file_size_bytes)}</td>
+        </tr>
+        <tr>
+          <th>Breite</th>
+          <td>{sizeX}</td>
+          <th>Höhe</th>
+          <td>{sizeY}</td>
+        </tr>
+        <tr>
+          <th>Tiefe</th>
+          <td>{sizeZ}</td>
+          <td colSpan={2} />
+        </tr>
+      </tbody>
+    </table>
+  );
+}
+
+interface MeshCompareProps {
+  assetId: string;
+  currentStats: MeshAnalysisLike;
+  meshSources: string[];
+}
+
+function MeshComparePanel({ assetId, currentStats, meshSources }: MeshCompareProps) {
+  const [compareFile, setCompareFile] = useState<string>("");
+  const [compareStats, setCompareStats] = useState<MeshStatsResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleCompare = async () => {
+    if (!compareFile) return;
+    setIsLoading(true);
+    try {
+      const stats = await getMeshStats(assetId, compareFile);
+      setCompareStats(stats);
+    } catch {
+      setCompareStats(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const comparableSources = meshSources.filter(
+    (s) => s !== "mesh.glb" && s.endsWith(".glb")
+  );
+  if (comparableSources.length === 0) return null;
+
+  return (
+    <div className="mesh-processing__compare">
+      <h4>Vergleich</h4>
+      <div className="mesh-processing__compare-controls">
+        <select
+          value={compareFile}
+          onChange={(e) => {
+            setCompareFile(e.target.value);
+            setCompareStats(null);
+          }}
+        >
+          <option value="">— Datei wählen —</option>
+          {comparableSources.map((f) => (
+            <option key={f} value={f}>
+              {f}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          className="btn btn--outline btn--sm"
+          onClick={() => void handleCompare()}
+          disabled={!compareFile || isLoading}
+        >
+          {isLoading ? "…" : "Vergleichen"}
+        </button>
+      </div>
+      {compareStats && (
+        <div className="mesh-processing__compare-result">
+          <p className="mesh-processing__compare-label">{compareStats.source_file}</p>
+          <table className="mesh-processing__stats-table mesh-processing__stats-table--compare">
+            <thead>
+              <tr>
+                <th>Kennzahl</th>
+                <th>mesh.glb</th>
+                <th>{compareStats.source_file}</th>
+                <th>Delta</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Faces</td>
+                <td>{currentStats.face_count.toLocaleString("de-DE")}</td>
+                <td>{compareStats.face_count.toLocaleString("de-DE")}</td>
+                <td className={compareStats.face_count < currentStats.face_count ? "mesh-processing__delta--less" : "mesh-processing__delta--more"}>
+                  {compareStats.face_count > currentStats.face_count ? "+" : ""}
+                  {(compareStats.face_count - currentStats.face_count).toLocaleString("de-DE")}
+                </td>
+              </tr>
+              <tr>
+                <td>Vertices</td>
+                <td>{currentStats.vertex_count.toLocaleString("de-DE")}</td>
+                <td>{compareStats.vertex_count.toLocaleString("de-DE")}</td>
+                <td className={compareStats.vertex_count < currentStats.vertex_count ? "mesh-processing__delta--less" : "mesh-processing__delta--more"}>
+                  {compareStats.vertex_count > currentStats.vertex_count ? "+" : ""}
+                  {(compareStats.vertex_count - currentStats.vertex_count).toLocaleString("de-DE")}
+                </td>
+              </tr>
+              <tr>
+                <td>Dateigröße</td>
+                <td>{formatBytes(currentStats.file_size_bytes)}</td>
+                <td>{formatBytes(compareStats.file_size_bytes)}</td>
+                <td>{formatBytes(Math.abs(compareStats.file_size_bytes - currentStats.file_size_bytes))}</td>
+              </tr>
+              <tr>
+                <td>Watertight</td>
+                <td>{currentStats.is_watertight ? "✓" : "✗"}</td>
+                <td>{compareStats.is_watertight ? "✓" : "✗"}</td>
+                <td />
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface MeshProcessingPanelProps {
   assetId: string;
@@ -266,12 +434,16 @@ export function MeshProcessingPanel({
         {analysisLoading ? (
           <p>Lade Analyse…</p>
         ) : analysis ? (
-          <p className="mesh-processing__stats">
-            Vertices: {analysis.vertex_count.toLocaleString("de-DE")} | Faces:{" "}
-            {analysis.face_count.toLocaleString("de-DE")} | Watertight:{" "}
-            {analysis.is_watertight ? "✓" : "✗"} | Manifold:{" "}
-            {analysis.is_manifold ? "✓" : "✗"}
-          </p>
+          <>
+            <MeshStatsTable stats={analysis} />
+            {meshSources.length > 1 && (
+              <MeshComparePanel
+                assetId={assetId}
+                currentStats={analysis}
+                meshSources={meshSources}
+              />
+            )}
+          </>
         ) : (
           <p>Keine Analyse verfügbar</p>
         )}

@@ -23,6 +23,7 @@ class MockEventSource {
     this.url = url;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   addEventListener(_type: string, _handler: unknown) {}
   close() { this.readyState = MockEventSource.CLOSED; }
 }

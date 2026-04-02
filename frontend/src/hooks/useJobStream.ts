@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { API_BASE } from "../api/client.js";
+import { API_BASE, apiClient } from "../api/client.js";
 import type { GenerationJobStatus } from "../api/generation.js";
 
 export interface JobStreamData {
@@ -70,7 +70,6 @@ export function useJobStream(
 
     const startPollingFallback = () => {
       // Polling-Fallback wenn SSE nicht verfügbar
-      const { apiClient } = require("../api/client.js");
       pollRef.current = setInterval(async () => {
         try {
           const { data: jobData } = await apiClient.get(

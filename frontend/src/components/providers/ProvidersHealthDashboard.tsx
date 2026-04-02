@@ -43,7 +43,7 @@ function ProviderRow({ provider }: { provider: ProviderHealthInfo }) {
 }
 
 export function ProvidersHealthDashboard() {
-  const { data, isLoading, error, dataUpdatedAt } = useQuery({
+  const { data, isLoading, error } = useQuery({
     queryKey: ["providers-health"],
     queryFn: getProvidersHealth,
     refetchInterval: 60_000,    // Alle 60 Sekunden neu laden

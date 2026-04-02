@@ -345,6 +345,87 @@ Vorschaubilder vollständig.
 
 ---
 
+---
+
+## E — Neue Funktionale Features (2026-04-02) ✅ Implementiert
+
+### FEAT-NEW-001: Auto-Tagging nach Mesh-Generierung ✅
+Der `tagging_agent` wird nach jedem erfolgreichen Mesh-Job automatisch ausgelöst.
+Generierte Tags werden direkt in `metadata.json` persistiert. Überspringt
+stillschweigend wenn `ANTHROPIC_API_KEY` nicht gesetzt oder Tags bereits vorhanden.
+
+**Implementiert in:**
+- `api/app/services/auto_tag_service.py` (neu)
+- `api/app/services/job_service.py` (Hook nach `persist_mesh_job`)
+
+---
+
+### FEAT-NEW-002: Animation Playback im Asset-Detail-Viewer ✅
+`AnimationMeshViewer` (vorhandene Komponente) wird jetzt im `AssetDetailModal`
+für den Animation-Step angezeigt. Play/Pause/Scrubber/Clip-Auswahl verfügbar.
+
+**Implementiert in:**
+- `frontend/src/components/assets/AssetFilesPreviews.tsx`
+
+---
+
+### FEAT-NEW-003: 3D-Print Readiness Check ✅
+Neuer Endpoint `GET /assets/{id}/print-readiness` prüft Watertightness, Manifold,
+Self-Intersections und gibt Bounding-Box in mm zurück. "Druckeignung prüfen"-Button
+im Export-Panel zeigt Checkliste und Dimensionen.
+
+**Implementiert in:**
+- `api/app/services/mesh_processing_service.py` (`print_readiness()`)
+- `api/app/schemas/asset.py` (`PrintReadinessReport`, `PrintReadinessCheck`, `PrintReadinessStats`)
+- `api/app/routers/assets.py` (`GET /assets/{id}/print-readiness`)
+- `frontend/src/api/assets.ts` (`checkPrintReadiness()`)
+- `frontend/src/components/assets/ExportPanel.tsx`
+
+---
+
+### FEAT-NEW-004: Asset Duplizierung ✅
+`POST /assets/{id}/duplicate` klont Asset-Ordner mit frischer UUID. Name, Tags,
+Notes, Rating werden übernommen. Optional `?up_to_step=mesh` für partielle Kopie.
+"⎘ Duplizieren"-Button im Modal-Header.
+
+**Implementiert in:**
+- `api/app/services/asset_service.py` (`duplicate_asset()`)
+- `api/app/schemas/asset.py` (`DuplicateAssetResponse`)
+- `api/app/routers/assets.py` (`POST /assets/{id}/duplicate`)
+- `frontend/src/api/assets.ts` (`duplicateAsset()`)
+- `frontend/src/components/assets/AssetDetailModal.tsx`
+
+---
+
+### FEAT-NEW-005: Auto-Repair nach Quality Assessment ✅
+`POST /assets/{id}/auto-repair` führt geordnete Repair-Aktionen aus dem
+Quality-Agent automatisch aus (`clip_floor`, `repair_mesh`, `simplify`,
+`remove_components`). "⚙ Auto-Repair ausführen"-Button in `QualityAnalysisPanel`,
+sichtbar wenn reparierbare Aktionen empfohlen wurden.
+
+**Implementiert in:**
+- `api/app/services/mesh_processing_service.py` (`auto_repair()`)
+- `api/app/schemas/asset.py` (`AutoRepairResponse`)
+- `api/app/routers/assets.py` (`POST /assets/{id}/auto-repair`)
+- `frontend/src/api/assets.ts` (`autoRepairMesh()`)
+- `frontend/src/components/assets/QualityAnalysisPanel.tsx`
+
+---
+
+### FEAT-NEW-006: Mesh-Metriken-Vergleich ✅
+Neue `MeshStatsTable`-Komponente zeigt detaillierte Kennzahlen (Vertices, Faces,
+Watertight, Manifold, Duplikate, Dateigröße, Bounding-Box-Dimensionen). Wenn mehrere
+Mesh-Varianten vorhanden: `MeshComparePanel` mit Delta-Tabelle (Faces ±, Vertices ±,
+Dateigröße). Neuer Endpoint `GET /assets/{id}/mesh-stats`.
+
+**Implementiert in:**
+- `api/app/schemas/asset.py` (`MeshStatsResponse`)
+- `api/app/routers/assets.py` (`GET /assets/{id}/mesh-stats`)
+- `frontend/src/api/assets.ts` (`getMeshStats()`)
+- `frontend/src/components/assets/MeshProcessingPanel.tsx` (`MeshStatsTable`, `MeshComparePanel`)
+
+---
+
 ## Prioritäts-Übersicht
 
 | # | Issue | Typ | Prio | Aufwand |
@@ -375,5 +456,12 @@ Vorschaubilder vollständig.
 | — | Webhook-Integration | Feature | Low | 3–4 Tage |
 | — | Prompt-Verlauf & Favoriten | Feature | Low | 2–3 Tage |
 | — | Blender Vorschau-Render | Feature | Low | 3–4 Tage |
+| ✅ | Auto-Tagging nach Mesh-Generierung | Feature | Normal | 0,5 Tage |
+| ✅ | Animation Playback im Asset-Detail-Viewer | Feature | Normal | 0,5 Tage |
+| ✅ | 3D-Print Readiness Check | Feature | Low | 1 Tag |
+| ✅ | Asset Duplizierung | Feature | Normal | 1 Tag |
+| ✅ | Auto-Repair nach Quality Assessment | Feature | Normal | 1 Tag |
+| ✅ | Mesh-Metriken-Vergleich | Feature | Low | 1 Tag |
 
-**Gesamtaufwand geschätzt:** ~68–99 Entwicklungstage
+**Gesamtaufwand geschätzt (ursprünglich):** ~68–99 Entwicklungstage
+**Implementiert 2026-04-02:** 6 neue Features (~5 Entwicklungstage)

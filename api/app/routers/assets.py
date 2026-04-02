@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, File, Form, Query, UploadFile
+from pydantic import BaseModel, Field
 from fastapi.responses import FileResponse
 
 from app.core.errors import raise_api_error
@@ -16,12 +17,16 @@ from app.schemas.asset import (
     AssetListItem,
     AssetMetaUpdateRequest,
     AssetStepInfo,
+    AutoRepairResponse,
     BatchDeleteRequest,
     CreateAssetResponse,
+    DuplicateAssetResponse,
     ExportListItem,
     ExportRequest,
     ExportResponse,
     ExportsListResponse,
+    MeshStatsResponse,
+    PrintReadinessReport,
     SketchfabUploadInfo,
     StepDeleteResponse,
     UploadAssetResponse,
@@ -69,7 +74,13 @@ from app.services.mesh_processing_service import (
     repair as mesh_repair,
 )
 from app.services.mesh_processing_service import (
+    auto_repair as mesh_auto_repair,
+)
+from app.services.mesh_processing_service import (
     generate_lods as mesh_generate_lods,
+)
+from app.services.mesh_processing_service import (
+    print_readiness as mesh_print_readiness,
 )
 from app.services.mesh_processing_service import (
     simplify as mesh_simplify,
@@ -699,3 +710,144 @@ async def create_asset():
     """Neues Asset anlegen, gibt asset_id zurück."""
     asset_id = asset_service.create_asset()
     return CreateAssetResponse(asset_id=asset_id)
+
+
+# ---------------------------------------------------------------------------
+# FEAT-NEW-004: Asset Duplizierung
+# ---------------------------------------------------------------------------
+
+@router.post("/{asset_id}/duplicate", response_model=DuplicateAssetResponse)
+async def duplicate_asset(
+    asset_id: str,
+    up_to_step: str | None = Query(
+        default=None,
+        description="Nur bis zu diesem Step kopieren (z.B. 'mesh'). Leer = alles.",
+    ),
+):
+    """
+    Klont ein Asset in einen neuen Asset-Ordner.
+
+    Kopiert alle Dateien und Metadaten. Das neue Asset erhält eine frische asset_id
+    und aktuelle Timestamps. Name, Tags, Notes und Rating werden übernommen.
+    Optional: up_to_step beschränkt den Kopiervorgang auf Steps bis zu diesem Schritt.
+    """
+    try:
+        new_asset_id, copied_steps = await asyncio.to_thread(
+            asset_service.duplicate_asset, asset_id, up_to_step
+        )
+        return DuplicateAssetResponse(new_asset_id=new_asset_id, copied_steps=copied_steps)
+    except FileNotFoundError as e:
+        raise_api_error(404, "Asset nicht gefunden", detail=str(e), code="ASSET_NOT_FOUND", chain=e)
+
+
+# ---------------------------------------------------------------------------
+# FEAT-NEW-003: 3D-Print Readiness Check
+# ---------------------------------------------------------------------------
+
+@router.get("/{asset_id}/print-readiness", response_model=PrintReadinessReport)
+async def get_print_readiness(
+    asset_id: str,
+    source_file: str = Query(default="mesh.glb", description="Quell-Mesh-Datei"),
+):
+    """
+    Prüft ob ein Mesh für den 3D-Druck geeignet ist.
+
+    Analysiert Watertightness, Manifold-Eigenschaften, Self-Intersections und
+    geometrische Kennzahlen (Bounding-Box in mm, Polygon-Anzahl).
+    """
+    try:
+        result = await asyncio.to_thread(mesh_print_readiness, asset_id, source_file)
+        from app.schemas.asset import PrintReadinessCheck, PrintReadinessStats  # noqa: PLC0415
+        return PrintReadinessReport(
+            print_ready=bool(result["print_ready"]),
+            checks=[
+                PrintReadinessCheck(**c)
+                for c in result["checks"]  # type: ignore[union-attr]
+            ],
+            stats=PrintReadinessStats(**result["stats"]),  # type: ignore[arg-type]
+            source_file=source_file,
+        )
+    except FileNotFoundError as e:
+        raise_api_error(404, "Mesh-Datei nicht gefunden", detail=str(e), code="FILE_NOT_FOUND", chain=e)
+    except (ValueError, OSError) as e:
+        raise_api_error(422, "Mesh-Analyse fehlgeschlagen", detail=str(e), code="ANALYSIS_FAILED", chain=e)
+
+
+# ---------------------------------------------------------------------------
+# FEAT-NEW-005: Auto-Repair nach Quality Assessment
+# ---------------------------------------------------------------------------
+
+class AutoRepairRequest(BaseModel):
+    source_file: str = "mesh.glb"
+    actions: list[str] = Field(
+        default=["clip_floor", "repair_mesh"],
+        description="Geordnete Liste von Aktionen: clip_floor, repair_mesh, simplify, remove_components",
+    )
+
+
+@router.post("/{asset_id}/auto-repair", response_model=AutoRepairResponse)
+async def auto_repair_mesh(asset_id: str, body: AutoRepairRequest):
+    """
+    Führt empfohlene Repair-Aktionen automatisch in der angegebenen Reihenfolge aus.
+
+    Unterstützte Aktionen: clip_floor, repair_mesh, simplify, remove_components.
+    Aktionen aus dem Quality-Agent (recommended_actions) können direkt übergeben werden.
+    """
+    meta = asset_service.get_asset(asset_id)
+    if not meta:
+        raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
+    try:
+        executed, output_files = await asyncio.to_thread(
+            mesh_auto_repair, asset_id, body.source_file, body.actions
+        )
+        msg = (
+            f"{len(executed)} Aktion(en) ausgeführt: {', '.join(executed)}"
+            if executed
+            else "Keine unterstützten Aktionen übergeben"
+        )
+        return AutoRepairResponse(
+            actions_executed=executed,
+            output_files=output_files,
+            message=msg,
+        )
+    except FileNotFoundError as e:
+        raise_api_error(404, "Mesh-Datei nicht gefunden", detail=str(e), code="FILE_NOT_FOUND", chain=e)
+    except (ValueError, OSError) as e:
+        raise_api_error(422, "Auto-Repair fehlgeschlagen", detail=str(e), code="REPAIR_FAILED", chain=e)
+
+
+# ---------------------------------------------------------------------------
+# FEAT-NEW-006: Mesh-Metriken-Vergleich
+# ---------------------------------------------------------------------------
+
+@router.get("/{asset_id}/mesh-stats", response_model=MeshStatsResponse)
+async def get_mesh_stats(
+    asset_id: str,
+    source_file: str = Query(default="mesh.glb", description="Quell-Mesh-Datei"),
+):
+    """
+    Gibt technische Mesh-Kennzahlen zurück (Vertex-/Face-Anzahl, Watertight, Bounding-Box).
+
+    Kann für verschiedene Mesh-Varianten aufgerufen werden (mesh.glb, mesh_repaired.glb etc.)
+    um Metriken zwischen Provider-Runs oder Processing-Schritten zu vergleichen.
+    """
+    meta = asset_service.get_asset(asset_id)
+    if not meta:
+        raise_api_error(404, "Asset nicht gefunden", code="ASSET_NOT_FOUND")
+    try:
+        from app.services.mesh_processing_service import analyze as mesh_analyze_fn  # noqa: PLC0415
+        analysis = await asyncio.to_thread(mesh_analyze_fn, asset_id, source_file)
+        return MeshStatsResponse(
+            source_file=source_file,
+            vertex_count=analysis.vertex_count,
+            face_count=analysis.face_count,
+            is_watertight=analysis.is_watertight,
+            is_manifold=analysis.is_manifold,
+            has_duplicate_vertices=analysis.has_duplicate_vertices,
+            file_size_bytes=analysis.file_size_bytes,
+            bounding_box=analysis.bounding_box,
+        )
+    except FileNotFoundError as e:
+        raise_api_error(404, "Mesh-Datei nicht gefunden", detail=str(e), code="FILE_NOT_FOUND", chain=e)
+    except (ValueError, OSError) as e:
+        raise_api_error(422, "Mesh-Analyse fehlgeschlagen", detail=str(e), code="ANALYSIS_FAILED", chain=e)
