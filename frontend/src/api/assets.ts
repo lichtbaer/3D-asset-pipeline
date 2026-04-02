@@ -393,3 +393,106 @@ export async function generateLods(
   );
   return data;
 }
+
+// FEAT-NEW-004: Asset Duplizierung
+
+export interface DuplicateAssetResponse {
+  new_asset_id: string;
+  copied_steps: string[];
+}
+
+export async function duplicateAsset(
+  assetId: string,
+  upToStep?: string
+): Promise<DuplicateAssetResponse> {
+  const params = upToStep ? { up_to_step: upToStep } : undefined;
+  const { data } = await apiClient.post<DuplicateAssetResponse>(
+    `/assets/${assetId}/duplicate`,
+    undefined,
+    { params }
+  );
+  return data;
+}
+
+// FEAT-NEW-003: 3D-Print Readiness Check
+
+export interface PrintReadinessCheck {
+  name: string;
+  passed: boolean;
+  description: string;
+}
+
+export interface PrintReadinessStats {
+  face_count: number;
+  vertex_count: number;
+  file_size_bytes: number;
+  width_mm: number;
+  height_mm: number;
+  depth_mm: number;
+}
+
+export interface PrintReadinessReport {
+  print_ready: boolean;
+  checks: PrintReadinessCheck[];
+  stats: PrintReadinessStats;
+  source_file: string;
+}
+
+export async function checkPrintReadiness(
+  assetId: string,
+  sourceFile = "mesh.glb"
+): Promise<PrintReadinessReport> {
+  const { data } = await apiClient.get<PrintReadinessReport>(
+    `/assets/${assetId}/print-readiness`,
+    { params: { source_file: sourceFile } }
+  );
+  return data;
+}
+
+// FEAT-NEW-005: Auto-Repair
+
+export interface AutoRepairRequest {
+  source_file: string;
+  actions: string[];
+}
+
+export interface AutoRepairResponse {
+  actions_executed: string[];
+  output_files: string[];
+  message: string;
+}
+
+export async function autoRepairMesh(
+  assetId: string,
+  req: AutoRepairRequest
+): Promise<AutoRepairResponse> {
+  const { data } = await apiClient.post<AutoRepairResponse>(
+    `/assets/${assetId}/auto-repair`,
+    req
+  );
+  return data;
+}
+
+// FEAT-NEW-006: Mesh-Metriken
+
+export interface MeshStatsResponse {
+  source_file: string;
+  vertex_count: number;
+  face_count: number;
+  is_watertight: boolean;
+  is_manifold: boolean;
+  has_duplicate_vertices: boolean;
+  file_size_bytes: number;
+  bounding_box: Record<string, number>;
+}
+
+export async function getMeshStats(
+  assetId: string,
+  sourceFile = "mesh.glb"
+): Promise<MeshStatsResponse> {
+  const { data } = await apiClient.get<MeshStatsResponse>(
+    `/assets/${assetId}/mesh-stats`,
+    { params: { source_file: sourceFile } }
+  );
+  return data;
+}

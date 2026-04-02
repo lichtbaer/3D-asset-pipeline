@@ -246,6 +246,88 @@ def clip_floor(
     }
 
 
+def auto_repair(
+    asset_id: str,
+    source_file: str,
+    recommended_actions: list[str],
+) -> tuple[list[str], list[str]]:
+    """
+    Führt Quality-Agent-Empfehlungen automatisch aus.
+
+    Unterstützt die Aktionen: clip_floor, repair_mesh, simplify, remove_components.
+    Aktionen werden in der übergebenen Reihenfolge (nach priority sortiert) ausgeführt.
+
+    Args:
+        asset_id: UUID des Assets
+        source_file: Quell-Mesh-Datei (z.B. "mesh.glb")
+        recommended_actions: Geordnete Liste der auszuführenden Aktionen
+
+    Returns:
+        (executed_actions, output_files) — ausgeführte Aktionen und erzeugte Dateien
+    """
+    # Aktionen die dieser Service ausführen kann (subset von RecommendedActionType)
+    _EXECUTABLE = {"clip_floor", "repair_mesh", "simplify", "remove_components"}
+
+    executed: list[str] = []
+    output_files: list[str] = []
+    current_source = source_file
+
+    for action in recommended_actions:
+        if action not in _EXECUTABLE:
+            logger.debug("Auto-Repair: überspringe Aktion '%s' (nicht ausführbar)", action)
+            continue
+
+        try:
+            if action == "clip_floor":
+                out_file, _ = clip_floor(asset_id, current_source)
+                executed.append(action)
+                output_files.append(out_file)
+                current_source = out_file
+
+            elif action == "repair_mesh":
+                out_file, _ = repair(
+                    asset_id,
+                    current_source,
+                    [
+                        RepairOperation.REMOVE_DUPLICATES,
+                        RepairOperation.REMOVE_DEGENERATE,
+                        RepairOperation.FIX_NORMALS,
+                        RepairOperation.FILL_HOLES,
+                    ],
+                )
+                executed.append(action)
+                output_files.append(out_file)
+                current_source = out_file
+
+            elif action == "simplify":
+                # Standardziel: 50% der aktuellen Faces
+                mesh_path = _asset_mesh_path(asset_id, current_source)
+                tmp_mesh = o3d.io.read_triangle_mesh(str(mesh_path))
+                current_faces = len(tmp_mesh.triangles)
+                target = max(1000, current_faces // 2)
+                out_file, _ = simplify(asset_id, current_source, target)
+                executed.append(action)
+                output_files.append(out_file)
+                current_source = out_file
+
+            elif action == "remove_components":
+                out_file, _ = remove_small_components(asset_id, current_source)
+                executed.append(action)
+                output_files.append(out_file)
+                current_source = out_file
+
+        except (FileNotFoundError, ValueError, OSError) as e:
+            logger.warning(
+                "Auto-Repair: Aktion '%s' für Asset %s fehlgeschlagen: %s",
+                action,
+                asset_id,
+                e,
+            )
+            break  # Weitere Aktionen abbrechen wenn eine fehlschlägt
+
+    return executed, output_files
+
+
 def generate_lods(
     asset_id: str,
     source_file: str,
@@ -333,6 +415,94 @@ def generate_lods(
         )
 
     return lod_results
+
+
+def print_readiness(
+    asset_id: str,
+    source_file: str,
+) -> dict[str, object]:
+    """
+    Prüft ob ein Mesh für den 3D-Druck geeignet ist.
+
+    Gibt ein strukturiertes Report-Dict zurück mit:
+    - print_ready: bool — true wenn alle Pflichtkriterien erfüllt
+    - checks: Liste von Einzelprüfungen (name, passed, description)
+    - stats: Bounding-Box, Volumen, Poly-Anzahl
+    """
+    source_path = _asset_mesh_path(asset_id, source_file)
+    mesh = o3d.io.read_triangle_mesh(str(source_path))
+
+    is_watertight = mesh.is_watertight()
+    is_manifold = mesh.is_edge_manifold()
+
+    # Self-Intersections via trimesh (teuer, aber aussagekräftig)
+    has_self_intersections = False
+    try:
+        import tempfile
+        with tempfile.NamedTemporaryFile(suffix=".glb", delete=False) as tmp:
+            tmp_path = tmp.name
+        try:
+            o3d.io.write_triangle_mesh(tmp_path, mesh)
+            tmesh = trimesh.load(tmp_path, file_type="glb", force="mesh")
+            if isinstance(tmesh, trimesh.Scene):
+                dumped = tmesh.dump(concatenate=True)
+                tmesh = dumped[0] if isinstance(dumped, list) else dumped
+            has_self_intersections = bool(tmesh.is_self_intersecting)
+        finally:
+            Path(tmp_path).unlink(missing_ok=True)
+    except Exception:
+        pass  # Self-Intersection-Check ist optional
+
+    bbox = mesh.get_axis_aligned_bounding_box()
+    min_b = bbox.get_min_bound()
+    max_b = bbox.get_max_bound()
+    width_mm = float((max_b[0] - min_b[0]) * 1000)
+    height_mm = float((max_b[1] - min_b[1]) * 1000)
+    depth_mm = float((max_b[2] - min_b[2]) * 1000)
+
+    face_count = len(mesh.triangles)
+    vertex_count = len(mesh.vertices)
+    file_size_bytes = source_path.stat().st_size
+
+    checks = [
+        {
+            "name": "Watertight",
+            "passed": is_watertight,
+            "description": "Mesh ist geschlossen (keine offenen Kanten)",
+        },
+        {
+            "name": "Manifold",
+            "passed": is_manifold,
+            "description": "Alle Kanten werden von genau 2 Faces geteilt",
+        },
+        {
+            "name": "Keine Self-Intersections",
+            "passed": not has_self_intersections,
+            "description": "Mesh schneidet sich nicht selbst",
+        },
+        {
+            "name": "Ausreichend Polygone",
+            "passed": face_count >= 100,
+            "description": f"Mindestens 100 Faces vorhanden ({face_count} gefunden)",
+        },
+    ]
+
+    # Druckbereit wenn alle Pflichtkriterien erfüllt (watertight + manifold + kein self-intersect)
+    mandatory_checks = [c for c in checks if c["name"] in ("Watertight", "Manifold", "Keine Self-Intersections")]
+    print_ready = all(c["passed"] for c in mandatory_checks)
+
+    return {
+        "print_ready": print_ready,
+        "checks": checks,
+        "stats": {
+            "face_count": face_count,
+            "vertex_count": vertex_count,
+            "file_size_bytes": file_size_bytes,
+            "width_mm": round(width_mm, 2),
+            "height_mm": round(height_mm, 2),
+            "depth_mm": round(depth_mm, 2),
+        },
+    }
 
 
 def remove_small_components(

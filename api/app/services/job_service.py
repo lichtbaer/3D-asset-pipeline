@@ -103,6 +103,9 @@ async def _persist_job_completion(job_id: str) -> None:
                 source_file,
                 job.glb_file_path,
             )
+            # Auto-Tagging: Best-Effort, darf Fehler nicht weiterwerfen
+            from app.services.auto_tag_service import auto_tag_asset_after_mesh  # noqa: PLC0415
+            await auto_tag_asset_after_mesh(asset_id)
         elif job.job_type == "rigging" and job.glb_file_path:
             await asset_service.persist_rigging_job(
                 str(job.id),

@@ -1,5 +1,6 @@
 import { getAssetFileUrl, type AssetDetail } from "../../api/assets.js";
 import { MeshViewer } from "../viewer/MeshViewer.js";
+import { AnimationMeshViewer } from "../viewer/AnimationMeshViewer.js";
 import { ImageProcessingList } from "./ImageProcessingList.js";
 import { ImageEditor } from "../pipeline/ImageEditor.js";
 
@@ -144,12 +145,13 @@ export function AssetFilesPreviews({
         )}
         {hasAnimation && animationUrl && (
           <div className="asset-modal__preview-item asset-modal__step-block">
-            <p className="asset-modal__preview-label">🎬 Animation</p>
-            {motionPrompt && (
-              <p className="asset-modal__motion-prompt">
-                Motion: {motionPrompt}
-              </p>
-            )}
+            <AnimationMeshViewer glbUrl={animationUrl} height={450} />
+            <p className="asset-modal__preview-label">
+              Animation
+              {motionPrompt && (
+                <span className="asset-modal__motion-prompt"> — {motionPrompt}</span>
+              )}
+            </p>
             <a
               href={animationUrl}
               download

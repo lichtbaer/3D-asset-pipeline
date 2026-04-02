@@ -5,6 +5,8 @@ import {
   getAssetExports,
   getAssetFileUrl,
   deleteAssetFile,
+  checkPrintReadiness,
+  type PrintReadinessReport,
 } from "../../api/assets.js";
 import { getMeshSources } from "../../api/meshProcessing.js";
 import type { ExportListItem } from "../../api/assets.js";
@@ -37,6 +39,7 @@ export function ExportPanel({ assetId }: ExportPanelProps) {
   const queryClient = useQueryClient();
   const [format, setFormat] = useState<"stl" | "obj" | "ply" | "gltf">("stl");
   const [sourceFile, setSourceFile] = useState("mesh.glb");
+  const [printReport, setPrintReport] = useState<PrintReadinessReport | null>(null);
 
   const { data: sourcesData } = useQuery({
     queryKey: ["mesh-sources", assetId],
@@ -84,6 +87,11 @@ export function ExportPanel({ assetId }: ExportPanelProps) {
       queryClient.invalidateQueries({ queryKey: ["asset", assetId] });
       queryClient.invalidateQueries({ queryKey: ["asset-exports", assetId] });
     },
+  });
+
+  const printReadinessMutation = useMutation({
+    mutationFn: () => checkPrintReadiness(assetId, effectiveSource),
+    onSuccess: (report) => setPrintReport(report),
   });
 
   return (
@@ -141,6 +149,51 @@ export function ExportPanel({ assetId }: ExportPanelProps) {
             : "Export fehlgeschlagen"}
         </p>
       )}
+
+      <div className="export-panel__print-readiness">
+        <button
+          type="button"
+          className="btn btn--outline btn--sm"
+          onClick={() => {
+            setPrintReport(null);
+            printReadinessMutation.mutate();
+          }}
+          disabled={printReadinessMutation.isPending}
+        >
+          {printReadinessMutation.isPending ? "Prüfe…" : "🖨 Druckeignung prüfen"}
+        </button>
+        {printReport && (
+          <div className="export-panel__print-report">
+            <span
+              className={`export-panel__print-badge ${
+                printReport.print_ready
+                  ? "export-panel__print-badge--ok"
+                  : "export-panel__print-badge--fail"
+              }`}
+            >
+              {printReport.print_ready ? "✓ Druckbereit" : "✗ Nicht druckbereit"}
+            </span>
+            <ul className="export-panel__print-checks">
+              {printReport.checks.map((c) => (
+                <li key={c.name} className="export-panel__print-check">
+                  <span>{c.passed ? "✓" : "✗"}</span>
+                  <strong>{c.name}</strong>
+                  <span className="export-panel__print-desc">{c.description}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="export-panel__print-stats">
+              {printReport.stats.face_count.toLocaleString()} Faces ·{" "}
+              {printReport.stats.width_mm.toFixed(1)} ×{" "}
+              {printReport.stats.height_mm.toFixed(1)} ×{" "}
+              {printReport.stats.depth_mm.toFixed(1)} mm
+            </p>
+          </div>
+        )}
+        {printReadinessMutation.isError && (
+          <p className="export-panel__error">Druckeignungsprüfung fehlgeschlagen</p>
+        )}
+      </div>
 
       {exportsList.length > 0 && (
         <div className="export-panel__exports">

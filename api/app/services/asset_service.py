@@ -588,6 +588,90 @@ def get_or_create_asset_id(existing_asset_id: str | None) -> str:
     return create_asset()
 
 
+def duplicate_asset(asset_id: str, up_to_step: str | None = None) -> tuple[str, list[str]]:
+    """
+    Klont ein Asset in einen neuen Asset-Ordner.
+
+    Kopiert alle Dateien und metadata.json. Das neue Asset erhält eine frische asset_id
+    und aktuelle Timestamps. Tags, Notes, Name und Rating werden übernommen.
+
+    Args:
+        asset_id: Quell-Asset-ID
+        up_to_step: Optional — nur Schritte bis (einschließlich) dieses Schritt kopieren.
+                    z.B. "mesh" kopiert nur image/bgremoval/mesh, nicht rigging/animation.
+
+    Returns:
+        (new_asset_id, copied_steps) — neue asset_id und Liste der kopierten Steps
+    """
+    src_meta = get_asset(asset_id)
+    if not src_meta:
+        raise FileNotFoundError(f"Asset {asset_id} nicht gefunden")
+
+    src_dir = AssetPaths(asset_id).base
+    if not src_dir.exists():
+        raise FileNotFoundError(f"Asset-Ordner {asset_id} nicht gefunden")
+
+    new_asset_id = create_asset()
+    dst_dir = AssetPaths(new_asset_id).base
+
+    # Pipeline-Step-Reihenfolge für up_to_step-Filter
+    step_order = ["image", "bgremoval", "mesh", "rigging", "animation"]
+
+    if up_to_step and up_to_step in step_order:
+        cutoff = step_order.index(up_to_step)
+        allowed_steps = set(step_order[: cutoff + 1])
+    else:
+        allowed_steps = None
+
+    copied_steps: list[str] = []
+
+    # Alle Dateien kopieren (außer metadata.json — wird neu geschrieben)
+    for src_file in src_dir.iterdir():
+        if not src_file.is_file() or src_file.name == "metadata.json":
+            continue
+        shutil.copy2(src_file, dst_dir / src_file.name)
+
+    # metadata.json neu aufbauen: frische IDs, gefilterte Steps
+    now = datetime.now(timezone.utc).isoformat()
+    new_meta: dict[str, Any] = {
+        "asset_id": new_asset_id,
+        "created_at": now,
+        "updated_at": now,
+        "steps": {},
+        "processing": [],
+        "image_processing": [],
+        "texture_baking": [],
+        "exports": [],
+    }
+
+    for step_name, step_data in src_meta.steps.items():
+        if allowed_steps is not None and step_name not in allowed_steps:
+            continue
+        new_meta["steps"][step_name] = dict(step_data)
+        copied_steps.append(step_name)
+
+    # Optionale Metadaten übernehmen
+    if src_meta.name:
+        new_meta["name"] = f"{src_meta.name} (Kopie)"
+    if src_meta.tags:
+        new_meta["tags"] = list(src_meta.tags)
+    if src_meta.notes:
+        new_meta["notes"] = src_meta.notes
+    if src_meta.rating is not None:
+        new_meta["rating"] = src_meta.rating
+    if src_meta.processing and allowed_steps is None:
+        new_meta["processing"] = list(src_meta.processing)
+
+    get_metadata_service().write(new_asset_id, new_meta)
+    logger.info(
+        "Asset %s dupliziert → %s (Steps: %s)",
+        asset_id,
+        new_asset_id,
+        copied_steps,
+    )
+    return new_asset_id, copied_steps
+
+
 # --- Re-exports from asset_import for backwards compatibility ---
 from app.services.asset_import import (  # noqa: E402, F401
     create_asset_from_image_upload,

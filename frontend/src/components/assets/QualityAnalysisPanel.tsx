@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import {
   assessQuality,
@@ -5,6 +6,7 @@ import {
   type QualityAssessment,
   type RecommendedActionType,
 } from "../../api/agents.js";
+import { autoRepairMesh } from "../../api/assets.js";
 
 const ISSUE_LABELS: Record<string, string> = {
   floor_artifact: "Boden-Artefakt",
@@ -38,6 +40,7 @@ const ACTION_LABELS: Record<RecommendedActionType, string> = {
 interface QualityAnalysisPanelProps {
   assetId: string;
   meshUrl: string | null;
+  meshSourceFile?: string;
   riggedUrl?: string | null;
   onNavigateToStep: (
     tab: "bgremoval" | "mesh" | "rigging" | "animation" | "mesh-processing",
@@ -51,11 +54,20 @@ interface QualityAnalysisPanelProps {
 export function QualityAnalysisPanel({
   assetId,
   meshUrl,
+  meshSourceFile = "mesh.glb",
   riggedUrl = null,
   onNavigateToStep,
   onScrollToExport,
   onScrollToSketchfab,
 }: QualityAnalysisPanelProps) {
+  const [autoRepairResult, setAutoRepairResult] = useState<string | null>(null);
+
+  const autoRepairMutation = useMutation({
+    mutationFn: (actions: string[]) =>
+      autoRepairMesh(assetId, { source_file: meshSourceFile, actions }),
+    onSuccess: (res) => setAutoRepairResult(res.message),
+  });
+
   const assessMutation = useMutation({
     mutationFn: () =>
       assessQuality({
@@ -185,6 +197,39 @@ export function QualityAnalysisPanel({
                   </li>
                 ))}
               </ul>
+              {quality!.recommended_actions.some((a) =>
+                ["clip_floor", "repair_mesh", "simplify", "remove_components"].includes(a.action)
+              ) && (
+                <div className="quality-analysis__auto-repair">
+                  <button
+                    type="button"
+                    className="btn btn--outline btn--sm"
+                    onClick={() => {
+                      setAutoRepairResult(null);
+                      const repairableActions = quality!.recommended_actions
+                        .filter((a) =>
+                          ["clip_floor", "repair_mesh", "simplify", "remove_components"].includes(
+                            a.action
+                          )
+                        )
+                        .sort((a, b) => a.priority - b.priority)
+                        .map((a) => a.action);
+                      autoRepairMutation.mutate(repairableActions);
+                    }}
+                    disabled={autoRepairMutation.isPending}
+                  >
+                    {autoRepairMutation.isPending ? "Repariere…" : "⚙ Auto-Repair ausführen"}
+                  </button>
+                  {autoRepairResult && (
+                    <p className="quality-analysis__auto-repair-result">{autoRepairResult}</p>
+                  )}
+                  {autoRepairMutation.isError && (
+                    <p className="quality-analysis__auto-repair-error">
+                      Auto-Repair fehlgeschlagen
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

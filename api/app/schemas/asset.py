@@ -153,3 +153,59 @@ class StepDeleteResponse(BaseModel):
     requires_confirmation: bool = False
     affected_steps: list[str] = Field(default_factory=list)
     message: str = ""
+
+
+class PrintReadinessCheck(BaseModel):
+    """Einzelne Prüfung im Print-Readiness-Report."""
+
+    name: str
+    passed: bool
+    description: str
+
+
+class PrintReadinessStats(BaseModel):
+    """Technische Kennzahlen für den Print-Readiness-Report."""
+
+    face_count: int
+    vertex_count: int
+    file_size_bytes: int
+    width_mm: float
+    height_mm: float
+    depth_mm: float
+
+
+class PrintReadinessReport(BaseModel):
+    """Response für GET /assets/{asset_id}/print-readiness."""
+
+    print_ready: bool
+    checks: list[PrintReadinessCheck]
+    stats: PrintReadinessStats
+    source_file: str
+
+
+class DuplicateAssetResponse(BaseModel):
+    """Response für POST /assets/{asset_id}/duplicate."""
+
+    new_asset_id: str
+    copied_steps: list[str] = Field(default_factory=list)
+
+
+class AutoRepairResponse(BaseModel):
+    """Response für POST /assets/{asset_id}/auto-repair."""
+
+    actions_executed: list[str] = Field(default_factory=list)
+    output_files: list[str] = Field(default_factory=list)
+    message: str = ""
+
+
+class MeshStatsResponse(BaseModel):
+    """Response für GET /assets/{asset_id}/mesh-stats."""
+
+    source_file: str
+    vertex_count: int
+    face_count: int
+    is_watertight: bool
+    is_manifold: bool
+    has_duplicate_vertices: bool
+    file_size_bytes: int
+    bounding_box: dict[str, float]
