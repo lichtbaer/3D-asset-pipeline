@@ -9,12 +9,12 @@ from typing import Any
 
 from gradio_client import Client, handle_file
 
+from app.core.config import settings
 from app.services.mesh_providers.base import MeshProvider
 
 logger = logging.getLogger(__name__)
 
 HUNYUAN_SPACE = "tencent/Hunyuan3D-2"
-MESH_TIMEOUT_SEC = 300
 
 
 class Hunyuan3DProvider(MeshProvider):
@@ -51,18 +51,7 @@ class Hunyuan3DProvider(MeshProvider):
             api_name="/generation_all",
         )
         # /generation_all returns (file, file, output, mesh_stats, seed) — erste Datei ist GLB
-        if result is None:
-            return None
-        if isinstance(result, (list, tuple)):
-            for item in result:
-                if item and isinstance(item, str) and (
-                    item.endswith(".glb") or item.endswith(".obj")
-                ):
-                    return str(item)
-            if result and result[0]:
-                return str(result[0])
-            return None
-        return str(result) if result else None
+        return self._extract_glb_path(result)
 
     async def generate(self, image_path: str, params: dict[str, Any]) -> str:
         steps = params.get("steps", self.default_params()["steps"])
@@ -74,7 +63,7 @@ class Hunyuan3DProvider(MeshProvider):
             asyncio.to_thread(
                 self._run_predict, image_path, steps, hf_token
             ),
-            timeout=MESH_TIMEOUT_SEC,
+            timeout=settings.MESH_GENERATION_TIMEOUT_S,
         )
 
         if not glb_path or not Path(glb_path).exists():

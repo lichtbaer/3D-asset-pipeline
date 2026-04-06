@@ -11,9 +11,9 @@ from app.core.rate_limit import limiter
 from app.database import get_session
 from app.models import GenerationJob
 from app.routers._generation_helpers import (
-    _extract_asset_id_from_url,
     _update_glb_job,
     _update_mesh_job_bgremoval,
+    resolve_asset_id,
 )
 from app.schemas.generation import (
     MeshGenerateRequest,
@@ -68,26 +68,9 @@ async def create_mesh_generation(
     if body.steps is not None and body.provider_key == "hunyuan3d-2":
         params.setdefault("steps", body.steps)
 
-    asset_id: UUID | None = None
-    if body.asset_id:
-        try:
-            asset_id = UUID(body.asset_id)
-        except ValueError:
-            raise_api_error(
-                422, f"Ungültige asset_id: {body.asset_id}",
-                code="VALIDATION_ERROR",
-            )
-    if asset_id is None and body.source_job_id:
-        src = await session.execute(
-            select(GenerationJob).where(GenerationJob.id == body.source_job_id)
-        )
-        src_job = src.scalar_one_or_none()
-        if src_job and src_job.asset_id:
-            asset_id = src_job.asset_id
-    if asset_id is None:
-        aid = _extract_asset_id_from_url(body.source_image_url)
-        if aid:
-            asset_id = aid
+    asset_id = await resolve_asset_id(
+        body.asset_id, body.source_job_id, body.source_image_url, session
+    )
 
     job = GenerationJob(
         job_type="mesh",

@@ -9,12 +9,12 @@ from typing import Any
 
 from gradio_client import Client, handle_file
 
+from app.core.config import settings
 from app.services.mesh_providers.base import MeshProvider
 
 logger = logging.getLogger(__name__)
 
 TRIPOSR_SPACE = "stabilityai/TripoSR"
-MESH_TIMEOUT_SEC = 300
 
 
 class TripoSRProvider(MeshProvider):
@@ -53,18 +53,7 @@ class TripoSRProvider(MeshProvider):
             mc_resolution=mc_resolution,
             api_name="/predict",
         )
-        if result is None:
-            return None
-        if isinstance(result, (list, tuple)):
-            for item in result:
-                if item and isinstance(item, str) and (
-                    item.endswith(".glb") or item.endswith(".obj")
-                ):
-                    return str(item)
-            if result and result[0]:
-                return str(result[0])
-            return None
-        return str(result) if result else None
+        return self._extract_glb_path(result)
 
     async def generate(self, image_path: str, params: dict[str, Any]) -> str:
         mc_resolution = params.get(
@@ -78,7 +67,7 @@ class TripoSRProvider(MeshProvider):
             asyncio.to_thread(
                 self._run_predict, image_path, mc_resolution, hf_token
             ),
-            timeout=MESH_TIMEOUT_SEC,
+            timeout=settings.MESH_GENERATION_TIMEOUT_S,
         )
 
         if not glb_path or not Path(glb_path).exists():

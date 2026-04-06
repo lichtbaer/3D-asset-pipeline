@@ -3,6 +3,7 @@ Zentraler Job-Service für GenerationJob-Status-Updates.
 Konsolidiert pending → running → done/failed Logik.
 """
 
+import asyncio
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -15,6 +16,11 @@ from app.database import async_session_factory
 from app.models import GenerationJob
 from app.models.enums import JobStatus
 from app.services import asset_service
+
+# Serialisiert den get_or_create_asset_id + asset_id-Update Block.
+# Verhindert, dass zwei gleichzeitig abgeschlossene Jobs ohne asset_id
+# jeweils ein eigenes Asset-Verzeichnis anlegen.
+_asset_create_lock = asyncio.Lock()
 
 # Job-Typen die result_url nutzen (Image, BgRemoval, Sketchfab)
 _RESULT_URL_JOB_TYPES = frozenset({"image", "bgremoval", "sketchfab_upload"})
@@ -57,11 +63,12 @@ async def _persist_job_completion(job_id: str) -> None:
             if aid:
                 asset_id_str = str(aid)
 
-        asset_id = asset_service.get_or_create_asset_id(asset_id_str)
+        async with _asset_create_lock:
+            asset_id = asset_service.get_or_create_asset_id(asset_id_str)
 
-        if job.asset_id != UUID(asset_id):
-            job.asset_id = UUID(asset_id)
-            await session.commit()
+            if job.asset_id != UUID(asset_id):
+                job.asset_id = UUID(asset_id)
+                await session.commit()
 
         if job.job_type == "image" and job.result_url:
             await asset_service.persist_image_job(

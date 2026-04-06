@@ -87,10 +87,10 @@ class PicsArtImageProvider(ImageProvider):
         if not api_key:
             raise RuntimeError("PICSART_API_KEY nicht konfiguriert")
 
-        width = params.get("width", 1024)
-        height = params.get("height", 1024)
+        width = max(256, min(2048, int(params.get("width", 1024))))
+        height = max(256, min(2048, int(params.get("height", 1024))))
         negative_prompt = params.get("negative_prompt")
-        count = params.get("count", 1)
+        count = max(1, min(4, int(params.get("count", 1))))
 
         request_body: dict[str, Any] = {
             "prompt": prompt,

@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import APIRouter, Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -18,6 +20,7 @@ from app.core.security import verify_api_key
 from app.database import check_db_connection
 from app.logging_config import setup_logging
 from app.routers import agents, assets, generation, presets, providers_health, sketchfab, storage, texture_bake
+from app.services.pipeline_orchestrator import cleanup_old_pipeline_runs
 
 setup_logging()
 
@@ -30,7 +33,15 @@ IMAGE_STORAGE_PATH.mkdir(parents=True, exist_ok=True)
 
 _api_auth = [Depends(verify_api_key)]
 
-app = FastAPI(title="Purzel ML Asset Pipeline API")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Startup- und Shutdown-Handler."""
+    await cleanup_old_pipeline_runs()
+    yield
+
+
+app = FastAPI(title="Purzel ML Asset Pipeline API", lifespan=lifespan)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
 

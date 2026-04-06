@@ -6,6 +6,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
+from app.models.enums import JobStatus
 
 
 class GenerationJob(Base):
@@ -17,7 +18,7 @@ class GenerationJob(Base):
         default=uuid.uuid4,
     )
     job_type: Mapped[str] = mapped_column(String(50), nullable=False)
-    status: Mapped[str] = mapped_column(String(50), nullable=False)
+    status: Mapped[JobStatus] = mapped_column(String(50), nullable=False)
     prompt: Mapped[str] = mapped_column(Text, nullable=False)
     provider_key: Mapped[str] = mapped_column(String(100), nullable=False)
     result_url: Mapped[str | None] = mapped_column(Text, nullable=True)

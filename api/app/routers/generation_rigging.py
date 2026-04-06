@@ -15,8 +15,8 @@ from app.providers.rigging import (
     list_rigging_providers,
 )
 from app.routers._generation_helpers import (
-    _extract_asset_id_from_url,
     _update_glb_job,
+    resolve_asset_id,
 )
 from app.schemas.generation import (
     RiggingGenerateRequest,
@@ -58,19 +58,9 @@ async def create_rigging(
     except ValueError:
         raise_api_error(422, f"Unbekannter provider_key: {body.provider_key}", code="UNKNOWN_PROVIDER")
 
-    asset_id: UUID | None = None
-    if body.asset_id:
-        try:
-            asset_id = UUID(body.asset_id)
-        except ValueError:
-            raise_api_error(
-                422, f"Ungültige asset_id: {body.asset_id}",
-                code="VALIDATION_ERROR",
-            )
-    if asset_id is None:
-        aid = _extract_asset_id_from_url(body.source_glb_url)
-        if aid:
-            asset_id = aid
+    asset_id = await resolve_asset_id(
+        body.asset_id, None, body.source_glb_url, session
+    )
 
     job = GenerationJob(
         job_type="rigging",
@@ -94,6 +84,55 @@ async def create_rigging(
     )
 
     return RiggingGenerateResponse(job_id=job.id, status="pending")
+
+
+@router.post("/rigging/retry/{job_id}", response_model=RiggingGenerateResponse, status_code=202)
+async def retry_rigging_job(
+    job_id: UUID,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),
+):
+    """Erstellt neuen Job mit gleichen Parametern wie fehlgeschlagener Job."""
+    result = await session.execute(
+        select(GenerationJob).where(
+            GenerationJob.id == job_id,
+            GenerationJob.job_type == "rigging",
+        )
+    )
+    job = result.scalar_one_or_none()
+    if not job:
+        raise_api_error(404, "Job nicht gefunden", code="JOB_NOT_FOUND")
+    if job.status != "failed":
+        raise_api_error(400, "Nur fehlgeschlagene Jobs können erneut versucht werden", code="INVALID_STATE")
+
+    source_glb_url = job.source_image_url or ""
+    if not source_glb_url:
+        raise_api_error(400, "Quell-GLB-URL fehlt für Retry", code="MISSING_SOURCE")
+
+    provider_key = job.provider_key or "unirig"
+
+    new_job = GenerationJob(
+        job_type="rigging",
+        status="pending",
+        prompt="[rigging]",
+        provider_key=provider_key,
+        source_image_url=source_glb_url,
+        asset_id=job.asset_id,
+    )
+    session.add(new_job)
+    await session.commit()
+    await session.refresh(new_job)
+
+    background_tasks.add_task(
+        run_rigging,
+        str(new_job.id),
+        source_glb_url,
+        provider_key,
+        str(job.asset_id) if job.asset_id else None,
+        _update_glb_job,
+    )
+
+    return RiggingGenerateResponse(job_id=new_job.id, status="pending")
 
 
 @router.get("/rigging/{job_id}", response_model=RiggingJobStatusResponse)

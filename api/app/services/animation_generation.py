@@ -6,6 +6,7 @@ import logging
 import os
 
 from app.config.storage import ANIMATION_STORAGE_PATH
+from app.core.config import settings
 from app.logging_utils import log_job_error
 from app.models.enums import JobStatus
 from app.providers.animation import (
@@ -68,7 +69,7 @@ async def run_animation(
         )
         result = await asyncio.wait_for(
             provider.animate(params),
-            timeout=300,
+            timeout=settings.ANIMATION_TIMEOUT_S,
         )
 
     if result is None:

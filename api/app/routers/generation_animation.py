@@ -17,8 +17,8 @@ from app.providers.animation import (
     list_animation_providers,
 )
 from app.routers._generation_helpers import (
-    _extract_asset_id_from_url,
     _update_glb_job,
+    resolve_asset_id,
 )
 from app.schemas.generation import (
     AnimationGenerateRequest,
@@ -89,19 +89,9 @@ async def create_animation(
     except ValueError:
         raise_api_error(422, f"Unbekannter provider_key: {body.provider_key}", code="UNKNOWN_PROVIDER")
 
-    asset_id: UUID | None = None
-    if body.asset_id:
-        try:
-            asset_id = UUID(body.asset_id)
-        except ValueError:
-            raise_api_error(
-                422, f"Ungültige asset_id: {body.asset_id}",
-                code="VALIDATION_ERROR",
-            )
-    if asset_id is None:
-        aid = _extract_asset_id_from_url(body.source_glb_url)
-        if aid:
-            asset_id = aid
+    asset_id = await resolve_asset_id(
+        body.asset_id, None, body.source_glb_url, session
+    )
 
     job = GenerationJob(
         job_type="animation",
