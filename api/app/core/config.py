@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     # Timeouts (Sekunden)
     IMAGE_DOWNLOAD_TIMEOUT_S: int = 60
     MESH_GENERATION_TIMEOUT_S: int = 300
+    RIGGING_TIMEOUT_S: int = 300
+    ANIMATION_TIMEOUT_S: int = 300
+    PIPELINE_JOB_TIMEOUT_S: float = 600.0
 
     # Max. Dateigröße für heruntergeladene Bilder (Bytes)
     IMAGE_DOWNLOAD_MAX_SIZE: int = 50 * 1024 * 1024  # 50 MB

@@ -14,6 +14,7 @@ from uuid import UUID
 
 from sqlalchemy import select
 
+from app.core.config import settings
 from app.database import async_session_factory
 from app.models import GenerationJob
 from app.models.enums import JobStatus
@@ -36,9 +37,8 @@ from app.services.rigging_generation import run_rigging
 
 logger = logging.getLogger(__name__)
 
-# Poll-Intervall und Timeout für Job-Warten
+# Poll-Intervall für Job-Warten
 _POLL_INTERVAL = 3.0    # Sekunden
-_JOB_TIMEOUT = 600.0    # 10 Minuten pro Schritt
 
 # In-memory Store für Pipeline-Run-Status (indexed by pipeline_run_id)
 _pipeline_runs: dict[str, PipelineRunStatus] = {}
@@ -55,7 +55,7 @@ async def _wait_for_job(job_id: str) -> dict[str, Any] | None:
     Gibt Job-Daten als Dict zurück oder None bei Timeout.
     """
     elapsed = 0.0
-    while elapsed < _JOB_TIMEOUT:
+    while elapsed < settings.PIPELINE_JOB_TIMEOUT_S:
         async with async_session_factory() as session:
             result = await session.execute(
                 select(GenerationJob).where(GenerationJob.id == UUID(job_id))
@@ -81,7 +81,7 @@ async def _wait_for_job(job_id: str) -> dict[str, Any] | None:
         await asyncio.sleep(_POLL_INTERVAL)
         elapsed += _POLL_INTERVAL
 
-    logger.warning("Job %s hat Timeout nach %.0fs erreicht", job_id, _JOB_TIMEOUT)
+    logger.warning("Job %s hat Timeout nach %.0fs erreicht", job_id, settings.PIPELINE_JOB_TIMEOUT_S)
     return None
 
 

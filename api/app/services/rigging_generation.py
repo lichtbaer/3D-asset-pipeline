@@ -5,14 +5,13 @@ import asyncio
 import logging
 
 from app.config.storage import MESH_STORAGE_PATH
+from app.core.config import settings
 from app.models.enums import JobStatus
 from app.providers.rigging import get_rigging_provider
 from app.providers.rigging.base import RiggingParams
 from app.services.job_error_handler import UpdateJobCallback, handle_provider_errors
 
 logger = logging.getLogger(__name__)
-
-RIGGING_TIMEOUT_SEC = 300
 
 
 async def run_rigging(
@@ -36,7 +35,7 @@ async def run_rigging(
     ):
         result = await asyncio.wait_for(
             provider.rig(params),
-            timeout=RIGGING_TIMEOUT_SEC,
+            timeout=settings.RIGGING_TIMEOUT_S,
         )
 
     if result is None:

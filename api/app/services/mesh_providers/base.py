@@ -35,3 +35,22 @@ class MeshProvider(ABC):
         Wird an Frontend für dynamisches Formular zurückgegeben.
         """
         ...
+
+    @staticmethod
+    def _extract_glb_path(result: Any) -> str | None:
+        """
+        Extrahiert den GLB/OBJ-Pfad aus einem Gradio-Ergebnis.
+        Gradio gibt je nach Space ein str, list oder tuple zurück.
+        """
+        if result is None:
+            return None
+        if isinstance(result, (list, tuple)):
+            for item in result:
+                if item and isinstance(item, str) and (
+                    item.endswith(".glb") or item.endswith(".obj")
+                ):
+                    return str(item)
+            if result and result[0]:
+                return str(result[0])
+            return None
+        return str(result) if result else None
