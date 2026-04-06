@@ -2,6 +2,8 @@
 
 Modularer Experimentierrahmen für KI-gestützte 3D Asset-Erzeugung.
 
+**Vollständige Dokumentation (MkDocs):** `pip install -r requirements-docs.txt`, dann `python3 -m mkdocs serve` (Standard: http://127.0.0.1:8001). Die Quellen liegen in [`docs/`](docs/).
+
 ## Quick Start
 
 ```bash
@@ -78,3 +80,5 @@ Für lokales Rigging ohne Hugging Face Space (keine externe Abhängigkeit, gerin
 4. **Docker mit GPU:** In `docker-compose.yml` den GPU-Block für den API-Service aktivieren (siehe Kommentar).
 
 Ohne CUDA oder fehlendem Checkpoint wird der Provider `unirig-local` nicht registriert; der Server startet trotzdem.
+
+Details zu UniRig und weiteren Themen: siehe die [MkDocs-Dokumentation](docs/index.md) bzw. `python3 -m mkdocs serve`.

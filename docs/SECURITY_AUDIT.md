@@ -6,7 +6,7 @@ Dieses Dokument dokumentiert die Ergebnisse von `pip-audit` fÃ¼r die Python-AbhÃ
 
 ```bash
 cd api
-pip-audit -l --format=json > docs/pip-audit-results.json
+pip-audit -l --format=json > ../docs/pip-audit-results.json
 pip-audit -l   # Summary in der Konsole
 ```
 

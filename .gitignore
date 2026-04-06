@@ -21,6 +21,9 @@ dist/
 coverage/
 docs/pip-audit-results.json
 
+# MkDocs
+site/
+
 # IDE
 .idea/
 .vscode/

@@ -1,0 +1,58 @@
+site_name: Purzel ML Asset Pipeline
+site_description: Dokumentation zur Purzel ML Asset Pipeline
+docs_dir: docs
+site_dir: site
+# Vermeidet Kollision mit der FastAPI-Instanz auf Port 8000
+dev_addr: 127.0.0.1:8001
+
+theme:
+  name: material
+  language: de
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Dunkles Design
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Helles Design
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.expand
+    - navigation.sections
+    - toc.follow
+    - content.code.copy
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - toc:
+      permalink: true
+
+nav:
+  - Start: index.md
+  - Erste Schritte: getting-started.md
+  - Architektur: architecture.md
+  - Backend: backend.md
+  - Frontend: frontend.md
+  - Konfiguration: configuration.md
+  - UniRig lokal: unirig-local.md
+  - API-Referenz: api-reference.md
+  - Konventionen (Agenten): agents.md
+  - Projekt & Qualität:
+      - Technical Debt: TECHNICAL_DEBT.md
+      - Security Audit: SECURITY_AUDIT.md
+      - UX Improvement Plan: UX_IMPROVEMENT_PLAN.md
+      - Design & UX Review: DESIGN_UX_REVIEW.md
+      - Improvement Proposals: IMPROVEMENT_PROPOSALS.md
+      - Blender Rigging PoC: BLENDER_RIGGING_POC.md
