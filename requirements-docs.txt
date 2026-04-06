@@ -1,0 +1,2 @@
+# Lokale / CI-Dokumentation (MkDocs). Nicht Teil des API-Images.
+mkdocs-material>=9.5,<10
