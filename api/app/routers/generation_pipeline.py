@@ -33,7 +33,7 @@ async def start_pipeline(
     Gibt sofort eine pipeline_run_id zurück. Status kann per GET /pipeline/{run_id}
     oder per SSE-Stream GET /pipeline/{run_id}/stream abgefragt werden.
     """
-    run_response = create_pipeline_run(body)
+    run_response = await create_pipeline_run(body)
     background_tasks.add_task(run_pipeline, run_response.pipeline_run_id, body)
     return run_response
 
@@ -41,7 +41,7 @@ async def start_pipeline(
 @router.get("/pipeline/{pipeline_run_id}", response_model=PipelineRunStatus)
 async def get_pipeline_status(pipeline_run_id: str) -> PipelineRunStatus:
     """Gibt den aktuellen Status eines Pipeline-Runs zurück."""
-    run = get_pipeline_run(pipeline_run_id)
+    run = await get_pipeline_run(pipeline_run_id)
     if run is None:
         raise_api_error(404, f"Pipeline-Run {pipeline_run_id} nicht gefunden", code="NOT_FOUND")
     return run
@@ -57,7 +57,7 @@ async def _stream_pipeline_events(pipeline_run_id: str) -> AsyncGenerator[str, N
     last_payload: str | None = None
 
     while elapsed < _PIPELINE_STREAM_TIMEOUT:
-        run = get_pipeline_run(pipeline_run_id)
+        run = await get_pipeline_run(pipeline_run_id)
 
         if run is None:
             payload = json.dumps({"error": "Pipeline-Run nicht gefunden", "pipeline_run_id": pipeline_run_id})
@@ -106,7 +106,7 @@ async def stream_pipeline_status(pipeline_run_id: str):
 
     Sendet bei jeder Änderung ein Event bis die Pipeline abgeschlossen ist.
     """
-    run = get_pipeline_run(pipeline_run_id)
+    run = await get_pipeline_run(pipeline_run_id)
     if run is None:
         raise_api_error(404, f"Pipeline-Run {pipeline_run_id} nicht gefunden", code="NOT_FOUND")
 
